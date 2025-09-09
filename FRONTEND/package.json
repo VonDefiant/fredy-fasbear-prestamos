@@ -1,0 +1,15 @@
+{
+  "name": "fredy-fasbear-frontend",
+  "version": "1.0.0",
+  "description": "Frontend PWA para Sistema de Préstamos Pignoraticios",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 3000",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "keywords": ["nuxt", "vue", "pwa", "primevue", "tailwind"],
+  "author": "Fredy Fasbear Industries",
+  "license": "MIT"
+}
