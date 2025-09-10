@@ -1,16 +1,20 @@
+<!-- 
+  Archivo: components/common/HomePage.vue
+  Componente principal de la página de inicio
+-->
 <template>
   <div class="homepage">
     <!-- Header -->
     <header class="header">
       <nav class="nav-container">
-        <NuxtLink to="/dashboard" class="logo">
-          <img src="~/assets/images/logo.png" alt="Logo">
+        <NuxtLink to="/" class="logo">
+          <img src="~/assets/images/logo.png" alt="Logo" />
         </NuxtLink>
         
         <ul class="nav-menu" :class="{ show: mobileMenuOpen }">
           <li><NuxtLink to="/empeno" @click="closeMobileMenu">Empeño</NuxtLink></li>
           <li><NuxtLink to="/tienda" @click="closeMobileMenu">Tienda</NuxtLink></li>
-          <li><NuxtLink to="/cuenta" @click="closeMobileMenu">Mi Cuenta</NuxtLink></li>
+          <li><NuxtLink to="/dashboard" @click="closeMobileMenu">Mi Cuenta</NuxtLink></li>
         </ul>
 
         <button class="mobile-menu-btn" @click="toggleMobileMenu">
@@ -67,10 +71,10 @@
             </NuxtLink>
           </div>
         </div>
+      </div>
 
-        <div class="hero-image" v-if="!isMobile">
-          <div class="banner-image"></div>
-        </div>
+      <div class="banner-section" v-if="!isMobile">
+        <img src="~/assets/images/banner.png" alt="Banner" class="banner-image" />
       </div>
     </section>
 
@@ -92,15 +96,7 @@
 </template>
 
 <script setup>
-// Meta tags
-useHead({
-  title: 'Empeña y Compra con Confianza - Freddy Fasbear',
-  meta: [
-    { name: 'description', content: 'Te brindamos préstamos por tus artículos y precios accesibles en tus compras.' }
-  ]
-})
-
-// Estado reactivo
+// Reactive data
 const mobileMenuOpen = ref(false)
 const isMobile = ref(false)
 
@@ -144,7 +140,7 @@ const features = ref([
   }
 ])
 
-// Métodos
+// Methods
 const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value
 }
@@ -162,15 +158,15 @@ const checkMobile = () => {
 const handleScroll = () => {
   if (process.client) {
     const header = document.querySelector('.header')
-    if (header && window.scrollY > 100) {
+    if (window.scrollY > 100) {
       header.style.background = 'linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(26, 26, 26, 0.95))'
-    } else if (header) {
+    } else {
       header.style.background = 'linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%)'
     }
   }
 }
 
-// Lifecycle
+// Lifecycle con Nuxt
 onMounted(() => {
   checkMobile()
   if (process.client) {
@@ -188,16 +184,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
+/* Todos los estilos de la página principal */
 .homepage {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  line-height: 1.6;
-  color: #1A1A1A;
   overflow-x: hidden;
 }
 
@@ -211,6 +199,7 @@ onUnmounted(() => {
   z-index: 1000;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+  transition: background 0.3s ease;
 }
 
 .nav-container {
@@ -281,6 +270,7 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #2C3E50 0%, #4A4A4A 50%, #1A1A1A 100%);
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   position: relative;
   overflow: hidden;
@@ -302,15 +292,14 @@ onUnmounted(() => {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 2rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4rem;
-  align-items: center;
   position: relative;
   z-index: 2;
 }
 
 .hero-content {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
   animation: slideInLeft 1s ease-out;
 }
 
@@ -342,6 +331,7 @@ onUnmounted(() => {
   display: flex;
   gap: 1.5rem;
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .btn {
@@ -383,19 +373,18 @@ onUnmounted(() => {
   transform: translateY(-2px);
 }
 
-.hero-image {
+.banner-section {
+  width: 100%;
+  margin-top: 4rem;
   position: relative;
-  animation: slideInRight 1s ease-out;
+  z-index: 2;
 }
 
 .banner-image {
   width: 100%;
-  height: 500px;
-  background-image: url('~/assets/images/banner.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  border-radius: 20px;
+  height: 400px;
+  object-fit: cover;
+  object-position: center;
   box-shadow: 0 20px 40px rgba(0,0,0,0.3);
 }
 
@@ -495,17 +484,6 @@ onUnmounted(() => {
   }
 }
 
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(50px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
 @keyframes float {
   0%, 100% {
     transform: translateY(0px);
@@ -537,13 +515,7 @@ onUnmounted(() => {
     display: block;
   }
 
-  .hero-container {
-    grid-template-columns: 1fr;
-    gap: 2rem;
-    text-align: center;
-  }
-
-  .hero-image {
+  .banner-section {
     display: none;
   }
 
@@ -553,10 +525,6 @@ onUnmounted(() => {
 
   .hero-description {
     font-size: 1rem;
-  }
-
-  .cta-buttons {
-    justify-content: center;
   }
 
   .btn {
@@ -575,20 +543,22 @@ onUnmounted(() => {
   .nav-container {
     padding: 0 1rem;
   }
+
+  .cta-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .btn {
+    width: 100%;
+    max-width: 300px;
+    justify-content: center;
+  }
 }
 
 @media (max-width: 480px) {
   .hero-title {
     font-size: 2rem;
-  }
-
-  .cta-buttons {
-    flex-direction: column;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
   }
 }
 </style>
