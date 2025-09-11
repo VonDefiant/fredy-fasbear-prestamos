@@ -25,7 +25,7 @@
       <div class="auth-header">
         <NuxtLink to="/" class="logo-link">
           <div class="logo">
-<img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
+            <img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
             <h1>Fredy Fasbear</h1>
           </div>
         </NuxtLink>
@@ -434,7 +434,13 @@ const registerForm = ref({
 
 // Computed
 const isRegisterFormValid = computed(() => {
-  return registerForm.value.password === registerForm.value.confirmPassword &&
+  return registerForm.value.nombre.trim() &&
+         registerForm.value.apellido.trim() &&
+         registerForm.value.email.trim() &&
+         registerForm.value.telefono.trim() &&
+         registerForm.value.cedula.trim() &&
+         registerForm.value.direccion.trim() &&
+         registerForm.value.password === registerForm.value.confirmPassword &&
          registerForm.value.password.length >= 8 &&
          registerForm.value.acceptTerms
 })
@@ -450,6 +456,7 @@ const clearMessages = () => {
   registerMessage.value = { text: '', type: '' }
 }
 
+// ===== FUNCIONES CONECTADAS AL BACKEND REAL =====
 const handleLogin = async () => {
   clearMessages()
   loginLoading.value = true
@@ -460,45 +467,56 @@ const handleLogin = async () => {
       throw new Error('Por favor completa todos los campos')
     }
 
-    console.log('Intentando login:', {
+    console.log('🔐 Intentando login con backend real...', {
       email: loginForm.value.email,
-      remember: loginForm.value.remember,
-      tipo_usuario: 'Cliente'
+      remember: loginForm.value.remember
     })
 
-    // Aquí harías la llamada real a tu API
-    /*
-    const { $api } = useNuxtApp()
-    const response = await $api.post('/auth/login', {
-      email: loginForm.value.email,
-      password: loginForm.value.password,
-      remember: loginForm.value.remember,
-      tipo_usuario: 'Cliente'
+    // Llamada real a tu API
+    const { api } = useApi()
+    const response = await api('/auth/login', {
+      method: 'POST',
+      body: {
+        email: loginForm.value.email,
+        password: loginForm.value.password,
+        remember: loginForm.value.remember
+      }
     })
     
-    if (response.token) {
-      // Guardar token y datos del usuario
-      // Redirigir al dashboard del cliente
-      await navigateTo('/dashboard')
-    }
-    */
+    console.log('✅ Respuesta del backend:', response)
 
-    // Simulación temporal
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    loginMessage.value = {
-      text: 'Inicio de sesión exitoso. Redirigiendo...',
-      type: 'success'
-    }
+    if (response.success && response.data.token) {
+      // Usar el composable de auth para guardar los datos
+      const { login } = useAuth()
+      login(response.data.token, response.data.user, loginForm.value.remember)
+      
+      loginMessage.value = {
+        text: 'Inicio de sesión exitoso. Redirigiendo...',
+        type: 'success'
+      }
 
-    // Simular redirección después de 1 segundo
-    setTimeout(() => {
-      navigateTo('/dashboard')
-    }, 1000)
+      // Redirigir al dashboard después de 1 segundo
+      setTimeout(() => {
+        navigateTo('/dashboard')
+      }, 1000)
+    } else {
+      throw new Error(response.message || 'Error en la respuesta del servidor')
+    }
 
   } catch (error) {
+    console.error('❌ Error en login:', error)
+    
+    // Manejar diferentes tipos de errores
+    let errorMessage = 'Error al iniciar sesión. Verifica tus credenciales.'
+    
+    if (error.data?.message) {
+      errorMessage = error.data.message
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
     loginMessage.value = {
-      text: error.message || 'Error al iniciar sesión. Verifica tus credenciales.',
+      text: errorMessage,
       type: 'error'
     }
   } finally {
@@ -520,59 +538,85 @@ const handleRegister = async () => {
       throw new Error('Las contraseñas no coinciden')
     }
 
-    console.log('Creando cuenta de cliente:', {
-      ...registerForm.value,
-      password: '[HIDDEN]',
-      confirmPassword: '[HIDDEN]',
-      tipo_usuario: 'Cliente'
-    })
+    if (registerForm.value.password.length < 8) {
+      throw new Error('La contraseña debe tener al menos 8 caracteres')
+    }
 
-    // Aquí harías la llamada real a tu API
-    /*
-    const { $api } = useNuxtApp()
-    const response = await $api.post('/auth/register', {
+    if (!registerForm.value.acceptTerms) {
+      throw new Error('Debes aceptar los términos y condiciones')
+    }
+
+    console.log('👤 Creando cuenta con backend real...', {
       nombre: registerForm.value.nombre,
       apellido: registerForm.value.apellido,
       email: registerForm.value.email,
       telefono: registerForm.value.telefono,
       cedula: registerForm.value.cedula,
       direccion: registerForm.value.direccion,
-      password: registerForm.value.password,
-      tipo_usuario: 'Cliente'
+      tipoUsuario: 'Cliente'
+    })
+
+    // Llamada real a tu API
+    const { api } = useApi()
+    const response = await api('/auth/register', {
+      method: 'POST',
+      body: {
+        nombre: registerForm.value.nombre.trim(),
+        apellido: registerForm.value.apellido.trim(),
+        email: registerForm.value.email.toLowerCase().trim(),
+        telefono: registerForm.value.telefono.trim(),
+        cedula: registerForm.value.cedula.trim(),
+        direccion: registerForm.value.direccion.trim(),
+        password: registerForm.value.password,
+        tipoUsuario: 'Cliente'
+      }
     })
     
+    console.log('✅ Usuario registrado:', response)
+
     if (response.success) {
       registerMessage.value = {
         text: 'Cuenta creada exitosamente. Puedes iniciar sesión ahora.',
         type: 'success'
       }
       
+      // Limpiar el formulario
+      registerForm.value = {
+        nombre: '',
+        apellido: '',
+        email: '',
+        telefono: '',
+        cedula: '',
+        direccion: '',
+        password: '',
+        confirmPassword: '',
+        acceptTerms: false
+      }
+      
       // Cambiar a tab de login después de 2 segundos
       setTimeout(() => {
         setActiveTab('login')
         // Pre-llenar email en el login
-        loginForm.value.email = registerForm.value.email
+        loginForm.value.email = response.data?.user?.email || ''
       }, 2000)
+    } else {
+      throw new Error(response.message || 'Error en el registro')
     }
-    */
-
-    // Simulación temporal
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    registerMessage.value = {
-      text: 'Cuenta creada exitosamente. Puedes iniciar sesión ahora.',
-      type: 'success'
-    }
-
-    // Cambiar a tab de login después de 2 segundos
-    setTimeout(() => {
-      setActiveTab('login')
-      loginForm.value.email = registerForm.value.email
-    }, 2000)
 
   } catch (error) {
+    console.error('❌ Error en registro:', error)
+    
+    // Manejar diferentes tipos de errores
+    let errorMessage = 'Error al crear la cuenta. Inténtalo de nuevo.'
+    
+    if (error.data?.message) {
+      errorMessage = error.data.message
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+
     registerMessage.value = {
-      text: error.message || 'Error al crear la cuenta. Inténtalo de nuevo.',
+      text: errorMessage,
       type: 'error'
     }
   } finally {
