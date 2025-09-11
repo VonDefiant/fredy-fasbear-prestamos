@@ -1,9 +1,9 @@
-// BACKEND/src/routes/auth.routes.js
 import express from 'express';
 import authController from '../controllers/auth.controller.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
-
+import { PrismaClient } from '@prisma/client'; 
+const prisma = new PrismaClient();  // AGREGAR ESTA LÍNEA
 const router = express.Router();
 
 // Rate limiting para login/register

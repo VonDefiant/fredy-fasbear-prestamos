@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
 
-// Generar JWT
+// Generar JWT usando variables de entorno
 const generateToken = (user) => {
   return jwt.sign(
     {
@@ -13,14 +13,14 @@ const generateToken = (user) => {
       email: user.email,
       tipoUsuario: user.tipoUsuario
     },
-    process.env.JWT_SECRET || 'tu_clave_secreta_aqui',
-    { expiresIn: '7d' }
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN }
   );
 };
 
-// Formatear datos del usuario
+// Formatear datos del usuario (remover passwordHash)
 const formatUserResponse = (user) => {
-  const { password, ...userWithoutPassword } = user;
+  const { passwordHash, ...userWithoutPassword } = user;
   return userWithoutPassword;
 };
 
@@ -39,6 +39,8 @@ const authController = {
         tipoUsuario = 'Cliente',
         fechaNacimiento
       } = req.body;
+
+      console.log('[AUTH] Iniciando registro de usuario:', email);
 
       // Validaciones básicas
       if (!nombre || !apellido || !email || !password || !cedula) {
@@ -66,6 +68,7 @@ const authController = {
       });
 
       if (existingUser) {
+        console.log('[AUTH] Usuario ya existe:', email);
         return res.status(400).json({
           success: false,
           message: existingUser.email === email.toLowerCase() 
@@ -78,7 +81,9 @@ const authController = {
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-      // Crear usuario
+      console.log('[AUTH] Creando usuario en base de datos...');
+
+      // Crear usuario (usando passwordHash como está en el schema)
       const newUser = await prisma.usuario.create({
         data: {
           nombre: nombre.trim(),
@@ -87,7 +92,7 @@ const authController = {
           telefono,
           cedula,
           direccion,
-          password: hashedPassword,
+          passwordHash: hashedPassword, // Campo correcto según schema
           tipoUsuario,
           fechaNacimiento: fechaNacimiento ? new Date(fechaNacimiento) : null,
           estado: 'Activo'
@@ -97,7 +102,7 @@ const authController = {
       // Generar token
       const token = generateToken(newUser);
 
-      console.log(`✅ Usuario registrado: ${newUser.email}`);
+      console.log('[AUTH] Usuario registrado exitosamente:', newUser.email);
 
       res.status(201).json({
         success: true,
@@ -109,7 +114,7 @@ const authController = {
       });
 
     } catch (error) {
-      console.error('❌ Error en registro:', error);
+      console.error('[ERROR] Error en registro:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
@@ -122,6 +127,8 @@ const authController = {
   login: async (req, res) => {
     try {
       const { email, password, remember = false } = req.body;
+
+      console.log('[AUTH] Intento de login:', email);
 
       // Validaciones básicas
       if (!email || !password) {
@@ -139,6 +146,7 @@ const authController = {
       });
 
       if (!user) {
+        console.log('[AUTH] Usuario no encontrado:', email);
         return res.status(401).json({
           success: false,
           message: 'Credenciales inválidas'
@@ -147,15 +155,17 @@ const authController = {
 
       // Verificar estado del usuario
       if (user.estado !== 'Activo') {
+        console.log('[AUTH] Usuario inactivo:', email);
         return res.status(401).json({
           success: false,
           message: 'Cuenta inactiva. Contacta al administrador'
         });
       }
 
-      // Verificar contraseña
-      const isPasswordValid = await bcrypt.compare(password, user.password);
+      // Verificar contraseña (usando passwordHash)
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       if (!isPasswordValid) {
+        console.log('[AUTH] Contraseña incorrecta para:', email);
         return res.status(401).json({
           success: false,
           message: 'Credenciales inválidas'
@@ -169,18 +179,18 @@ const authController = {
       });
 
       // Generar token con duración según "remember"
-      const tokenExpiry = remember ? '30d' : '7d';
+      const tokenExpiry = remember ? '30d' : process.env.JWT_EXPIRES_IN;
       const token = jwt.sign(
         {
           id: user.id,
           email: user.email,
           tipoUsuario: user.tipoUsuario
         },
-        process.env.JWT_SECRET || 'tu_clave_secreta_aqui',
+        process.env.JWT_SECRET,
         { expiresIn: tokenExpiry }
       );
 
-      console.log(`✅ Login exitoso: ${user.email}`);
+      console.log('[AUTH] Login exitoso:', user.email);
 
       res.status(200).json({
         success: true,
@@ -193,7 +203,7 @@ const authController = {
       });
 
     } catch (error) {
-      console.error('❌ Error en login:', error);
+      console.error('[ERROR] Error en login:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
@@ -233,7 +243,7 @@ const authController = {
       });
 
     } catch (error) {
-      console.error('❌ Error obteniendo perfil:', error);
+      console.error('[ERROR] Error obteniendo perfil:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -257,7 +267,7 @@ const authController = {
         }
       });
 
-      console.log(`✅ Perfil actualizado: ${updatedUser.email}`);
+      console.log('[AUTH] Perfil actualizado:', updatedUser.email);
 
       res.status(200).json({
         success: true,
@@ -268,7 +278,7 @@ const authController = {
       });
 
     } catch (error) {
-      console.error('❌ Error actualizando perfil:', error);
+      console.error('[ERROR] Error actualizando perfil:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -301,8 +311,8 @@ const authController = {
         where: { id: userId }
       });
 
-      // Verificar contraseña actual
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      // Verificar contraseña actual (usando passwordHash)
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
       if (!isCurrentPasswordValid) {
         return res.status(400).json({
           success: false,
@@ -313,13 +323,13 @@ const authController = {
       // Encriptar nueva contraseña
       const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
-      // Actualizar contraseña
+      // Actualizar contraseña (usando passwordHash)
       await prisma.usuario.update({
         where: { id: userId },
-        data: { password: hashedNewPassword }
+        data: { passwordHash: hashedNewPassword }
       });
 
-      console.log(`✅ Contraseña cambiada: ${user.email}`);
+      console.log('[AUTH] Contraseña cambiada:', user.email);
 
       res.status(200).json({
         success: true,
@@ -327,7 +337,7 @@ const authController = {
       });
 
     } catch (error) {
-      console.error('❌ Error cambiando contraseña:', error);
+      console.error('[ERROR] Error cambiando contraseña:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'
@@ -347,7 +357,7 @@ const authController = {
       });
 
     } catch (error) {
-      console.error('❌ Error en logout:', error);
+      console.error('[ERROR] Error en logout:', error);
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor'

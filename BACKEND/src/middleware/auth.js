@@ -8,7 +8,7 @@ const prisma = new PrismaClient();
 export const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1]; 
 
     if (!token) {
       return res.status(401).json({
@@ -17,8 +17,8 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Verificar token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_clave_secreta_aqui');
+    // Verificar token usando solo la variable de entorno
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Buscar usuario en base de datos
     const user = await prisma.usuario.findUnique({
@@ -58,7 +58,7 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    console.error('❌ Error en middleware de auth:', error);
+    console.error('[ERROR] Error en middleware de auth:', error);
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -95,7 +95,7 @@ export const optionalAuth = async (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_clave_secreta_aqui');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await prisma.usuario.findUnique({
         where: { id: decoded.id }
       });
