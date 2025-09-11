@@ -25,7 +25,7 @@
       <div class="auth-header">
         <NuxtLink to="/" class="logo-link">
           <div class="logo">
-          <img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
+<img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
             <h1>Fredy Fasbear</h1>
           </div>
         </NuxtLink>
