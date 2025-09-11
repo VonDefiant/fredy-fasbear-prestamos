@@ -1,139 +1,484 @@
 <template>
-  <div class="login-page">
-    <div class="login-container">
-      <!-- Logo y encabezado -->
-      <div class="login-header">
-        <h1 class="logo-text">Freddy Fasbear</h1>
-        <p class="subtitle">Sistema de Empeño</p>
+  <div class="auth-page">
+    <!-- Background decorativo -->
+    <div class="auth-background">
+      <div class="floating-shape shape-1">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="floating-shape shape-2">
+        <svg width="35" height="35" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="2" fill="none"/>
+        </svg>
+      </div>
+      <div class="floating-shape shape-3">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+          <path d="M6 3H8L12 7L16 3H18L12 11L18 21H16L12 17L8 21H6L12 11L6 3Z" fill="currentColor"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="auth-container">
+      <!-- Header con logo -->
+      <div class="auth-header">
+        <NuxtLink to="/" class="logo-link">
+          <div class="logo">
+          <img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
+            <h1>Fredy Fasbear</h1>
+          </div>
+        </NuxtLink>
+        <p class="auth-subtitle">Accede a tu cuenta o únete a nuestra familia</p>
       </div>
 
-      <!-- Formulario de login -->
-      <form @submit.prevent="handleLogin" class="login-form">
-        <h2>Iniciar Sesión</h2>
-        
-        <!-- Alert de error -->
-        <div v-if="error" class="alert alert-error">
-          {{ error }}
-        </div>
-
-        <!-- Email -->
-        <div class="form-group">
-          <label for="email" class="form-label">Correo Electrónico</label>
-          <input
-            id="email"
-            v-model="form.email"
-            type="email"
-            class="form-control"
-            placeholder="tu@email.com"
-            required
-            :disabled="loading"
-          />
-        </div>
-
-        <!-- Password -->
-        <div class="form-group">
-          <label for="password" class="form-label">Contraseña</label>
-          <input
-            id="password"
-            v-model="form.password"
-            type="password"
-            class="form-control"
-            placeholder="••••••••"
-            required
-            :disabled="loading"
-          />
-        </div>
-
-        <!-- Remember me -->
-        <div class="form-group">
-          <label class="checkbox-label">
-            <input
-              v-model="form.remember"
-              type="checkbox"
-              :disabled="loading"
-            />
-            <span class="checkmark"></span>
-            Recordarme
-          </label>
-        </div>
-
-        <!-- Submit button -->
-        <button
-          type="submit"
-          class="btn btn-primary btn-login"
-          :disabled="loading"
+      <!-- Selector de tabs -->
+      <div class="tab-selector">
+        <button 
+          class="tab-btn" 
+          :class="{ active: activeTab === 'login' }"
+          @click="setActiveTab('login')"
         >
-          <span v-if="loading" class="loading"></span>
-          {{ loading ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 3H7C5.9 3 5 3.9 5 5V19C5 20.1 5.9 21 7 21H15C16.1 21 17 20.1 17 19V5C17 3.9 16.1 3 15 3Z" stroke="currentColor" stroke-width="2" fill="none"/>
+            <path d="M10 17L15 12L10 7" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+          Iniciar Sesión
         </button>
+        <button 
+          class="tab-btn" 
+          :class="{ active: activeTab === 'register' }"
+          @click="setActiveTab('register')"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M16 21V19C16 17.9 15.1 17 14 17H10C8.9 17 8 17.9 8 19V21" stroke="currentColor" stroke-width="2" fill="none"/>
+            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+          Crear Cuenta
+        </button>
+      </div>
 
-        <!-- Links adicionales -->
-        <div class="login-links">
-          <NuxtLink to="/forgot-password" class="forgot-link">
-            ¿Olvidaste tu contraseña?
-          </NuxtLink>
+      <!-- Formularios -->
+      <div class="form-container">
+        <!-- Formulario de Login -->
+        <div v-if="activeTab === 'login'" class="form-content">
+          <form @submit.prevent="handleLogin" class="auth-form">
+            <h2>Bienvenido de vuelta</h2>
+            <p class="form-description">Ingresa tus credenciales para acceder a tu cuenta</p>
+
+            <!-- Alert de error/success -->
+            <div v-if="loginMessage.text" class="alert" :class="loginMessage.type">
+              <svg v-if="loginMessage.type === 'error'" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+                <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M22 11.08V12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C13.6569 2 15.1569 2.5 16.3856 3.35814" stroke="currentColor" stroke-width="2"/>
+                <path d="M22 4L12 14.01L9 11.01" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              {{ loginMessage.text }}
+            </div>
+
+            <div class="form-group">
+              <label for="login-email">Correo Electrónico</label>
+              <div class="input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4Z" stroke="currentColor" stroke-width="2"/>
+                  <polyline points="22,6 12,13 2,6" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input
+                  id="login-email"
+                  v-model="loginForm.email"
+                  type="email"
+                  placeholder="tu@email.com"
+                  required
+                  :disabled="loginLoading"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="login-password">Contraseña</label>
+              <div class="input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input
+                  id="login-password"
+                  v-model="loginForm.password"
+                  :type="showLoginPassword ? 'text' : 'password'"
+                  placeholder="••••••••"
+                  required
+                  :disabled="loginLoading"
+                />
+                <button 
+                  type="button" 
+                  class="password-toggle"
+                  @click="showLoginPassword = !showLoginPassword"
+                >
+                  <svg v-if="showLoginPassword" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M17.94 17.94C16.2306 19.243 14.1491 19.9649 12 20C5 20 1 12 1 12C2.24389 9.68192 4.231 7.81663 6.65 6.61L17.94 17.94Z" stroke="currentColor" stroke-width="2"/>
+                    <path d="M9.9 4.24C10.5883 4.0789 11.2931 3.99836 12 4C19 4 23 12 23 12C22.393 13.1356 21.6691 14.2048 20.84 15.19L9.9 4.24Z" stroke="currentColor" stroke-width="2"/>
+                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-options">
+              <label class="checkbox-label">
+                <input v-model="loginForm.remember" type="checkbox" :disabled="loginLoading">
+                <span class="checkmark"></span>
+                Recordarme
+              </label>
+              <NuxtLink to="/forgot-password" class="forgot-link">¿Olvidaste tu contraseña?</NuxtLink>
+            </div>
+
+            <button type="submit" class="btn btn-primary" :disabled="loginLoading">
+              <svg v-if="loginLoading" class="loading-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M15 3H7C5.9 3 5 3.9 5 5V19C5 20.1 5.9 21 7 21H15C16.1 21 17 20.1 17 19V5C17 3.9 16.1 3 15 3Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                <path d="M10 17L15 12L10 7" stroke="currentColor" stroke-width="2" fill="none"/>
+              </svg>
+              {{ loginLoading ? 'Iniciando sesión...' : 'Iniciar Sesión' }}
+            </button>
+          </form>
         </div>
-      </form>
 
-      <!-- Footer del login -->
-      <div class="login-footer">
-        <p>¿No tienes cuenta? <NuxtLink to="/register">Regístrate aquí</NuxtLink></p>
-        <NuxtLink to="/" class="back-home">← Volver al inicio</NuxtLink>
+        <!-- Formulario de Registro -->
+        <div v-if="activeTab === 'register'" class="form-content">
+          <form @submit.prevent="handleRegister" class="auth-form">
+            <h2>Únete a nosotros</h2>
+            <p class="form-description">Crea tu cuenta y empieza a disfrutar nuestros servicios</p>
+
+            <!-- Alert de error/success -->
+            <div v-if="registerMessage.text" class="alert" :class="registerMessage.type">
+              <svg v-if="registerMessage.type === 'error'" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+                <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M22 11.08V12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C13.6569 2 15.1569 2.5 16.3856 3.35814" stroke="currentColor" stroke-width="2"/>
+                <path d="M22 4L12 14.01L9 11.01" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              {{ registerMessage.text }}
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="register-name">Nombre</label>
+                <div class="input-wrapper">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21V19C20 17.9 19.1 17 18 17H6C4.9 17 4 17.9 4 19V21" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <input
+                    id="register-name"
+                    v-model="registerForm.nombre"
+                    type="text"
+                    placeholder="Juan"
+                    required
+                    :disabled="registerLoading"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="register-lastname">Apellido</label>
+                <div class="input-wrapper">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21V19C20 17.9 19.1 17 18 17H6C4.9 17 4 17.9 4 19V21" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <input
+                    id="register-lastname"
+                    v-model="registerForm.apellido"
+                    type="text"
+                    placeholder="Pérez"
+                    required
+                    :disabled="registerLoading"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="register-email">Correo Electrónico</label>
+              <div class="input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 4H20C21.1 4 22 4.9 22 6V18C22 19.1 21.1 20 20 20H4C2.9 20 2 19.1 2 18V6C2 4.9 2.9 4 4 4Z" stroke="currentColor" stroke-width="2"/>
+                  <polyline points="22,6 12,13 2,6" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input
+                  id="register-email"
+                  v-model="registerForm.email"
+                  type="email"
+                  placeholder="juan@email.com"
+                  required
+                  :disabled="registerLoading"
+                />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="register-phone">Teléfono</label>
+                <div class="input-wrapper">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M22 16.92V19C22 20.1046 21.1046 21 20 21H18C8.05888 21 0 12.9411 0 3V1C0 -0.104569 0.895431 -1 2 -1H5.08C5.63228 -1 6.10204 -0.530243 6.10204 0.0220408V2.5C6.10204 3.05228 5.63228 3.52204 5.08 3.52204H3C3 11.8366 9.16344 18 17.5 18V15.92C17.5 15.3677 17.9698 14.898 18.522 14.898H21C21.5523 14.898 22.0221 15.3677 22.0221 15.92L22 16.92Z" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <input
+                    id="register-phone"
+                    v-model="registerForm.telefono"
+                    type="tel"
+                    placeholder="+502 1234-5678"
+                    required
+                    :disabled="registerLoading"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="register-cedula">DPI</label>
+                <div class="input-wrapper">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                    <line x1="7" y1="8" x2="17" y2="8" stroke="currentColor" stroke-width="2"/>
+                    <line x1="7" y1="12" x2="13" y2="12" stroke="currentColor" stroke-width="2"/>
+                    <line x1="7" y1="16" x2="13" y2="16" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <input
+                    id="register-cedula"
+                    v-model="registerForm.cedula"
+                    type="text"
+                    placeholder="1234567890123"
+                    required
+                    :disabled="registerLoading"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="register-address">Dirección</label>
+              <div class="input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M21 10C21 17 12 23 12 23S3 17 3 10C3 5.02944 7.02944 1 12 1C16.9706 1 21 5.02944 21 10Z" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input
+                  id="register-address"
+                  v-model="registerForm.direccion"
+                  type="text"
+                  placeholder="Tu dirección completa"
+                  required
+                  :disabled="registerLoading"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="register-password">Contraseña</label>
+              <div class="input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input
+                  id="register-password"
+                  v-model="registerForm.password"
+                  :type="showRegisterPassword ? 'text' : 'password'"
+                  placeholder="••••••••"
+                  required
+                  minlength="8"
+                  :disabled="registerLoading"
+                />
+                <button 
+                  type="button" 
+                  class="password-toggle"
+                  @click="showRegisterPassword = !showRegisterPassword"
+                >
+                  <svg v-if="showRegisterPassword" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M17.94 17.94C16.2306 19.243 14.1491 19.9649 12 20C5 20 1 12 1 12C2.24389 9.68192 4.231 7.81663 6.65 6.61L17.94 17.94Z" stroke="currentColor" stroke-width="2"/>
+                    <path d="M9.9 4.24C10.5883 4.0789 11.2931 3.99836 12 4C19 4 23 12 23 12C22.393 13.1356 21.6691 14.2048 20.84 15.19L9.9 4.24Z" stroke="currentColor" stroke-width="2"/>
+                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="register-confirm-password">Confirmar Contraseña</label>
+              <div class="input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input
+                  id="register-confirm-password"
+                  v-model="registerForm.confirmPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  placeholder="••••••••"
+                  required
+                  :disabled="registerLoading"
+                />
+                <button 
+                  type="button" 
+                  class="password-toggle"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                >
+                  <svg v-if="showConfirmPassword" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M17.94 17.94C16.2306 19.243 14.1491 19.9649 12 20C5 20 1 12 1 12C2.24389 9.68192 4.231 7.81663 6.65 6.61L17.94 17.94Z" stroke="currentColor" stroke-width="2"/>
+                    <path d="M9.9 4.24C10.5883 4.0789 11.2931 3.99836 12 4C19 4 23 12 23 12C22.393 13.1356 21.6691 14.2048 20.84 15.19L9.9 4.24Z" stroke="currentColor" stroke-width="2"/>
+                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="form-options">
+              <label class="checkbox-label">
+                <input v-model="registerForm.acceptTerms" type="checkbox" required :disabled="registerLoading">
+                <span class="checkmark"></span>
+                Acepto los <NuxtLink to="/terms" target="_blank">términos y condiciones</NuxtLink>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" :disabled="registerLoading || !isRegisterFormValid">
+              <svg v-if="registerLoading" class="loading-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M16 21V19C16 17.9 15.1 17 14 17H10C8.9 17 8 17.9 8 19V21" stroke="currentColor" stroke-width="2" fill="none"/>
+                <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+              </svg>
+              {{ registerLoading ? 'Creando cuenta...' : 'Crear Cuenta' }}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="auth-footer">
+        <p>¿Problemas para acceder? <NuxtLink to="/contact">Contáctanos</NuxtLink></p>
+        <NuxtLink to="/" class="back-home">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M19 12H5M12 19L5 12L12 5" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Volver al inicio
+        </NuxtLink>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-// Meta tags para la página
+// Meta tags
 useHead({
   title: 'Iniciar Sesión',
   meta: [
-    { name: 'description', content: 'Accede a tu cuenta en Freddy Fasbear Industries' }
+    { name: 'description', content: 'Accede a tu cuenta de Fredy Fasbear Industries o crea una nueva cuenta como cliente' }
   ]
 })
 
-// Datos reactivos
-const form = ref({
+// Reactive state
+const activeTab = ref('login')
+const loginLoading = ref(false)
+const registerLoading = ref(false)
+const showLoginPassword = ref(false)
+const showRegisterPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+// Messages
+const loginMessage = ref({ text: '', type: '' })
+const registerMessage = ref({ text: '', type: '' })
+
+// Forms
+const loginForm = ref({
   email: '',
   password: '',
   remember: false
 })
 
-const loading = ref(false)
-const error = ref('')
+const registerForm = ref({
+  nombre: '',
+  apellido: '',
+  email: '',
+  telefono: '',
+  cedula: '',
+  direccion: '',
+  password: '',
+  confirmPassword: '',
+  acceptTerms: false
+})
 
-// Acceso a plugins
-const { $api } = useNuxtApp()
+// Computed
+const isRegisterFormValid = computed(() => {
+  return registerForm.value.password === registerForm.value.confirmPassword &&
+         registerForm.value.password.length >= 8 &&
+         registerForm.value.acceptTerms
+})
 
-// Método para manejar el login
+// Methods
+const setActiveTab = (tab) => {
+  activeTab.value = tab
+  clearMessages()
+}
+
+const clearMessages = () => {
+  loginMessage.value = { text: '', type: '' }
+  registerMessage.value = { text: '', type: '' }
+}
+
 const handleLogin = async () => {
-  error.value = ''
-  loading.value = true
+  clearMessages()
+  loginLoading.value = true
 
   try {
     // Validaciones básicas
-    if (!form.value.email || !form.value.password) {
+    if (!loginForm.value.email || !loginForm.value.password) {
       throw new Error('Por favor completa todos los campos')
     }
 
-    // Simular llamada a la API
-    console.log('Intentando login con:', {
-      email: form.value.email,
-      remember: form.value.remember
+    console.log('Intentando login:', {
+      email: loginForm.value.email,
+      remember: loginForm.value.remember,
+      tipo_usuario: 'Cliente'
     })
 
     // Aquí harías la llamada real a tu API
     /*
+    const { $api } = useNuxtApp()
     const response = await $api.post('/auth/login', {
-      email: form.value.email,
-      password: form.value.password,
-      remember: form.value.remember
+      email: loginForm.value.email,
+      password: loginForm.value.password,
+      remember: loginForm.value.remember,
+      tipo_usuario: 'Cliente'
     })
     
-    // Guardar token y redirigir
     if (response.token) {
-      // Guardar token en cookie/localStorage
+      // Guardar token y datos del usuario
+      // Redirigir al dashboard del cliente
       await navigateTo('/dashboard')
     }
     */
@@ -141,224 +486,537 @@ const handleLogin = async () => {
     // Simulación temporal
     await new Promise(resolve => setTimeout(resolve, 1500))
     
-    // Por ahora, simplemente mostrar éxito
-    alert('Login exitoso! (simulado)')
-    await navigateTo('/')
+    loginMessage.value = {
+      text: 'Inicio de sesión exitoso. Redirigiendo...',
+      type: 'success'
+    }
 
-  } catch (err) {
-    error.value = err.message || 'Error al iniciar sesión'
+    // Simular redirección después de 1 segundo
+    setTimeout(() => {
+      navigateTo('/dashboard')
+    }, 1000)
+
+  } catch (error) {
+    loginMessage.value = {
+      text: error.message || 'Error al iniciar sesión. Verifica tus credenciales.',
+      type: 'error'
+    }
   } finally {
-    loading.value = false
+    loginLoading.value = false
   }
 }
 
-// Limpiar error cuando el usuario empiece a escribir
-watch([() => form.value.email, () => form.value.password], () => {
-  if (error.value) {
-    error.value = ''
+const handleRegister = async () => {
+  clearMessages()
+  registerLoading.value = true
+
+  try {
+    // Validaciones
+    if (!isRegisterFormValid.value) {
+      throw new Error('Por favor completa todos los campos correctamente')
+    }
+
+    if (registerForm.value.password !== registerForm.value.confirmPassword) {
+      throw new Error('Las contraseñas no coinciden')
+    }
+
+    console.log('Creando cuenta de cliente:', {
+      ...registerForm.value,
+      password: '[HIDDEN]',
+      confirmPassword: '[HIDDEN]',
+      tipo_usuario: 'Cliente'
+    })
+
+    // Aquí harías la llamada real a tu API
+    /*
+    const { $api } = useNuxtApp()
+    const response = await $api.post('/auth/register', {
+      nombre: registerForm.value.nombre,
+      apellido: registerForm.value.apellido,
+      email: registerForm.value.email,
+      telefono: registerForm.value.telefono,
+      cedula: registerForm.value.cedula,
+      direccion: registerForm.value.direccion,
+      password: registerForm.value.password,
+      tipo_usuario: 'Cliente'
+    })
+    
+    if (response.success) {
+      registerMessage.value = {
+        text: 'Cuenta creada exitosamente. Puedes iniciar sesión ahora.',
+        type: 'success'
+      }
+      
+      // Cambiar a tab de login después de 2 segundos
+      setTimeout(() => {
+        setActiveTab('login')
+        // Pre-llenar email en el login
+        loginForm.value.email = registerForm.value.email
+      }, 2000)
+    }
+    */
+
+    // Simulación temporal
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    registerMessage.value = {
+      text: 'Cuenta creada exitosamente. Puedes iniciar sesión ahora.',
+      type: 'success'
+    }
+
+    // Cambiar a tab de login después de 2 segundos
+    setTimeout(() => {
+      setActiveTab('login')
+      loginForm.value.email = registerForm.value.email
+    }, 2000)
+
+  } catch (error) {
+    registerMessage.value = {
+      text: error.message || 'Error al crear la cuenta. Inténtalo de nuevo.',
+      type: 'error'
+    }
+  } finally {
+    registerLoading.value = false
+  }
+}
+
+// Limpiar mensajes cuando el usuario empiece a escribir
+watch([() => loginForm.value.email, () => loginForm.value.password], () => {
+  if (loginMessage.value.text) {
+    clearMessages()
+  }
+})
+
+watch([() => registerForm.value.email, () => registerForm.value.password], () => {
+  if (registerMessage.value.text) {
+    clearMessages()
   }
 })
 </script>
 
 <style scoped>
-.login-page {
+.auth-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #2C3E50 0%, #4A6741 100%);
+  background: linear-gradient(135deg, #2C3E50 0%, #4A4A4A 50%, #1A1A1A 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
+  position: relative;
+  overflow: hidden;
 }
 
-.login-container {
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+/* Background decorativo */
+.auth-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.floating-shape {
+  position: absolute;
+  opacity: 0.1;
+  color: #D4AF37;
+  animation: float 8s ease-in-out infinite;
+}
+
+.shape-1 {
+  top: 10%;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.shape-2 {
+  top: 60%;
+  right: 15%;
+  animation-delay: 3s;
+}
+
+.shape-3 {
+  bottom: 15%;
+  left: 20%;
+  animation-delay: 6s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-30px) rotate(180deg); }
+}
+
+/* Container principal */
+.auth-container {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 25px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
+  position: relative;
+  z-index: 10;
 }
 
-.login-header {
-  background: linear-gradient(135deg, #2C3E50, #1A252F);
+/* Header */
+.auth-header {
+  background: linear-gradient(135deg, #2C3E50, #1A1A1A);
   color: white;
   text-align: center;
-  padding: 2rem;
+  padding: 2.5rem 2rem;
 }
 
-.logo-text {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #D4AF37;
+.logo-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
   margin-bottom: 0.5rem;
 }
 
-.subtitle {
-  color: #ccc;
+.logo img {
+  height: 50px;
+  width: auto;
+  object-fit: contain;
+}
+
+.logo h1 {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #D4AF37;
   margin: 0;
 }
 
-.login-form {
-  padding: 2rem;
+.auth-subtitle {
+  color: #ccc;
+  margin: 0;
+  font-size: 0.95rem;
 }
 
-.login-form h2 {
-  text-align: center;
+/* Tab selector */
+.tab-selector {
+  display: flex;
+  background: #f8f9fa;
+  margin: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 1.2rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  color: #6c757d;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn.active {
+  color: #D4AF37;
+  background: white;
+  border-bottom-color: #D4AF37;
+}
+
+.tab-btn:hover {
+  background: #f1f3f4;
+}
+
+/* Form container */
+.form-container {
+  padding: 2.5rem;
+}
+
+.form-content {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-form h2 {
   color: #2C3E50;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.6rem;
 }
 
+.form-description {
+  color: #6c757d;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+/* Form groups */
 .form-group {
   margin-bottom: 1.5rem;
 }
 
-.form-label {
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-group label {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
-  color: #333;
+  color: #2C3E50;
+  font-size: 0.9rem;
 }
 
-.form-control {
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrapper svg {
+  position: absolute;
+  left: 12px;
+  color: #6c757d;
+  z-index: 2;
+}
+
+.input-wrapper input {
   width: 100%;
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 5px;
-  font-size: 1rem;
-  transition: border-color 0.3s ease;
+  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: #fafbfc;
 }
 
-.form-control:focus {
+.input-wrapper input:focus {
   outline: none;
   border-color: #D4AF37;
+  background: white;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
-.form-control:disabled {
+.input-wrapper input:disabled {
   background-color: #f8f9fa;
   cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.3s ease;
+}
+
+.password-toggle:hover {
+  color: #D4AF37;
+}
+
+/* Form options */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
   cursor: pointer;
-  user-select: none;
+  font-size: 0.9rem;
+  color: #6c757d;
 }
 
 .checkbox-label input[type="checkbox"] {
   margin-right: 0.5rem;
+  accent-color: #D4AF37;
 }
 
-.btn-login {
+.forgot-link {
+  color: #D4AF37;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+/* Buttons */
+.btn {
   width: 100%;
-  padding: 0.875rem;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
-  border-radius: 5px;
-  margin-bottom: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  text-decoration: none;
 }
 
-.btn-login:disabled {
+.btn-primary {
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
+  color: #1A1A1A;
+  box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(212, 175, 55, 0.6);
+}
+
+.btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
 }
 
-.login-links {
-  text-align: center;
-  margin-top: 1rem;
-}
-
-.forgot-link {
-  color: #6c757d;
+/* Alerts */
+.alert {
+  padding: 0.875rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.9rem;
-  text-decoration: none;
-}
-
-.forgot-link:hover {
-  color: #D4AF37;
-  text-decoration: underline;
-}
-
-.login-footer {
-  background: #f8f9fa;
-  padding: 1.5rem;
-  text-align: center;
-  border-top: 1px solid #e9ecef;
-}
-
-.login-footer p {
-  margin-bottom: 1rem;
-  color: #6c757d;
-}
-
-.login-footer a {
-  color: #D4AF37;
-  text-decoration: none;
   font-weight: 500;
 }
 
-.login-footer a:hover {
-  text-decoration: underline;
-}
-
-.back-home {
-  display: inline-block;
-  color: #6c757d !important;
-  font-size: 0.9rem;
-}
-
-.back-home:hover {
-  color: #2C3E50 !important;
-}
-
-.alert {
-  padding: 0.75rem;
-  border-radius: 5px;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-}
-
-.alert-error {
+.alert.error {
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
   color: #721c24;
 }
 
-.loading {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: #fff;
-  animation: spin 1s ease-in-out infinite;
+.alert.info {
+  background-color: #d1ecf1;
+  border: 1px solid #bee5eb;
+  color: #0c5460;
+}
+
+.alert.success {
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
+/* Footer */
+.auth-footer {
+  background: #f8f9fa;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  border-top: 1px solid #e9ecef;
+}
+
+.auth-footer p {
+  margin-bottom: 1rem;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.auth-footer a {
+  color: #D4AF37;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6c757d !important;
+  font-size: 0.9rem;
+  transition: color 0.3s ease;
+}
+
+.back-home:hover {
+  color: #2C3E50 !important;
+}
+
 /* Responsive */
-@media (max-width: 480px) {
-  .login-page {
+@media (max-width: 640px) {
+  .auth-page {
     padding: 1rem 0.5rem;
   }
   
-  .login-container {
+  .auth-container {
     margin: 0;
+    border-radius: 15px;
   }
   
-  .login-header,
-  .login-form {
+  .auth-header,
+  .form-container {
     padding: 1.5rem;
   }
   
-  .logo-text {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-options {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .tab-btn {
+    padding: 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo h1 {
     font-size: 1.5rem;
+  }
+  
+  .auth-form h2 {
+    font-size: 1.4rem;
   }
 }
 </style>

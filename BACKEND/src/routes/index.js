@@ -49,7 +49,7 @@ router.get('/info', (req, res) => {
   res.status(200).json({
     success: true,
     data: {
-      name: 'Freddy Fasbear Industries API',
+      name: 'Fredy Fasbear Industries API',
       version: '1.0.0',
       description: 'API para sistema de empeño y tienda en línea',
       endpoints: {

@@ -8,7 +8,7 @@
 
 <script setup>
 useHead({
-  titleTemplate: '%s - Freddy Fasbear Industries',
+  titleTemplate: '%s - Fredy Fasbear Industries',
   meta: [
     { name: 'description', content: 'Sistema de empeño profesional y confiable' },
     { name: 'viewport', content: 'width=device-width, initial-scale=1' }
