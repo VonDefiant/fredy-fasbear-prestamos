@@ -267,39 +267,94 @@ const authController = {
   },
 
   // PUT /api/auth/profile
-  updateProfile: async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const { nombre, apellido, telefono, direccion } = req.body;
+updateProfile: async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { nombre, apellido, telefono, direccion, fechaNacimiento } = req.body;
 
-      const updatedUser = await prisma.usuario.update({
-        where: { id: userId },
-        data: {
-          ...(nombre && { nombre: nombre.trim() }),
-          ...(apellido && { apellido: apellido.trim() }),
-          ...(telefono && { telefono }),
-          ...(direccion && { direccion })
-        }
-      });
+    console.log('[AUTH] Actualizando perfil de usuario ID:', userId);
+    console.log('[AUTH] Datos recibidos:', { nombre, apellido, telefono, direccion, fechaNacimiento });
 
-      console.log('[AUTH] Perfil actualizado:', updatedUser.email);
-
-      res.status(200).json({
-        success: true,
-        message: 'Perfil actualizado exitosamente',
-        data: {
-          user: formatUserResponse(updatedUser)
-        }
-      });
-
-    } catch (error) {
-      console.error('[ERROR] Error actualizando perfil:', error);
-      res.status(500).json({
+    // Validaciones básicas
+    if (!nombre || !apellido || !telefono || !direccion) {
+      return res.status(400).json({
         success: false,
-        message: 'Error interno del servidor'
+        message: 'Todos los campos obligatorios deben ser completados'
       });
     }
-  },
+
+    // Preparar datos para actualizar
+    const updateData = {
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      telefono: telefono.trim(),
+      direccion: direccion.trim()
+    };
+
+    // Manejar fecha de nacimiento (opcional)
+    if (fechaNacimiento) {
+      // Validar formato de fecha
+      const birthDate = new Date(fechaNacimiento);
+      if (isNaN(birthDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Formato de fecha de nacimiento inválido'
+        });
+      }
+
+      // Validar que sea mayor de edad (18 años)
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (age < 18 || (age === 18 && monthDiff < 0) || 
+          (age === 18 && monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Debes ser mayor de 18 años'
+        });
+      }
+
+      updateData.fechaNacimiento = birthDate;
+    } else if (fechaNacimiento === null || fechaNacimiento === '') {
+      // Si se envía null o string vacío, limpiar la fecha
+      updateData.fechaNacimiento = null;
+    }
+
+    // Actualizar usuario en base de datos
+    const updatedUser = await prisma.usuario.update({
+      where: { id: userId },
+      data: updateData
+    });
+
+    console.log('[AUTH] Perfil actualizado exitosamente para:', updatedUser.email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Perfil actualizado exitosamente',
+      data: {
+        user: formatUserResponse(updatedUser)
+      }
+    });
+
+  } catch (error) {
+    console.error('[ERROR] Error actualizando perfil:', error);
+    
+    // Manejo específico de errores de Prisma
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe un usuario con esos datos'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+},
 
   // POST /api/auth/change-password
   changePassword: async (req, res) => {

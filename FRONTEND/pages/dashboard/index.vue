@@ -5,19 +5,33 @@
       <div class="header-container">
         <div class="header-left">
           <NuxtLink to="/" class="logo">
-            <img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
+            <!-- Opción 1: Si tienes el logo en public/ -->
+            <img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+            <!-- Fallback con ícono SVG si no encuentra la imagen -->
+            <div class="logo-fallback" style="display: none;">
+              <svg width="40" height="40" viewBox="0 0 100 100" fill="none">
+                <circle cx="50" cy="50" r="45" fill="#D4AF37" stroke="#1A1A1A" stroke-width="3"/>
+                <circle cx="35" cy="35" r="8" fill="#1A1A1A"/>
+                <circle cx="65" cy="35" r="8" fill="#1A1A1A"/>
+                <path d="M35 65 Q50 75 65 65" stroke="#1A1A1A" stroke-width="3" fill="none"/>
+                <rect x="45" y="15" width="10" height="15" fill="#1A1A1A" rx="5"/>
+              </svg>
+            </div>
             <h1>Fredy Fasbear</h1>
           </NuxtLink>
         </div>
         
         <div class="header-right">
           <div class="user-info">
-            <span class="welcome-text">Bienvenido, {{ user?.nombre }}</span>
+            <!-- Mostrar nombre completo del usuario logueado -->
+            <span class="welcome-text">
+              Bienvenido, {{ user?.nombre }} {{ user?.apellido || '' }}
+            </span>
             <div class="user-avatar">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M20 21V19C20 17.9 19.1 17 18 17H6C4.9 17 4 17.9 4 19V21" stroke="currentColor" stroke-width="2"/>
-                <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-              </svg>
+              <!-- Mostrar iniciales del usuario -->
+              <span class="user-initials">
+                {{ getUserInitials() }}
+              </span>
             </div>
           </div>
           <button @click="handleLogout" class="logout-btn">
@@ -132,7 +146,7 @@
                 </svg>
               </div>
               <div class="activity-content">
-                <h4>¡Bienvenido a Fredy Fasbear Industries!</h4>
+                <h4>¡Bienvenido a Fredy Fasbear Industries, {{ user?.nombre }}!</h4>
                 <p>Tu cuenta ha sido creada exitosamente. Explora nuestros servicios.</p>
                 <span class="activity-time">Hace unos momentos</span>
               </div>
@@ -165,6 +179,19 @@ const { user, logout } = useAuth()
 const handleLogout = () => {
   logout()
   navigateTo('/')
+}
+
+// Función para obtener las iniciales del usuario
+const getUserInitials = () => {
+  if (!user.value) return 'U'
+  
+  const nombre = user.value.nombre || ''
+  const apellido = user.value.apellido || ''
+  
+  const inicialNombre = nombre.charAt(0).toUpperCase()
+  const inicialApellido = apellido.charAt(0).toUpperCase()
+  
+  return `${inicialNombre}${inicialApellido}` || 'U'
 }
 
 // Verificar que el usuario esté cargado
@@ -206,8 +233,16 @@ onMounted(() => {
   color: inherit;
 }
 
-.logo svg {
-  color: #D4AF37;
+.logo img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.logo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .logo h1 {
@@ -237,12 +272,19 @@ onMounted(() => {
 .user-avatar {
   width: 40px;
   height: 40px;
-  background: rgba(212, 175, 55, 0.2);
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #D4AF37;
+  color: white;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.user-initials {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .logout-btn {

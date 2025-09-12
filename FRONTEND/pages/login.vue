@@ -488,7 +488,7 @@ const handleLogin = async () => {
     if (response.success && response.data.token) {
       // Usar el composable de auth para guardar los datos
       const { login } = useAuth()
-      login(response.data.token, response.data.user, loginForm.value.remember)
+login(response.data.user, response.data.token, loginForm.value.remember)
       
       loginMessage.value = {
         text: 'Inicio de sesión exitoso. Redirigiendo...',
