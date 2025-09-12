@@ -162,6 +162,15 @@ const authController = {
         });
       }
 
+      // Verificar que el usuario tenga passwordHash
+      if (!user.passwordHash) {
+        console.log('[AUTH] Usuario sin passwordHash:', email);
+        return res.status(401).json({
+          success: false,
+          message: 'Usuario inválido. Contacta al administrador.'
+        });
+      }
+
       // Verificar contraseña (usando passwordHash)
       const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
       if (!isPasswordValid) {
@@ -172,10 +181,16 @@ const authController = {
         });
       }
 
-      // Actualizar último acceso
-      await prisma.usuario.update({
-        where: { id: user.id },
-        data: { ultimoAcceso: new Date() }
+      console.log('[AUTH] Contraseña verificada correctamente para:', email);
+
+      // Crear registro de sesión en lugar de actualizar ultimoAcceso
+      await prisma.sesionUsuario.create({
+        data: {
+          usuarioId: user.id,
+          ipInicio: req.ip || req.connection.remoteAddress,
+          userAgent: req.get('User-Agent'),
+          tipoSesion: 'web'
+        }
       });
 
       // Generar token con duración según "remember"

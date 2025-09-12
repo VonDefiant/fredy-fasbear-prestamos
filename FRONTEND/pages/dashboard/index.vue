@@ -5,9 +5,7 @@
       <div class="header-container">
         <div class="header-left">
           <NuxtLink to="/" class="logo">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z" fill="currentColor"/>
-            </svg>
+            <img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
             <h1>Fredy Fasbear</h1>
           </NuxtLink>
         </div>
