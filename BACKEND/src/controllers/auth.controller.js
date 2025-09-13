@@ -235,7 +235,7 @@ const authController = {
       const user = await prisma.usuario.findUnique({
         where: { id: userId },
         include: {
-          solicitudesPrestamo: {
+          solicitudes: {
             where: { estado: 'Aprobada' },
             take: 5,
             orderBy: { fechaSolicitud: 'desc' }

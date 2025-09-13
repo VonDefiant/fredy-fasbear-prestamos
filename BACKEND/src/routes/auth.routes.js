@@ -2,7 +2,8 @@ import express from 'express';
 import authController from '../controllers/auth.controller.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
-import { PrismaClient } from '@prisma/client'; 
+import { PrismaClient } from '@prisma/client';  // AGREGAR ESTA LÍNEA
+
 const prisma = new PrismaClient();  // AGREGAR ESTA LÍNEA
 const router = express.Router();
 

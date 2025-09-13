@@ -25,8 +25,8 @@
       <div class="auth-header">
         <NuxtLink to="/" class="logo-link">
           <div class="logo">
-            <img src="~/assets/images/logo.png" alt="Fredy Fasbear Logo" />
-            <h1>Fredy Fasbear</h1>
+          <img src="~/assets/images/logo.png" alt="Logo">
+            <h1>Freddy Fasbear</h1>
           </div>
         </NuxtLink>
         <p class="auth-subtitle">Accede a tu cuenta o únete a nuestra familia</p>
@@ -249,7 +249,7 @@
               </div>
 
               <div class="form-group">
-                <label for="register-cedula">DPI</label>
+                <label for="register-cedula">Cédula/DPI</label>
                 <div class="input-wrapper">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
