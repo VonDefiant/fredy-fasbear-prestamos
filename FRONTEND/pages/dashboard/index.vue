@@ -144,9 +144,9 @@
                   <path d="M22 11.08V12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C13.6569 2 15.1569 2.5 16.3856 3.35814" stroke="currentColor" stroke-width="2"/>
                   <path d="M22 4L12 14.01L9 11.01" stroke="currentColor" stroke-width="2"/>
                 </svg>
-              </div>
+              </div>              
               <div class="activity-content">
-                <h4>¡Bienvenido a Fredy Fasbear Industries, {{ user?.nombre }}!</h4>
+                <h4>¡Bienvenido a Fredy Fasbear Industries, {{ user?.nombre }} {{ user?.apellido || '' }}!</h4>
                 <p>Tu cuenta ha sido creada exitosamente. Explora nuestros servicios.</p>
                 <span class="activity-time">Hace unos momentos</span>
               </div>
