@@ -141,7 +141,7 @@ app.use('/api', routes);
 // ===== MANEJO DE ERRORES Y RUTAS NO ENCONTRADAS =====
 
 // Ruta catch-all para APIs no encontradas
-app.use('/api/*', (req, res) => {
+app.use('/api', (req, res) => {
   res.status(404).json({
     success: false,
     message: 'Endpoint de API no encontrado',
@@ -152,7 +152,7 @@ app.use('/api/*', (req, res) => {
 });
 
 // Catch-all para otras rutas
-app.use('*', (req, res) => {
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: 'Ruta no encontrada',

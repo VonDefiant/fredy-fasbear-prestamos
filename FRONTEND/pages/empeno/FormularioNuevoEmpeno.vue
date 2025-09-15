@@ -1039,7 +1039,30 @@ watch(() => props.visible, (newValue) => {
   position: relative;
 }
 
-/* Líneas eliminadas para evitar sobreposición */
+/* Línea base fija detrás de todo */
+.progress-steps::before {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  right: 15px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  z-index: 0;
+}
+
+/* Línea de progreso activa */
+.progress-steps::after {
+  content: '';
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  height: 2px;
+  background: #D4AF37;
+  z-index: 0;
+  transition: width 0.6s ease;
+  width: calc(((v-bind(pasoActual) - 1) / 3) * 100%);
+}
 
 .step-indicator {
   display: flex;

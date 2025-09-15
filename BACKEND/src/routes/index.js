@@ -154,7 +154,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // ===== MANEJO DE RUTAS NO ENCONTRADAS =====
-router.use('*', (req, res) => {
+router.use((req, res) => {
   console.log(`❌ Ruta no encontrada: ${req.method} ${req.originalUrl}`);
   
   res.status(404).json({

@@ -1,14 +1,16 @@
 // ===============================================
 // Archivo: BACKEND/src/controllers/solicitudes.controller.js
-// Controlador temporal para solicitudes (sin dependencias externas)
+// Controlador para solicitudes de empéño
 // ===============================================
 
 import { PrismaClient } from '@prisma/client';
+import path from 'path';
+import fs from 'fs/promises';
 
 const prisma = new PrismaClient();
 
 export default {
-  // Crear nueva solicitud de empéño
+  // ===== CREAR NUEVA SOLICITUD =====
   async crearSolicitud(req, res) {
     try {
       const { userId } = req.user;
@@ -34,7 +36,7 @@ export default {
       if (!tipoArticulo || !descripcion || !valorEstimado || !montoSolicitado) {
         return res.status(400).json({
           success: false,
-          message: 'Faltan campos obligatorios'
+          message: 'Faltan campos obligatorios: tipoArticulo, descripcion, valorEstimado, montoSolicitado'
         });
       }
 
@@ -45,398 +47,219 @@ export default {
         });
       }
 
-      // Generar número único de solicitud
-      const año = new Date().getFullYear();
-      const contador = await prisma.solicitudEmpeno?.count?.({
-        where: {
-          fechaSolicitud: {
-            gte: new Date(`${año}-01-01`),
-            lt: new Date(`${año + 1}-01-01`)
-          }
-        }
-      }) || 0;
-      
-      const numeroSolicitud = `SOL-${año}-${String(contador + 1).padStart(6, '0')}`;
+      // Verificar que el tipo de artículo existe
+      const tipoArticuloExiste = await prisma.tipoArticulo.findUnique({
+        where: { id: parseInt(tipoArticulo) }
+      });
 
-      // Procesar archivos subidos (simplificado)
-      let fotosInfo = [];
-      let documentoInfo = null;
+      if (!tipoArticuloExiste) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tipo de artículo no válido'
+        });
+      }
+
+      // Procesar archivos subidos
+      let fotosGuardadas = [];
+      let documentoGuardado = null;
 
       if (req.files) {
+        const uploadDir = path.join(process.cwd(), 'uploads', 'solicitudes');
+        
+        // Crear directorio si no existe
+        try {
+          await fs.access(uploadDir);
+        } catch {
+          await fs.mkdir(uploadDir, { recursive: true });
+        }
+
         // Procesar fotos
         if (req.files.fotos) {
           const fotos = Array.isArray(req.files.fotos) ? req.files.fotos : [req.files.fotos];
-          fotosInfo = fotos.map((foto, index) => ({
-            nombre: foto.name,
-            tamaño: foto.size,
-            tipo: foto.mimetype,
-            esPrincipal: index === 0
-          }));
+          
+          for (let i = 0; i < fotos.length; i++) {
+            const foto = fotos[i];
+            const fileName = `foto_${Date.now()}_${i + 1}_${foto.name}`;
+            const filePath = path.join(uploadDir, fileName);
+            
+            await foto.mv(filePath);
+            
+            fotosGuardadas.push({
+              nombre: foto.name,
+              nombreArchivo: fileName,
+              ruta: filePath,
+              tamaño: foto.size,
+              tipo: foto.mimetype,
+              esPrincipal: i === 0
+            });
+          }
         }
 
         // Procesar documento técnico
         if (req.files.documentoTecnico) {
-          documentoInfo = {
-            nombre: req.files.documentoTecnico.name,
-            tamaño: req.files.documentoTecnico.size,
-            tipo: req.files.documentoTecnico.mimetype
+          const doc = req.files.documentoTecnico;
+          const fileName = `doc_${Date.now()}_${doc.name}`;
+          const filePath = path.join(uploadDir, fileName);
+          
+          await doc.mv(filePath);
+          
+          documentoGuardado = {
+            nombre: doc.name,
+            nombreArchivo: fileName,
+            ruta: filePath,
+            tamaño: doc.size,
+            tipo: doc.mimetype
           };
         }
       }
 
-      // Crear solicitud en base de datos (simulado sin Prisma por ahora)
-      const solicitudData = {
-        numeroSolicitud,
-        usuarioId: userId,
-        tipoArticulo: parseInt(tipoArticulo),
-        descripcion,
-        estadoFisico,
-        valorEstimado: parseFloat(valorEstimado),
-        marca,
-        modelo,
-        especificacionesTecnicas,
-        montoSolicitado: parseFloat(montoSolicitado),
-        plazoMeses: parseInt(plazoMeses),
-        modalidadPago,
-        planPagosJson: planPagos ? JSON.stringify(planPagos) : null,
-        rangoAvaluoJson: rangoAvaluo ? JSON.stringify(rangoAvaluo) : null,
-        aceptaTerminos: true,
-        fotosInfo: JSON.stringify(fotosInfo),
-        documentoInfo: documentoInfo ? JSON.stringify(documentoInfo) : null,
-        fechaSolicitud: new Date(),
-        estado: 'pendiente'
-      };
+      // ===== GUARDAR EN BASE DE DATOS =====
+      const resultado = await prisma.$transaction(async (tx) => {
+        
+        // 1. Crear la solicitud de préstamo
+        const solicitudCreada = await tx.solicitudPrestamo.create({
+          data: {
+            usuarioId: parseInt(userId),
+            estado: 'Pendiente',
+            observaciones: `Solicitud de préstamo por Q${montoSolicitado} a ${plazoMeses} meses`
+          }
+        });
 
-      // Por ahora solo devolvemos los datos sin guardar en DB
-      console.log('📝 Datos de solicitud procesados:', {
+        console.log('✅ Solicitud creada con ID:', solicitudCreada.id);
+
+        // 2. Crear el artículo asociado
+        const articuloCreado = await tx.articulo.create({
+          data: {
+            solicitudId: solicitudCreada.id,
+            tipoArticuloId: parseInt(tipoArticulo),
+            descripcion: descripcion,
+            marca: marca || null,
+            modelo: modelo || null,
+            estadoFisico: estadoFisico,
+            valorEstimadoCliente: parseFloat(valorEstimado),
+            especificacionesTecnicas: especificacionesTecnicas || null
+          }
+        });
+
+        console.log('✅ Artículo creado con ID:', articuloCreado.id);
+
+        // 3. Crear registros de documentos si hay archivos
+        const documentosCreados = [];
+
+        // Guardar fotos
+        for (const foto of fotosGuardadas) {
+          const docFoto = await tx.documento.create({
+            data: {
+              tipoDocumento: 'Foto_Prenda',
+              nombreArchivo: foto.nombreArchivo,
+              rutaArchivo: foto.ruta,
+              idRelacionado: solicitudCreada.id,
+              tipoRelacion: 'Solicitud',
+              tamanoArchivo: foto.tamaño,
+              tipoMime: foto.tipo
+            }
+          });
+          documentosCreados.push(docFoto);
+        }
+
+        // Guardar documento técnico
+        if (documentoGuardado) {
+          const docTecnico = await tx.documento.create({
+            data: {
+              tipoDocumento: 'Especificaciones',
+              nombreArchivo: documentoGuardado.nombreArchivo,
+              rutaArchivo: documentoGuardado.ruta,
+              idRelacionado: solicitudCreada.id,
+              tipoRelacion: 'Solicitud',
+              tamanoArchivo: documentoGuardado.tamaño,
+              tipoMime: documentoGuardado.tipo
+            }
+          });
+          documentosCreados.push(docTecnico);
+        }
+
+        return {
+          solicitud: solicitudCreada,
+          articulo: articuloCreado,
+          documentos: documentosCreados
+        };
+      });
+
+      // Generar número de solicitud para respuesta
+      const numeroSolicitud = `SOL-${new Date().getFullYear()}-${String(resultado.solicitud.id).padStart(6, '0')}`;
+
+      console.log('🎉 Solicitud procesada exitosamente:', {
         numero: numeroSolicitud,
-        usuario: userId,
-        articulo: descripcion,
-        monto: montoSolicitado,
-        fotos: fotosInfo.length,
-        documento: !!documentoInfo
+        solicitudId: resultado.solicitud.id,
+        articuloId: resultado.articulo.id,
+        documentos: resultado.documentos.length
       });
 
       res.status(201).json({
         success: true,
-        message: 'Solicitud creada exitosamente',
+        message: 'Solicitud de empéño creada exitosamente',
         data: {
-          solicitud: {
-            id: `temp_${Date.now()}`,
-            numero: numeroSolicitud,
-            estado: 'pendiente',
-            fechaSolicitud: new Date(),
-            montoSolicitado: parseFloat(montoSolicitado),
-            plazoMeses: parseInt(plazoMeses),
-            articulo: {
-              descripcion,
-              valorEstimado: parseFloat(valorEstimado)
-            }
+          numeroSolicitud,
+          solicitudId: resultado.solicitud.id,
+          articuloId: resultado.articulo.id,
+          estado: resultado.solicitud.estado,
+          fechaSolicitud: resultado.solicitud.fechaSolicitud,
+          montoSolicitado: parseFloat(montoSolicitado),
+          plazoMeses: parseInt(plazoMeses),
+          archivosSubidos: {
+            fotos: fotosGuardadas.length,
+            documentoTecnico: documentoGuardado ? 1 : 0
           }
-        },
-        timestamp: new Date().toISOString()
+        }
       });
 
     } catch (error) {
       console.error('❌ Error creando solicitud:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error creando la solicitud',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  },
-
-  // Obtener solicitudes del usuario
-  async getMisSolicitudes(req, res) {
-    try {
-      const { userId } = req.user;
-      const { estado, limite = 10, pagina = 1 } = req.query;
-
-      console.log(`📋 Obteniendo solicitudes para usuario: ${userId}`);
-
-      // Datos de ejemplo por ahora
-      const solicitudesEjemplo = [
-        {
-          id: 'temp_001',
-          numero: 'SOL-2024-000001',
-          estado: 'pendiente',
-          estadoTexto: 'Pendiente de Evaluación',
-          fechaSolicitud: new Date('2024-09-01'),
-          fechaRespuesta: null,
-          montoSolicitado: 5000,
-          montoAprobado: null,
-          plazoMeses: 3,
-          articulo: {
-            id: 'art_001',
-            nombre: 'iPhone 14 Pro',
-            categoria: 'Celulares',
-            valorEstimado: 8000,
-            fotoPrincipal: null
-          },
-          ultimoAvaluo: null,
-          diasTranscurridos: 13
+      
+      // Si hubo error, intentar limpiar archivos subidos
+      try {
+        if (req.files) {
+          const uploadDir = path.join(process.cwd(), 'uploads', 'solicitudes');
+          const files = await fs.readdir(uploadDir);
+          // Aquí podrías implementar lógica para limpiar archivos huérfanos
         }
-      ];
-
-      const solicitudesFiltradas = estado && estado !== 'todas' 
-        ? solicitudesEjemplo.filter(s => s.estado === estado)
-        : solicitudesEjemplo;
-
-      res.status(200).json({
-        success: true,
-        data: {
-          solicitudes: solicitudesFiltradas,
-          paginacion: {
-            pagina: parseInt(pagina),
-            limite: parseInt(limite),
-            total: solicitudesFiltradas.length
-          }
-        },
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('❌ Error obteniendo solicitudes:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo solicitudes',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  },
-
-  // Obtener detalle de una solicitud
-  async getDetalleSolicitud(req, res) {
-    try {
-      const { solicitudId } = req.params;
-      const { userId } = req.user;
-
-      console.log(`🔍 Obteniendo detalle de solicitud: ${solicitudId}`);
-
-      // Datos de ejemplo por ahora
-      const solicitudEjemplo = {
-        id: solicitudId,
-        numero: 'SOL-2024-000001',
-        estado: 'pendiente',
-        estadoTexto: 'Pendiente de Evaluación',
-        fechas: {
-          solicitud: new Date('2024-09-01'),
-          respuesta: null,
-          vencimiento: null
-        },
-        montos: {
-          solicitado: 5000,
-          aprobado: null
-        },
-        condiciones: {
-          plazoMeses: 3,
-          modalidadPago: 'mensual'
-        },
-        articulo: {
-          id: 'art_001',
-          nombre: 'iPhone 14 Pro',
-          descripcion: 'iPhone 14 Pro de 256GB en excelente estado',
-          categoria: 'Celulares',
-          estadoFisico: 'excelente',
-          valorEstimado: 8000,
-          marca: 'Apple',
-          modelo: 'iPhone 14 Pro',
-          fotos: [],
-          especificaciones: {}
-        },
-        avaluos: [],
-        planPagos: null,
-        rangoAvaluo: null,
-        prestamo: null,
-        diasTranscurridos: 13,
-        documentoTecnico: null
-      };
-
-      res.status(200).json({
-        success: true,
-        data: {
-          solicitud: solicitudEjemplo
-        },
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('❌ Error obteniendo detalle de solicitud:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error obteniendo detalle de solicitud',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  },
-
-  // Cancelar solicitud
-  async cancelarSolicitud(req, res) {
-    try {
-      const { solicitudId } = req.params;
-      const { motivo } = req.body;
-      const { userId } = req.user;
-
-      console.log(`❌ Cancelando solicitud: ${solicitudId}`);
-
-      res.status(200).json({
-        success: true,
-        message: 'Solicitud cancelada exitosamente',
-        data: {
-          solicitud: {
-            id: solicitudId,
-            estado: 'cancelada',
-            fechaCancelacion: new Date()
-          }
-        },
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('❌ Error cancelando solicitud:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error cancelando la solicitud',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  },
-
-  // Aceptar oferta de préstamo
-  async aceptarOferta(req, res) {
-    try {
-      const { solicitudId } = req.params;
-      const { aceptaCondiciones } = req.body;
-      const { userId } = req.user;
-
-      console.log(`✅ Aceptando oferta para solicitud: ${solicitudId}`);
-
-      if (!aceptaCondiciones) {
-        return res.status(400).json({
-          success: false,
-          message: 'Debe aceptar las condiciones de la oferta'
-        });
+      } catch (cleanupError) {
+        console.error('❌ Error limpiando archivos:', cleanupError);
       }
 
-      res.status(200).json({
-        success: true,
-        message: 'Oferta aceptada y préstamo creado exitosamente',
-        data: {
-          prestamo: {
-            id: `prestamo_${Date.now()}`,
-            numero: `PR-2024-${String(Math.floor(Math.random() * 1000)).padStart(6, '0')}`,
-            montoPrestado: 5000,
-            fechaCreacion: new Date(),
-            fechaVencimiento: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 días
-          }
-        },
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('❌ Error aceptando oferta:', error);
       res.status(500).json({
         success: false,
-        message: 'Error aceptando la oferta',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message: 'Error interno del servidor al crear la solicitud',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
       });
     }
   },
 
-  // Obtener categorías de artículos disponibles
+  // ===== OBTENER CATEGORIAS =====
   async getCategorias(req, res) {
     try {
-      console.log('📂 Obteniendo categorías de artículos');
-
-      // Categorías de ejemplo por ahora
-      const categoriasEjemplo = [
-        {
-          id: 1,
-          nombre: 'Joyería',
-          descripcion: 'Joyas, anillos, collares, pulseras',
-          porcentajeMaximoPrestamo: 70,
-          requiereEspecificaciones: false,
-          camposEspecificaciones: null
+      console.log('📋 Obteniendo categorías de artículos...');
+      
+      const categorias = await prisma.tipoArticulo.findMany({
+        where: {
+          estado: 'Activo'
         },
-        {
-          id: 2,
-          nombre: 'Oro',
-          descripcion: 'Artículos de oro puro o aleaciones',
-          porcentajeMaximoPrestamo: 80,
-          requiereEspecificaciones: false,
-          camposEspecificaciones: null
+        select: {
+          id: true,
+          nombre: true,
+          porcentajeMinAvaluo: true,
+          porcentajeMaxAvaluo: true,
+          requiereElectronico: true
         },
-        {
-          id: 3,
-          nombre: 'Plata',
-          descripcion: 'Artículos de plata pura o aleaciones',
-          porcentajeMaximoPrestamo: 60,
-          requiereEspecificaciones: false,
-          camposEspecificaciones: null
-        },
-        {
-          id: 4,
-          nombre: 'Celulares',
-          descripcion: 'Teléfonos móviles y smartphones',
-          porcentajeMaximoPrestamo: 75,
-          requiereEspecificaciones: true,
-          camposEspecificaciones: ['marca', 'modelo', 'capacidad', 'estado_bateria']
-        },
-        {
-          id: 5,
-          nombre: 'Computadoras',
-          descripcion: 'Laptops, PCs, tablets',
-          porcentajeMaximoPrestamo: 65,
-          requiereEspecificaciones: true,
-          camposEspecificaciones: ['marca', 'modelo', 'procesador', 'ram', 'almacenamiento']
-        },
-        {
-          id: 6,
-          nombre: 'Televisores',
-          descripcion: 'Televisores y monitores',
-          porcentajeMaximoPrestamo: 55,
-          requiereEspecificaciones: true,
-          camposEspecificaciones: ['marca', 'modelo', 'tamaño', 'tipo_pantalla']
-        },
-        {
-          id: 7,
-          nombre: 'Relojes',
-          descripcion: 'Relojes de pulsera y de bolsillo',
-          porcentajeMaximoPrestamo: 75,
-          requiereEspecificaciones: false,
-          camposEspecificaciones: null
-        },
-        {
-          id: 8,
-          nombre: 'Vehículos',
-          descripcion: 'Automóviles, motocicletas',
-          porcentajeMaximoPrestamo: 85,
-          requiereEspecificaciones: true,
-          camposEspecificaciones: ['marca', 'modelo', 'año', 'kilometraje', 'combustible']
-        },
-        {
-          id: 9,
-          nombre: 'Herramientas',
-          descripcion: 'Herramientas eléctricas y manuales',
-          porcentajeMaximoPrestamo: 50,
-          requiereEspecificaciones: false,
-          camposEspecificaciones: null
-        },
-        {
-          id: 10,
-          nombre: 'Electrodomésticos',
-          descripcion: 'Refrigeradoras, lavadoras, etc.',
-          porcentajeMaximoPrestamo: 45,
-          requiereEspecificaciones: true,
-          camposEspecificaciones: ['marca', 'modelo', 'capacidad', 'tipo']
+        orderBy: {
+          nombre: 'asc'
         }
-      ];
+      });
 
       res.status(200).json({
         success: true,
-        data: { categorias: categoriasEjemplo },
-        timestamp: new Date().toISOString()
+        message: 'Categorías obtenidas exitosamente',
+        data: categorias
       });
 
     } catch (error) {
@@ -444,7 +267,197 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo categorías',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+      });
+    }
+  },
+
+  // ===== OBTENER MIS SOLICITUDES =====
+  async getMisSolicitudes(req, res) {
+    try {
+      const { userId } = req.user;
+      const { estado, limite = 10, pagina = 1 } = req.query;
+
+      console.log(`📋 Obteniendo solicitudes del usuario: ${userId}`);
+
+      const where = {
+        usuarioId: parseInt(userId)
+      };
+
+      if (estado && estado !== 'todos') {
+        where.estado = estado.charAt(0).toUpperCase() + estado.slice(1);
+      }
+
+      const skip = (parseInt(pagina) - 1) * parseInt(limite);
+
+      const [solicitudes, total] = await Promise.all([
+        prisma.solicitudPrestamo.findMany({
+          where,
+          include: {
+            articulos: {
+              include: {
+                tipoArticulo: {
+                  select: {
+                    nombre: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            fechaSolicitud: 'desc'
+          },
+          skip,
+          take: parseInt(limite)
+        }),
+        prisma.solicitudPrestamo.count({ where })
+      ]);
+
+      const solicitudesFormateadas = solicitudes.map(solicitud => ({
+        id: solicitud.id,
+        numeroSolicitud: `SOL-${solicitud.fechaSolicitud.getFullYear()}-${String(solicitud.id).padStart(6, '0')}`,
+        fechaSolicitud: solicitud.fechaSolicitud,
+        estado: solicitud.estado,
+        observaciones: solicitud.observaciones,
+        articulo: solicitud.articulos[0] ? {
+          descripcion: solicitud.articulos[0].descripcion,
+          tipoArticulo: solicitud.articulos[0].tipoArticulo.nombre,
+          valorEstimado: solicitud.articulos[0].valorEstimadoCliente
+        } : null
+      }));
+
+      res.status(200).json({
+        success: true,
+        message: 'Solicitudes obtenidas exitosamente',
+        data: {
+          solicitudes: solicitudesFormateadas,
+          paginacion: {
+            total,
+            pagina: parseInt(pagina),
+            limite: parseInt(limite),
+            totalPaginas: Math.ceil(total / parseInt(limite))
+          }
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo solicitudes:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo solicitudes',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+      });
+    }
+  },
+
+  // ===== OBTENER DETALLE DE SOLICITUD =====
+  async getDetalleSolicitud(req, res) {
+    try {
+      const { solicitudId } = req.params;
+      const { userId } = req.user;
+
+      console.log(`📋 Obteniendo detalle de solicitud: ${solicitudId}`);
+
+      const solicitud = await prisma.solicitudPrestamo.findFirst({
+        where: {
+          id: parseInt(solicitudId),
+          usuarioId: parseInt(userId)
+        },
+        include: {
+          articulos: {
+            include: {
+              tipoArticulo: true
+            }
+          },
+          usuario: {
+            select: {
+              nombre: true,
+              apellido: true,
+              email: true,
+              telefono: true
+            }
+          }
+        }
+      });
+
+      if (!solicitud) {
+        return res.status(404).json({
+          success: false,
+          message: 'Solicitud no encontrada'
+        });
+      }
+
+      // Obtener documentos asociados
+      const documentos = await prisma.documento.findMany({
+        where: {
+          idRelacionado: parseInt(solicitudId),
+          tipoRelacion: 'Solicitud'
+        }
+      });
+
+      const numeroSolicitud = `SOL-${solicitud.fechaSolicitud.getFullYear()}-${String(solicitud.id).padStart(6, '0')}`;
+
+      res.status(200).json({
+        success: true,
+        message: 'Detalle de solicitud obtenido exitosamente',
+        data: {
+          numeroSolicitud,
+          ...solicitud,
+          documentos
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error obteniendo detalle de solicitud:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error obteniendo detalle de solicitud',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+      });
+    }
+  },
+
+  // ===== CANCELAR SOLICITUD =====
+  async cancelarSolicitud(req, res) {
+    try {
+      const { solicitudId } = req.params;
+      const { userId } = req.user;
+      const { motivo } = req.body;
+
+      console.log(`🚫 Cancelando solicitud: ${solicitudId}`);
+
+      const solicitudActualizada = await prisma.solicitudPrestamo.updateMany({
+        where: {
+          id: parseInt(solicitudId),
+          usuarioId: parseInt(userId),
+          estado: {
+            in: ['Pendiente']
+          }
+        },
+        data: {
+          estado: 'Rechazada',
+          observaciones: `Cancelada por el usuario. Motivo: ${motivo || 'No especificado'}`
+        }
+      });
+
+      if (solicitudActualizada.count === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se pudo cancelar la solicitud. Verifica el estado actual.'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Solicitud cancelada exitosamente'
+      });
+
+    } catch (error) {
+      console.error('❌ Error cancelando solicitud:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error cancelando solicitud',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
       });
     }
   }
