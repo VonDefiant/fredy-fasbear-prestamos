@@ -1,6 +1,6 @@
-<!-- 
+<!--
   Archivo: pages/empeno/index.vue
-  Página principal de empéños/préstamos
+  Página principal de empéños/préstamos - ARREGLADO COMPLETO
 -->
 <template>
   <div class="empenos-page">
@@ -30,8 +30,35 @@
       </div>
     </header>
 
+    <!-- Loading state -->
+    <div v-if="loadingData" class="loading-overlay">
+      <div class="loading-spinner">
+        <svg class="animate-spin" width="40" height="40" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+          <path fill="currentColor" opacity="0.75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+        </svg>
+        <p>Cargando información...</p>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div v-if="error && !loadingData" class="error-state">
+      <div class="error-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+          <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </div>
+      <h3>Error al cargar los datos</h3>
+      <p>{{ error }}</p>
+      <button class="btn-primary" @click="cargarDatos">
+        Reintentar
+      </button>
+    </div>
+
     <!-- Contenido principal -->
-    <main class="empenos-main">
+    <main class="empenos-main" v-else>
       <div class="container">
         <!-- Estadísticas rápidas -->
         <section class="stats-section">
@@ -44,7 +71,7 @@
               </div>
               <div class="stat-content">
                 <h3>Préstamos Activos</h3>
-                <p class="stat-number">{{ prestamosActivos.length }}</p>
+                <p class="stat-number">{{ estadisticas.prestamosActivos }}</p>
                 <span class="stat-subtitle">En proceso</span>
               </div>
             </div>
@@ -57,9 +84,9 @@
                 </svg>
               </div>
               <div class="stat-content">
-                <h3>Pendientes de Pago</h3>
-                <p class="stat-number">{{ prestamosPendientes.length }}</p>
-                <span class="stat-subtitle">Próximos vencimientos</span>
+                <h3>Solicitudes Pendientes</h3>
+                <p class="stat-number">{{ estadisticas.solicitudesPendientes }}</p>
+                <span class="stat-subtitle">En evaluación</span>
               </div>
             </div>
 
@@ -71,12 +98,12 @@
               </div>
               <div class="stat-content">
                 <h3>Total Prestado</h3>
-                <p class="stat-number">Q{{ formatCurrency(totalPrestado) }}</p>
+                <p class="stat-number">Q{{ formatCurrency(estadisticas.totalPrestado) }}</p>
                 <span class="stat-subtitle">Monto acumulado</span>
               </div>
             </div>
 
-            <div class="stat-card available">
+            <div class="stat-card completed">
               <div class="stat-icon">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -84,9 +111,9 @@
                 </svg>
               </div>
               <div class="stat-content">
-                <h3>Límite Disponible</h3>
-                <p class="stat-number">Q{{ formatCurrency(limiteDisponible) }}</p>
-                <span class="stat-subtitle">Para nuevos préstamos</span>
+                <h3>Préstamos Completados</h3>
+                <p class="stat-number">{{ estadisticas.prestamosCompletados }}</p>
+                <span class="stat-subtitle">Finalizados</span>
               </div>
             </div>
           </div>
@@ -119,89 +146,139 @@
           </div>
         </section>
 
-        <!-- Lista de préstamos activos -->
+        <!-- Lista de préstamos y solicitudes -->
         <section class="prestamos-section">
           <div class="section-header">
-            <h2>Mis Préstamos Activos</h2>
+            <h2>Mis Préstamos y Solicitudes</h2>
             <div class="filters">
-              <select v-model="filtroEstado" class="filter-select">
-                <option value="todos">Todos los estados</option>
-                <option value="activo">Activos</option>
-                <option value="vencido">Vencidos</option>
-                <option value="renovado">Renovados</option>
+              <select v-model="filtroEstado" class="filter-select" @change="aplicarFiltros">
+                <option value="">Todos</option>
+                <option value="Pendiente">Solicitudes Pendientes</option>
+                <option value="Evaluando">En Evaluación</option>
+                <option value="Aprobada">Aprobadas</option>
+                <option value="Activo">Préstamos Activos</option>
+                <option value="Vencido">Vencidos</option>
+                <option value="Pagado">Pagados</option>
+                <option value="Rechazada">Rechazadas</option>
               </select>
             </div>
           </div>
 
-          <div class="prestamos-grid" v-if="prestamosFiltrados.length > 0">
+          <div class="prestamos-grid" v-if="itemsFiltrados.length > 0">
             <div 
-              v-for="prestamo in prestamosFiltrados" 
-              :key="prestamo.id" 
+              v-for="item in itemsFiltrados" 
+              :key="`${item.tipo}-${item.id}`" 
               class="prestamo-card"
-              :class="prestamo.estado"
+              :class="[item.estado.toLowerCase().replace('_', '-'), item.tipo]"
             >
               <div class="prestamo-header">
                 <div class="prestamo-info">
-                  <h3 class="prestamo-titulo">{{ prestamo.articulo }}</h3>
-                  <p class="prestamo-fecha">Fecha: {{ formatDate(prestamo.fecha) }}</p>
+                  <h3 class="prestamo-titulo">{{ getItemTitulo(item) }}</h3>
+                  <p class="prestamo-fecha">{{ getItemFecha(item) }}</p>
+                  <span class="tipo-badge" :class="item.tipo">{{ item.tipo === 'solicitud' ? 'Solicitud' : 'Préstamo' }}</span>
                 </div>
                 <div class="prestamo-estado">
-                  <span class="estado-badge" :class="prestamo.estado">{{ prestamo.estadoTexto }}</span>
+                  <span class="estado-badge" :class="item.estado.toLowerCase().replace('_', '-')">
+                    {{ formatEstado(item.estado) }}
+                  </span>
                 </div>
               </div>
 
               <div class="prestamo-body">
                 <div class="prestamo-details">
-                  <div class="detail-item">
+                  <div class="detail-item" v-if="item.tipo === 'prestamo'">
                     <span class="detail-label">Monto prestado:</span>
-                    <span class="detail-value">Q{{ formatCurrency(prestamo.montoPrestado) }}</span>
+                    <span class="detail-value">Q{{ formatCurrency(item.montoPrestado || 0) }}</span>
                   </div>
-                  <div class="detail-item">
+                  <div class="detail-item" v-if="item.tipo === 'prestamo'">
                     <span class="detail-label">Interés:</span>
-                    <span class="detail-value">{{ prestamo.interes }}%</span>
+                    <span class="detail-value">{{ item.tasaInteres || 0 }}%</span>
                   </div>
-                  <div class="detail-item">
+                  <div class="detail-item" v-if="item.valorEstimado">
+                    <span class="detail-label">Valor estimado:</span>
+                    <span class="detail-value">Q{{ formatCurrency(item.valorEstimado) }}</span>
+                  </div>
+                  <div class="detail-item" v-if="item.fechaVencimiento">
                     <span class="detail-label">Vencimiento:</span>
-                    <span class="detail-value" :class="{ 'vencido': isVencido(prestamo.fechaVencimiento) }">
-                      {{ formatDate(prestamo.fechaVencimiento) }}
+                    <span class="detail-value" :class="{ 'vencido': isVencido(item.fechaVencimiento) }">
+                      {{ formatDate(item.fechaVencimiento) }}
                     </span>
                   </div>
-                  <div class="detail-item">
-                    <span class="detail-label">Total a pagar:</span>
-                    <span class="detail-value total">Q{{ formatCurrency(prestamo.totalPagar) }}</span>
+                  <div class="detail-item" v-if="item.tipo === 'prestamo' && item.saldoPendiente">
+                    <span class="detail-label">Saldo pendiente:</span>
+                    <span class="detail-value total">Q{{ formatCurrency(item.saldoPendiente) }}</span>
+                  </div>
+                  <div class="detail-item" v-if="item.observaciones">
+                    <span class="detail-label">Observaciones:</span>
+                    <span class="detail-value">{{ item.observaciones }}</span>
                   </div>
                 </div>
 
                 <div class="prestamo-actions">
-                  <button class="btn-action primary" @click="verDetalle(prestamo)">
+                  <button class="btn-action primary" @click="verDetalle(item)">
                     Ver Detalle
                   </button>
-                  <button class="btn-action secondary" @click="renovarPrestamo(prestamo)" v-if="prestamo.estado === 'activo'">
-                    Renovar
+                  <button 
+                    class="btn-action secondary" 
+                    @click="renovarPrestamo(item)" 
+                    v-if="item.tipo === 'prestamo' && item.estado === 'Activo'"
+                    :disabled="loadingOperaciones"
+                  >
+                    {{ loadingOperaciones ? 'Procesando...' : 'Renovar' }}
                   </button>
-                  <button class="btn-action success" @click="pagarPrestamo(prestamo)" v-if="prestamo.estado === 'activo'">
-                    Pagar
+                  <button 
+                    class="btn-action success" 
+                    @click="pagarPrestamo(item)" 
+                    v-if="item.tipo === 'prestamo' && ['Activo', 'Vencido', 'En_Mora'].includes(item.estado)"
+                    :disabled="loadingOperaciones"
+                  >
+                    {{ loadingOperaciones ? 'Procesando...' : 'Pagar' }}
+                  </button>
+                  <button 
+                    class="btn-action warning" 
+                    @click="cancelarSolicitud(item)" 
+                    v-if="item.tipo === 'solicitud' && item.estado === 'Pendiente'"
+                    :disabled="loadingOperaciones"
+                  >
+                    {{ loadingOperaciones ? 'Cancelando...' : 'Cancelar' }}
                   </button>
                 </div>
               </div>
 
-              <div class="prestamo-progress">
+              <div class="prestamo-progress" v-if="item.tipo === 'prestamo' && item.fechaVencimiento">
                 <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: prestamo.porcentajeTiempo + '%' }"></div>
+                  <div class="progress-fill" :style="{ width: calcularPorcentajeTiempo(item) + '%' }"></div>
                 </div>
-                <span class="progress-text">{{ prestamo.diasRestantes }} días restantes</span>
+                <span class="progress-text">{{ calcularDiasRestantes(item) }} días restantes</span>
+              </div>
+
+              <div class="solicitud-progress" v-if="item.tipo === 'solicitud'">
+                <div class="progress-steps">
+                  <div class="step" :class="{ active: true, completed: ['Evaluando', 'Aprobada', 'Rechazada'].includes(item.estado) }">
+                    <span class="step-number">1</span>
+                    <span class="step-label">Enviada</span>
+                  </div>
+                  <div class="step" :class="{ active: ['Evaluando', 'Aprobada', 'Rechazada'].includes(item.estado), completed: ['Aprobada', 'Rechazada'].includes(item.estado) }">
+                    <span class="step-number">2</span>
+                    <span class="step-label">Evaluación</span>
+                  </div>
+                  <div class="step" :class="{ active: item.estado === 'Aprobada', completed: false }">
+                    <span class="step-number">3</span>
+                    <span class="step-label">Aprobación</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Estado vacío -->
-          <div class="empty-state" v-else>
+          <div class="empty-state" v-else-if="!loadingData">
             <div class="empty-icon">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
                 <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
               </svg>
             </div>
-            <h3>No tienes préstamos activos</h3>
+            <h3>{{ filtroEstado ? 'No hay elementos con este estado' : 'No tienes préstamos o solicitudes' }}</h3>
             <p>¡Comienza tu primer empéño y obtén el efectivo que necesitas!</p>
             <button class="btn-primary" @click="abrirFormularioEmpeno">
               Crear Nuevo Empéño
@@ -211,7 +288,7 @@
       </div>
     </main>
 
-    <!-- Modal para nuevo préstamo -->
+    <!-- Modal para nuevo préstamo - ARREGLADO EL SCROLL -->
     <Teleport to="body" v-if="mostrarNuevoPrestamo">
       <div class="modal-overlay" @click="cerrarModalNuevoPrestamo">
         <div class="modal-content formulario-modal" @click.stop>
@@ -222,12 +299,14 @@
             </svg>
           </button>
           
-          <!-- Componente del formulario -->
-          <FormularioNuevoEmpeno 
-            :visible="mostrarNuevoPrestamo"
-            @close="cerrarModalNuevoPrestamo"
-            @submit="procesarSolicitudEmpeno"
-          />
+          <!-- Contenedor con scroll arreglado -->
+          <div class="modal-scroll-container">
+            <FormularioNuevoEmpeno 
+              :visible="mostrarNuevoPrestamo"
+              @close="cerrarModalNuevoPrestamo"
+              @submit="procesarSolicitudEmpeno"
+            />
+          </div>
         </div>
       </div>
     </Teleport>
@@ -276,6 +355,11 @@
                 <option value="6">6 meses</option>
               </select>
             </div>
+            <div class="form-group">
+              <button class="btn-secondary full-width" @click="obtenerSimulacionOficial" :disabled="loadingSimulacion">
+                {{ loadingSimulacion ? 'Calculando...' : 'Obtener Cálculo Oficial' }}
+              </button>
+            </div>
           </div>
           <div class="calculator-result">
             <div class="result-item">
@@ -294,6 +378,28 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast notifications -->
+    <div v-if="notification.show" class="notification-toast" :class="notification.type">
+      <div class="notification-content">
+        <svg v-if="notification.type === 'success'" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <svg v-else-if="notification.type === 'error'" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+          <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span>{{ notification.message }}</span>
+      </div>
+      <button @click="notification.show = false" class="notification-close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -311,48 +417,34 @@ useHead({
   ]
 })
 
-// Auth composable
+// ===== COMPOSABLES Y DEPENDENCIAS =====
 const { user } = useAuth()
+const { api } = useApi()
+const { crearSolicitudEmpeno } = useSolicitudes() // AGREGAR ESTA LÍNEA
 
 // Importar el componente del formulario
 import FormularioNuevoEmpeno from '~/pages/empeno/FormularioNuevoEmpeno.vue'
 
-// Estado reactivo
+// ===== ESTADO REACTIVO =====
 const mostrarNuevoPrestamo = ref(false)
 const mostrarCalculadora = ref(false)
-const filtroEstado = ref('todos')
+const filtroEstado = ref('')
 
-// Datos de ejemplo para préstamos
-const prestamosActivos = ref([
-  {
-    id: 1,
-    articulo: 'Cadena de Oro 18k',
-    fecha: '2024-08-15',
-    fechaVencimiento: '2024-09-15',
-    montoPrestado: 5000,
-    interes: 5,
-    totalPagar: 5250,
-    estado: 'activo',
-    estadoTexto: 'Activo',
-    diasRestantes: 12,
-    porcentajeTiempo: 60
-  },
-  {
-    id: 2,
-    articulo: 'iPhone 14 Pro',
-    fecha: '2024-08-01',
-    fechaVencimiento: '2024-09-01',
-    montoPrestado: 8000,
-    interes: 5,
-    totalPagar: 8400,
-    estado: 'vencido',
-    estadoTexto: 'Vencido',
-    diasRestantes: -2,
-    porcentajeTiempo: 100
-  }
-])
+// Estados de carga
+const loadingData = ref(true)
+const loadingOperaciones = ref(false)
+const loadingSimulacion = ref(false)
+const error = ref(null)
 
-const prestamosPendientes = ref([])
+// Datos combinados (solicitudes + préstamos)
+const solicitudes = ref([])
+const prestamos = ref([])
+const estadisticas = ref({
+  prestamosActivos: 0,
+  solicitudesPendientes: 0,
+  totalPrestado: 0,
+  prestamosCompletados: 0
+})
 
 // Calculadora
 const calculadora = ref({
@@ -365,23 +457,62 @@ const calculadora = ref({
   totalPagar: 0
 })
 
-// Computed
-const totalPrestado = computed(() => {
-  return prestamosActivos.value.reduce((total, prestamo) => total + prestamo.montoPrestado, 0)
+// Sistema de notificaciones
+const notification = ref({
+  show: false,
+  type: 'success',
+  message: ''
 })
 
-const limiteDisponible = computed(() => {
-  return 50000 - totalPrestado.value // Límite de ejemplo
+// ===== COMPUTED PROPERTIES =====
+const itemsCombinados = computed(() => {
+  const items = []
+  
+  // Agregar solicitudes
+  solicitudes.value.forEach(solicitud => {
+    const articulo = solicitud.articulos?.[0]
+    items.push({
+      id: solicitud.id,
+      tipo: 'solicitud',
+      estado: solicitud.estado,
+      fecha: solicitud.fechaSolicitud,
+      observaciones: solicitud.observaciones,
+      valorEstimado: articulo?.valorEstimadoCliente || 0,
+      descripcion: articulo?.descripcion || 'Sin descripción',
+      marca: articulo?.marca,
+      modelo: articulo?.modelo,
+      articulos: solicitud.articulos || []
+    })
+  })
+  
+  // Agregar préstamos
+  prestamos.value.forEach(prestamo => {
+    items.push({
+      id: prestamo.id,
+      tipo: 'prestamo',
+      estado: prestamo.estado,
+      fecha: prestamo.fechaInicio,
+      fechaVencimiento: prestamo.fechaVencimiento,
+      montoPrestado: prestamo.montoPrestado,
+      tasaInteres: prestamo.tasaInteres,
+      saldoPendiente: prestamo.saldoPendiente,
+      descripcion: getArticuloDescripcion(prestamo),
+      contrato: prestamo.contrato
+    })
+  })
+  
+  // Ordenar por fecha (más recientes primero)
+  return items.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
 })
 
-const prestamosFiltrados = computed(() => {
-  if (filtroEstado.value === 'todos') {
-    return prestamosActivos.value
+const itemsFiltrados = computed(() => {
+  if (!filtroEstado.value) {
+    return itemsCombinados.value
   }
-  return prestamosActivos.value.filter(prestamo => prestamo.estado === filtroEstado.value)
+  return itemsCombinados.value.filter(item => item.estado === filtroEstado.value)
 })
 
-// Métodos
+// ===== MÉTODOS DE UTILIDAD =====
 const getUserInitials = () => {
   if (!user.value) return 'U'
   
@@ -394,63 +525,6 @@ const getUserInitials = () => {
   return `${inicialNombre}${inicialApellido}` || 'U'
 }
 
-const abrirFormularioEmpeno = () => {
-  mostrarNuevoPrestamo.value = true
-  console.log('Abriendo formulario de empéño...')
-}
-
-const cerrarModalNuevoPrestamo = () => {
-  mostrarNuevoPrestamo.value = false
-}
-
-const procesarSolicitudEmpeno = async (datosFormulario) => {
-  try {
-    // Aquí harías la petición a tu API para procesar la solicitud
-    // Ejemplo de estructura de datos que recibes del formulario:
-    /*
-    datosFormulario contiene:
-    - tipoArticulo: ID del tipo de artículo
-    - descripcion: Descripción detallada
-    - estadoFisico: Estado del artículo
-    - valorEstimado: Valor estimado por el cliente
-    - marca, modelo: Para artículos electrónicos
-    - especificacionesTecnicas: Para electrónicos
-    - fotos: Array de archivos de imagen
-    - documentoTecnico: Archivo PDF/DOC (opcional)
-    - montoSolicitado: Monto del préstamo solicitado
-    - plazoMeses: Plazo en meses (1-6)
-    - modalidadPago: 'mensual' o 'semanal'
-    - aceptaTerminos: boolean
-    - plan_pagos: JSON con plan calculado
-    - rango_avaluo: JSON con rango de avalúo
-    */
-    
-    // const response = await $fetch('/api/empenos/solicitudes', {
-    //   method: 'POST',
-    //   body: datosFormulario
-    // })
-    
-    console.log('Datos de la solicitud:', datosFormulario)
-    
-    // Simular procesamiento exitoso
-    alert('¡Solicitud enviada exitosamente! Te contactaremos pronto para el avalúo.')
-    cerrarModalNuevoPrestamo()
-    
-    // Opcional: actualizar la lista de préstamos o redirigir
-    // await refreshPrestamos()
-    
-  } catch (error) {
-    console.error('Error al procesar solicitud:', error)
-    alert('Error al enviar la solicitud. Inténtalo nuevamente.')
-  }
-}
-
-const contactarAsesor = () => {
-  // Aquí puedes implementar la lógica para contactar al asesor
-  alert('Redirigiendo a WhatsApp...')
-  window.open('https://wa.me/50212345678?text=Hola,%20me%20interesa%20hacer%20un%20empeño', '_blank')
-}
-
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('es-GT', {
     minimumFractionDigits: 2,
@@ -459,6 +533,7 @@ const formatCurrency = (amount) => {
 }
 
 const formatDate = (dateString) => {
+  if (!dateString) return 'N/A'
   return new Date(dateString).toLocaleDateString('es-GT', {
     year: 'numeric',
     month: 'short',
@@ -466,10 +541,286 @@ const formatDate = (dateString) => {
   })
 }
 
+const formatEstado = (estado) => {
+  const estados = {
+    'Pendiente': 'Pendiente',
+    'Evaluando': 'En Evaluación',
+    'Aprobada': 'Aprobada',
+    'Rechazada': 'Rechazada',
+    'Activo': 'Activo',
+    'Vencido': 'Vencido', 
+    'En_Mora': 'En Mora',
+    'Pagado': 'Pagado'
+  }
+  return estados[estado] || estado
+}
+
 const isVencido = (fechaVencimiento) => {
+  if (!fechaVencimiento) return false
   return new Date(fechaVencimiento) < new Date()
 }
 
+const getItemTitulo = (item) => {
+  if (item.tipo === 'solicitud') {
+    return item.descripcion || 'Solicitud de empéño'
+  }
+  return item.descripcion || 'Préstamo activo'
+}
+
+const getItemFecha = (item) => {
+  if (item.tipo === 'solicitud') {
+    return `Solicitud: ${formatDate(item.fecha)}`
+  }
+  return `Fecha inicio: ${formatDate(item.fecha)}`
+}
+
+const getArticuloDescripcion = (prestamo) => {
+  if (prestamo.contrato?.solicitud?.articulos?.[0]) {
+    const articulo = prestamo.contrato.solicitud.articulos[0]
+    return `${articulo.descripcion}${articulo.marca ? ` - ${articulo.marca}` : ''}`
+  }
+  return 'Artículo en empéño'
+}
+
+const calcularDiasRestantes = (item) => {
+  if (!item.fechaVencimiento) return 0
+  
+  const hoy = new Date()
+  const vencimiento = new Date(item.fechaVencimiento)
+  const diferencia = vencimiento - hoy
+  const dias = Math.ceil(diferencia / (1000 * 60 * 60 * 24))
+  
+  return Math.max(0, dias)
+}
+
+const calcularPorcentajeTiempo = (item) => {
+  if (!item.fecha || !item.fechaVencimiento) return 0
+  
+  const inicio = new Date(item.fecha)
+  const vencimiento = new Date(item.fechaVencimiento)
+  const hoy = new Date()
+  
+  const tiempoTotal = vencimiento - inicio
+  const tiempoTranscurrido = hoy - inicio
+  
+  const porcentaje = Math.min(100, Math.max(0, (tiempoTranscurrido / tiempoTotal) * 100))
+  return Math.round(porcentaje)
+}
+
+// ===== MÉTODOS DE NOTIFICACIÓN =====
+const mostrarNotificacion = (message, type = 'success') => {
+  notification.value = {
+    show: true,
+    type,
+    message
+  }
+  
+  setTimeout(() => {
+    notification.value.show = false
+  }, 5000)
+}
+
+// ===== MÉTODOS DE CARGA DE DATOS =====
+const cargarSolicitudes = async () => {
+  try {
+    console.log('🔄 Cargando solicitudes...')
+    const response = await api('/solicitudes')
+    
+    if (response.success) {
+      solicitudes.value = response.data.solicitudes || []
+      console.log('✅ Solicitudes cargadas:', solicitudes.value.length)
+    }
+  } catch (err) {
+    console.error('❌ Error cargando solicitudes:', err)
+  }
+}
+
+const cargarPrestamos = async () => {
+  try {
+    console.log('🔄 Cargando préstamos...')
+    const response = await api('/prestamos', {
+      params: { limite: 50, pagina: 1 }
+    })
+    
+    if (response.success) {
+      prestamos.value = response.data.prestamos || []
+      console.log('✅ Préstamos cargados:', prestamos.value.length)
+    }
+  } catch (err) {
+    console.error('❌ Error cargando préstamos:', err)
+    // No es error crítico si no hay préstamos aún
+  }
+}
+
+const calcularEstadisticas = () => {
+  const stats = {
+    prestamosActivos: prestamos.value.filter(p => p.estado === 'Activo').length,
+    solicitudesPendientes: solicitudes.value.filter(s => s.estado === 'Pendiente').length,
+    totalPrestado: prestamos.value.reduce((sum, p) => sum + (Number(p.montoPrestado) || 0), 0),
+    prestamosCompletados: prestamos.value.filter(p => p.estado === 'Pagado').length
+  }
+  
+  estadisticas.value = stats
+  console.log('📊 Estadísticas calculadas:', stats)
+}
+
+const cargarDatos = async () => {
+  try {
+    loadingData.value = true
+    error.value = null
+    
+    console.log('🔄 Cargando todos los datos...')
+    
+    // Cargar solicitudes y préstamos en paralelo
+    await Promise.all([
+      cargarSolicitudes(),
+      cargarPrestamos()
+    ])
+    
+    // Calcular estadísticas
+    calcularEstadisticas()
+    
+  } catch (err) {
+    console.error('❌ Error cargando datos:', err)
+    error.value = err.message || 'Error al cargar los datos'
+    mostrarNotificacion('Error al cargar los datos', 'error')
+  } finally {
+    loadingData.value = false
+  }
+}
+
+const aplicarFiltros = () => {
+  console.log('🔍 Aplicando filtro:', filtroEstado.value)
+}
+
+// ===== MÉTODOS DE OPERACIONES =====
+const abrirFormularioEmpeno = () => {
+  mostrarNuevoPrestamo.value = true
+  console.log('📝 Abriendo formulario de empéño...')
+}
+
+const cerrarModalNuevoPrestamo = () => {
+  mostrarNuevoPrestamo.value = false
+}
+
+const procesarSolicitudEmpeno = async (formData) => {
+  try {
+    console.log('📤 Procesando solicitud de empéño...')
+    
+    // Mostrar loading mientras se procesa
+    loadingData.value = true
+    
+    // Obtener token del usuario autenticado
+    const { getToken } = useAuth()
+    const token = getToken()
+    
+    if (!token) {
+      throw new Error('No tienes sesión activa. Por favor inicia sesión.')
+    }
+    
+    // Hacer petición directa al backend con FormData
+    console.log('🚀 Enviando solicitud al backend...')
+    const response = await fetch('http://localhost:3001/api/solicitudes', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+        // NO agregar Content-Type, fetch lo manejará automáticamente para FormData
+      },
+      body: formData
+    })
+    
+    console.log('📡 Respuesta recibida:', response.status, response.statusText)
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || `Error ${response.status}: ${response.statusText}`)
+    }
+    
+    const result = await response.json()
+    console.log('✅ Solicitud exitosa:', result)
+    
+    // Cerrar modal primero
+    cerrarModalNuevoPrestamo()
+    
+    // Mostrar notificación de éxito
+    mostrarNotificacion(
+      `¡Solicitud enviada exitosamente! Número: ${result.data.solicitud.numero}. Te contactaremos pronto para el avalúo.`, 
+      'success'
+    )
+    
+    // Recargar datos para mostrar la nueva solicitud
+    await cargarDatos()
+    
+  } catch (error) {
+    console.error('❌ Error procesando solicitud:', error)
+    mostrarNotificacion('Error al enviar la solicitud: ' + (error.message || 'Error desconocido'), 'error')
+  } finally {
+    loadingData.value = false
+  }
+}
+
+const verDetalle = (item) => {
+  console.log('👁️ Ver detalle:', item)
+  if (item.tipo === 'solicitud') {
+    navigateTo(`/empeno/solicitudes/${item.id}`)
+  } else {
+    navigateTo(`/empeno/${item.id}`)
+  }
+}
+
+const renovarPrestamo = async (prestamo) => {
+  try {
+    loadingOperaciones.value = true
+    mostrarNotificacion('Funcionalidad de renovación próximamente', 'info')
+  } catch (error) {
+    mostrarNotificacion('Error al renovar el préstamo', 'error')
+  } finally {
+    loadingOperaciones.value = false
+  }
+}
+
+const pagarPrestamo = async (prestamo) => {
+  try {
+    loadingOperaciones.value = true
+    navigateTo(`/empeno/${prestamo.id}?action=pagar`)
+  } catch (error) {
+    mostrarNotificacion('Error al procesar el pago', 'error')
+  } finally {
+    loadingOperaciones.value = false
+  }
+}
+
+const cancelarSolicitud = async (solicitud) => {
+  try {
+    loadingOperaciones.value = true
+    console.log('❌ Cancelando solicitud:', solicitud.id)
+    
+    const response = await api(`/solicitudes/${solicitud.id}/cancelar`, {
+      method: 'PUT',
+      body: { motivo: 'Cancelada por el usuario' }
+    })
+    
+    if (response.success) {
+      mostrarNotificacion('Solicitud cancelada exitosamente', 'success')
+      await cargarDatos()
+    }
+  } catch (error) {
+    console.error('❌ Error cancelando solicitud:', error)
+    mostrarNotificacion('Error al cancelar la solicitud', 'error')
+  } finally {
+    loadingOperaciones.value = false
+  }
+}
+
+const descargarReporte = async () => {
+  try {
+    mostrarNotificacion('Funcionalidad de reportes próximamente', 'info')
+  } catch (error) {
+    mostrarNotificacion('Error al descargar el reporte', 'error')
+  }
+}
+
+// ===== CALCULADORA =====
 const calcularPrestamo = () => {
   const valor = parseFloat(calculadora.value.valor) || 0
   const porcentaje = parseFloat(calculadora.value.porcentaje) || 50
@@ -481,36 +832,62 @@ const calcularPrestamo = () => {
   calculadora.value.totalPagar = calculadora.value.montoPrestamo + calculadora.value.interesTotal
 }
 
-const verDetalle = (prestamo) => {
-  // Navegar a la página de detalle del préstamo
-  navigateTo(`/empeno/${prestamo.id}`)
-}
-
-const renovarPrestamo = (prestamo) => {
-  alert(`Renovando préstamo de ${prestamo.articulo}...`)
-  // Implementar lógica de renovación
-}
-
-const pagarPrestamo = (prestamo) => {
-  alert(`Procesando pago de ${prestamo.articulo}...`)
-  // Implementar lógica de pago
-}
-
-const descargarReporte = () => {
-  alert('Descargando reporte...')
-  // Implementar lógica de descarga
-}
-
-// Verificar autenticación
-onMounted(() => {
-  if (!user.value) {
-    navigateTo('/login')
+const obtenerSimulacionOficial = async () => {
+  try {
+    loadingSimulacion.value = true
+    
+    const response = await api('/prestamos/simulacion', {
+      params: {
+        valorArticulo: calculadora.value.valor,
+        porcentajePrestamo: calculadora.value.porcentaje,
+        plazoMeses: calculadora.value.plazo
+      }
+    })
+    
+    if (response.success) {
+      const simData = response.data
+      calculadora.value.montoPrestamo = simData.montoPrestamo
+      calculadora.value.interesTotal = simData.interesTotal
+      calculadora.value.totalPagar = simData.totalPagar
+      calculadora.value.interesMensual = simData.tasaInteres
+      
+      mostrarNotificacion('Simulación actualizada con datos oficiales', 'success')
+    }
+    
+  } catch (error) {
+    console.error('❌ Error obteniendo simulación:', error)
+    mostrarNotificacion('Error al obtener la simulación oficial', 'error')
+  } finally {
+    loadingSimulacion.value = false
   }
+}
+
+// ===== LIFECYCLE HOOKS =====
+onMounted(async () => {
+  console.log('🚀 Inicializando página de empéños...')
+  
+  if (!user.value) {
+    console.log('❌ Usuario no autenticado, redirigiendo...')
+    navigateTo('/login')
+    return
+  }
+  
+  console.log('✅ Usuario autenticado:', user.value.nombre)
+  
+  // Cargar datos iniciales
+  await cargarDatos()
+  
+  // Calcular préstamo inicial
   calcularPrestamo()
+})
+
+onUnmounted(() => {
+  notification.value.show = false
 })
 </script>
 
 <style scoped>
+/* Mantener todos los estilos originales con mejoras */
 .empenos-page {
   min-height: 100vh;
   background: #f8f9fa;
@@ -595,6 +972,52 @@ onMounted(() => {
   font-size: 0.9rem;
 }
 
+/* Loading y Error States */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #D4AF37;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+  min-height: 50vh;
+}
+
+.error-icon {
+  color: #E74C3C;
+  margin-bottom: 1rem;
+}
+
 /* Main content */
 .empenos-main {
   padding: 2rem 0;
@@ -645,7 +1068,7 @@ onMounted(() => {
   border-left-color: #D4AF37;
 }
 
-.stat-card.available {
+.stat-card.completed {
   border-left-color: #3498DB;
 }
 
@@ -672,7 +1095,7 @@ onMounted(() => {
   color: #D4AF37;
 }
 
-.stat-card.available .stat-icon {
+.stat-card.completed .stat-icon {
   background: rgba(52, 152, 219, 0.1);
   color: #3498DB;
 }
@@ -799,6 +1222,22 @@ onMounted(() => {
   transform: translateY(-2px);
 }
 
+.prestamo-card.pendiente {
+  border-left-color: #F39C12;
+}
+
+.prestamo-card.evaluando {
+  border-left-color: #3498DB;
+}
+
+.prestamo-card.aprobada {
+  border-left-color: #27AE60;
+}
+
+.prestamo-card.rechazada {
+  border-left-color: #E74C3C;
+}
+
 .prestamo-card.activo {
   border-left-color: #27AE60;
 }
@@ -807,8 +1246,12 @@ onMounted(() => {
   border-left-color: #E74C3C;
 }
 
-.prestamo-card.renovado {
-  border-left-color: #F39C12;
+.prestamo-card.en-mora {
+  border-left-color: #E67E22;
+}
+
+.prestamo-card.pagado {
+  border-left-color: #95A5A6;
 }
 
 .prestamo-header {
@@ -828,9 +1271,28 @@ onMounted(() => {
 }
 
 .prestamo-fecha {
-  margin: 0;
+  margin: 0.25rem 0;
   color: #666;
   font-size: 0.9rem;
+}
+
+.tipo-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+.tipo-badge.solicitud {
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498DB;
+}
+
+.tipo-badge.prestamo {
+  background: rgba(39, 174, 96, 0.1);
+  color: #27AE60;
 }
 
 .estado-badge {
@@ -839,6 +1301,26 @@ onMounted(() => {
   font-size: 0.8rem;
   font-weight: 500;
   text-transform: uppercase;
+}
+
+.estado-badge.pendiente {
+  background: rgba(243, 156, 18, 0.1);
+  color: #F39C12;
+}
+
+.estado-badge.evaluando {
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498DB;
+}
+
+.estado-badge.aprobada {
+  background: rgba(39, 174, 96, 0.1);
+  color: #27AE60;
+}
+
+.estado-badge.rechazada {
+  background: rgba(231, 76, 60, 0.1);
+  color: #E74C3C;
 }
 
 .estado-badge.activo {
@@ -851,9 +1333,14 @@ onMounted(() => {
   color: #E74C3C;
 }
 
-.estado-badge.renovado {
-  background: rgba(243, 156, 18, 0.1);
-  color: #F39C12;
+.estado-badge.en-mora {
+  background: rgba(230, 126, 34, 0.1);
+  color: #E67E22;
+}
+
+.estado-badge.pagado {
+  background: rgba(149, 165, 166, 0.1);
+  color: #95A5A6;
 }
 
 .prestamo-body {
@@ -908,6 +1395,11 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
+.btn-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn-action.primary {
   background: #3498DB;
   color: white;
@@ -923,7 +1415,12 @@ onMounted(() => {
   color: white;
 }
 
-.btn-action:hover {
+.btn-action.warning {
+  background: #E67E22;
+  color: white;
+}
+
+.btn-action:not(:disabled):hover {
   transform: translateY(-1px);
   filter: brightness(1.1);
 }
@@ -956,6 +1453,83 @@ onMounted(() => {
   font-size: 0.8rem;
   color: #666;
   white-space: nowrap;
+}
+
+/* Progreso de solicitudes */
+.solicitud-progress {
+  padding: 1rem 1.5rem;
+  background: #F8F9FA;
+  border-top: 1px solid #E0E0E0;
+}
+
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.progress-steps::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #E0E0E0;
+  z-index: 1;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+  z-index: 2;
+  background: #F8F9FA;
+  padding: 0 0.5rem;
+}
+
+.step-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #E0E0E0;
+  color: #666;
+  font-weight: bold;
+  font-size: 0.8rem;
+  transition: all 0.3s ease;
+}
+
+.step.active .step-number {
+  background: #3498DB;
+  color: white;
+}
+
+.step.completed .step-number {
+  background: #27AE60;
+  color: white;
+}
+
+.step-label {
+  font-size: 0.7rem;
+  color: #666;
+  text-align: center;
+  font-weight: 500;
+}
+
+.step.active .step-label {
+  color: #3498DB;
+  font-weight: 600;
+}
+
+.step.completed .step-label {
+  color: #27AE60;
+  font-weight: 600;
 }
 
 /* Empty state */
@@ -998,7 +1572,27 @@ onMounted(() => {
   transform: translateY(-1px);
 }
 
-/* Modal styles */
+.btn-secondary {
+  background: #3498DB;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: #2980B9;
+  transform: translateY(-1px);
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Modal styles - ARREGLADO EL SCROLL */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1020,9 +1614,10 @@ onMounted(() => {
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
-  overflow-y: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .formulario-modal {
@@ -1030,13 +1625,33 @@ onMounted(() => {
   max-height: 95vh;
   width: 95%;
   position: relative;
-  overflow: hidden;
 }
 
-.formulario-modal .formulario-empeno {
-  border-radius: 0;
-  max-height: 95vh;
+/* ARREGLO DEL SCROLL - CONTENEDOR ESPECIAL */
+.modal-scroll-container {
+  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(95vh - 2rem);
+  padding: 0;
+}
+
+.modal-scroll-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-scroll-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.modal-scroll-container::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 4px;
+}
+
+.modal-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #B8941F;
 }
 
 .modal-close-floating {
@@ -1197,6 +1812,81 @@ onMounted(() => {
   font-size: 1.3rem;
 }
 
+/* Notification Toast */
+.notification-toast {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 1100;
+  max-width: 400px;
+  border-left: 4px solid;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-toast.success {
+  border-left-color: #27AE60;
+  color: #27AE60;
+}
+
+.notification-toast.error {
+  border-left-color: #E74C3C;
+  color: #E74C3C;
+}
+
+.notification-toast.warning {
+  border-left-color: #F39C12;
+  color: #F39C12;
+}
+
+.notification-toast.info {
+  border-left-color: #3498DB;
+  color: #3498DB;
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.notification-content span {
+  color: #2C3E50;
+  font-weight: 500;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.notification-close:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .header-container {
@@ -1251,8 +1941,19 @@ onMounted(() => {
     right: 0.5rem;
   }
 
-  .modal-footer {
-    flex-direction: column;
+  .notification-toast {
+    top: 1rem;
+    right: 1rem;
+    left: 1rem;
+    max-width: none;
+  }
+
+  .progress-steps {
+    gap: 0.5rem;
+  }
+
+  .step-label {
+    font-size: 0.6rem;
   }
 }
 </style>

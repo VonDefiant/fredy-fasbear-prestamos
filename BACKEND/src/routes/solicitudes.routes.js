@@ -1,21 +1,15 @@
 // ===============================================
 // Archivo: BACKEND/src/routes/solicitudes.routes.js
-// Rutas para la gestión de solicitudes de empéño - CORREGIDO SEGÚN SCHEMA
+// Rutas para la gestión de solicitudes de empéño - CORREGIDO
 // ===============================================
 
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { catchAsync } from '../middleware/errorHandler.js';
+import { authenticateToken } from '../middleware/auth.js'; // IMPORTAR MIDDLEWARE REAL
 
 const router = express.Router();
 const prisma = new PrismaClient();
-
-// Middleware de autenticación temporal (simplificado para desarrollo)
-const authenticateToken = (req, res, next) => {
-  // Por ahora usamos un usuario temporal, luego conectas tu auth real
-  req.user = { userId: 1 }; // ID 1 del usuario administrador que se crea en el seed
-  next();
-};
 
 // Middleware para logging
 router.use((req, res, next) => {
@@ -23,7 +17,7 @@ router.use((req, res, next) => {
   next();
 });
 
-// Aplicar autenticación
+// USAR MIDDLEWARE REAL DE AUTENTICACIÓN
 router.use(authenticateToken);
 
 // GET /api/solicitudes/categorias - CORREGIDO
@@ -44,7 +38,7 @@ router.get('/categorias', catchAsync(async (req, res) => {
       orderBy: { nombre: 'asc' }
     });
 
-    // CORREGIDO: Formatear los datos correctamente
+    // Formatear los datos correctamente
     const categorias = tiposArticulo.map(tipo => ({
       id: tipo.id,
       nombre: tipo.nombre,
@@ -55,12 +49,12 @@ router.get('/categorias', catchAsync(async (req, res) => {
 
     console.log('✅ Categorías procesadas:', categorias);
 
-    // Devolver en formato que espera el frontend
     res.status(200).json({
       success: true,
-      data: categorias, // Frontend espera result.data directamente
+      data: categorias,
       timestamp: new Date().toISOString()
     });
+    
   } catch (error) {
     console.error('❌ Error obteniendo categorías:', error);
     res.status(500).json({
@@ -71,86 +65,132 @@ router.get('/categorias', catchAsync(async (req, res) => {
   }
 }));
 
-// GET /api/solicitudes
+// GET /api/solicitudes - CORREGIDO
 router.get('/', catchAsync(async (req, res) => {
-  const { userId } = req.user;
+  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
+  const userId = req.user.id;
+  const { estado, limite = 10, pagina = 1 } = req.query;
+  
   console.log(`📋 Obteniendo solicitudes para usuario: ${userId}`);
 
   try {
-    const solicitudes = await prisma.solicitudPrestamo.findMany({
-      where: { usuarioId: userId },
-      include: {
-        articulos: {
-          include: {
-            tipoArticulo: true
-          }
-        }
-      },
-      orderBy: { fechaSolicitud: 'desc' }
-    });
+    const whereClause = {
+      usuarioId: userId
+    };
 
-    const solicitudesFormateadas = solicitudes.map(solicitud => ({
-      id: solicitud.id,
-      numero: `SOL-2024-${String(solicitud.id).padStart(6, '0')}`,
-      estado: solicitud.estado.toLowerCase(),
-      estadoTexto: solicitud.estado === 'Pendiente' ? 'En revisión' : solicitud.estado,
-      fechaSolicitud: solicitud.fechaSolicitud,
-      montoSolicitado: parseFloat(solicitud.articulos[0]?.valorEstimadoCliente || 0),
-      articuloPrincipal: solicitud.articulos[0] ? {
-        tipo: solicitud.articulos[0].tipoArticulo.nombre,
-        descripcion: solicitud.articulos[0].descripcion
-      } : null
-    }));
+    if (estado && estado !== 'todos') {
+      whereClause.estado = estado.charAt(0).toUpperCase() + estado.slice(1);
+    }
+
+    const skip = (parseInt(pagina) - 1) * parseInt(limite);
+
+    const [solicitudes, total] = await Promise.all([
+      prisma.solicitudPrestamo.findMany({
+        where: whereClause,
+        include: {
+          articulos: {
+            include: {
+              tipoArticulo: {
+                select: {
+                  nombre: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          fechaSolicitud: 'desc'
+        },
+        skip,
+        take: parseInt(limite)
+      }),
+      prisma.solicitudPrestamo.count({ where: whereClause })
+    ]);
+
+    const solicitudesFormateadas = solicitudes.map(solicitud => {
+      const articulo = solicitud.articulos?.[0];
+      return {
+        id: solicitud.id,
+        numero: `SOL-2024-${String(solicitud.id).padStart(6, '0')}`,
+        estado: solicitud.estado,
+        fechaSolicitud: solicitud.fechaSolicitud,
+        fechaEvaluacion: solicitud.fechaEvaluacion,
+        observaciones: solicitud.observaciones,
+        articulos: solicitud.articulos.map(art => ({
+          id: art.id,
+          descripcion: art.descripcion,
+          marca: art.marca,
+          modelo: art.modelo,
+          valorEstimadoCliente: art.valorEstimadoCliente,
+          tipoArticulo: art.tipoArticulo?.nombre
+        }))
+      };
+    });
 
     res.status(200).json({
       success: true,
-      data: solicitudesFormateadas,
-      total: solicitudesFormateadas.length,
+      data: {
+        solicitudes: solicitudesFormateadas,
+        paginacion: {
+          total,
+          pagina: parseInt(pagina),
+          limite: parseInt(limite),
+          totalPaginas: Math.ceil(total / parseInt(limite))
+        }
+      },
       timestamp: new Date().toISOString()
     });
+
   } catch (error) {
     console.error('❌ Error obteniendo solicitudes:', error);
     res.status(500).json({
       success: false,
-      message: 'Error obteniendo solicitudes'
+      message: 'Error obteniendo solicitudes',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
     });
   }
 }));
 
-// POST /api/solicitudes - CORREGIDO según schema
+// POST /api/solicitudes - CORREGIDO
 router.post('/', catchAsync(async (req, res) => {
-  const { userId } = req.user;
-  console.log('🆕 Creando nueva solicitud para usuario:', userId);
-  
+  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
+  const userId = req.user.id;
+  const {
+    tipoArticulo,
+    descripcion,
+    estadoFisico,
+    valorEstimado,
+    marca,
+    modelo,
+    especificacionesTecnicas,
+    montoSolicitado,
+    plazoMeses,
+    modalidadPago,
+    aceptaTerminos
+  } = req.body;
+
+  console.log(`🆕 Creando nueva solicitud para usuario: ${userId}`);
+  console.log('📋 Datos recibidos:', {
+    tipoArticulo,
+    descripcion: descripcion?.substring(0, 50) + '...',
+    valorEstimado,
+    montoSolicitado,
+    plazoMeses
+  });
+
   try {
-    const {
-      tipoArticulo,
-      descripcion,
-      estadoFisico,
-      valorEstimado,
-      marca,
-      modelo,
-      especificacionesTecnicas,
-      montoSolicitado,  // Este es el monto que el usuario quiere
-      plazoMeses,
-      modalidadPago,
-      planPagos,
-      rangoAvaluo
-    } = req.body;
-
-    console.log('📋 Datos recibidos:', {
-      tipoArticulo,
-      descripcion: descripcion?.substring(0, 50) + '...',
-      valorEstimado,
-      montoSolicitado,
-      plazoMeses
-    });
-
     // Validaciones básicas
-    if (!tipoArticulo || !descripcion || !estadoFisico || !valorEstimado) {
+    if (!tipoArticulo || !descripcion || !valorEstimado || !montoSolicitado) {
       return res.status(400).json({
         success: false,
-        message: 'Faltan campos requeridos: tipoArticulo, descripcion, estadoFisico, valorEstimado'
+        message: 'Faltan campos obligatorios: tipoArticulo, descripcion, valorEstimado, montoSolicitado'
+      });
+    }
+
+    if (!aceptaTerminos || aceptaTerminos === 'false') {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe aceptar los términos y condiciones'
       });
     }
 
@@ -166,18 +206,18 @@ router.post('/', catchAsync(async (req, res) => {
       });
     }
 
-    // CORREGIDO: Crear según el schema correcto
-    const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Crear la solicitud (solo con campos que existen en el schema)
+    // Crear la solicitud y el artículo en una transacción
+    const result = await prisma.$transaction(async (tx) => {
+      // Crear la solicitud
       const nuevaSolicitud = await tx.solicitudPrestamo.create({
         data: {
           usuarioId: userId,
           estado: 'Pendiente',
-          observaciones: `Solicitud automática. Monto solicitado: Q${montoSolicitado || 'No especificado'}. Plazo: ${plazoMeses || 'No especificado'} meses. Plan: ${JSON.stringify(planPagos) || 'No especificado'}`
+          observaciones: null
         }
       });
 
-      // 2. Crear el artículo asociado (con los campos correctos del schema)
+      // Crear el artículo asociado
       const nuevoArticulo = await tx.articulo.create({
         data: {
           solicitudId: nuevaSolicitud.id,
@@ -185,10 +225,10 @@ router.post('/', catchAsync(async (req, res) => {
           descripcion: descripcion,
           marca: marca || null,
           modelo: modelo || null,
-          serie: null, // Si no lo envías, será null
-          color: null, // Si no lo envías, será null
-          estadoFisico: estadoFisico,
-          valorEstimadoCliente: parseFloat(valorEstimado), // El valor estimado del cliente
+          serie: null,
+          color: null,
+          estadoFisico: estadoFisico || 'Bueno',
+          valorEstimadoCliente: parseFloat(valorEstimado),
           especificacionesTecnicas: especificacionesTecnicas || null
         }
       });
@@ -197,21 +237,20 @@ router.post('/', catchAsync(async (req, res) => {
     });
 
     console.log('✅ Solicitud creada exitosamente:', {
-      solicitudId: resultado.solicitud.id,
-      articuloId: resultado.articulo.id
+      solicitudId: result.solicitud.id,
+      articuloId: result.articulo.id
     });
 
-    // Respuesta de éxito
     res.status(201).json({
       success: true,
       message: 'Solicitud creada exitosamente',
       data: {
-        solicitudId: resultado.solicitud.id,
-        numeroSolicitud: `SOL-2024-${String(resultado.solicitud.id).padStart(6, '0')}`,
-        estado: resultado.solicitud.estado,
-        fechaSolicitud: resultado.solicitud.fechaSolicitud,
-        montoSolicitado: parseFloat(montoSolicitado || valorEstimado),
-        articuloId: resultado.articulo.id
+        solicitud: {
+          id: result.solicitud.id,
+          numero: `SOL-2024-${String(result.solicitud.id).padStart(6, '0')}`,
+          estado: result.solicitud.estado,
+          fechaSolicitud: result.solicitud.fechaSolicitud
+        }
       },
       timestamp: new Date().toISOString()
     });
@@ -221,14 +260,15 @@ router.post('/', catchAsync(async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor al crear la solicitud',
-      error: error.message
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
     });
   }
 }));
 
-// GET /api/solicitudes/:id - Obtener solicitud específica
+// GET /api/solicitudes/:id - CORREGIDO
 router.get('/:id', catchAsync(async (req, res) => {
-  const { userId } = req.user;
+  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
+  const userId = req.user.id;
   const solicitudId = parseInt(req.params.id);
 
   console.log(`📋 Obteniendo solicitud ${solicitudId} para usuario ${userId}`);
@@ -298,12 +338,61 @@ router.get('/:id', catchAsync(async (req, res) => {
     console.error('❌ Error obteniendo solicitud:', error);
     res.status(500).json({
       success: false,
-      message: 'Error obteniendo la solicitud'
+      message: 'Error obteniendo la solicitud',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
     });
   }
 }));
 
-// PUT /api/solicitudes/:id/estado - Actualizar estado de solicitud
+// PUT /api/solicitudes/:id/cancelar - CORREGIDO
+router.put('/:id/cancelar', catchAsync(async (req, res) => {
+  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
+  const userId = req.user.id;
+  const solicitudId = parseInt(req.params.id);
+  const { motivo } = req.body;
+
+  console.log(`🚫 Cancelando solicitud ${solicitudId} para usuario ${userId}`);
+
+  try {
+    const solicitudActualizada = await prisma.solicitudPrestamo.updateMany({
+      where: {
+        id: solicitudId,
+        usuarioId: userId,
+        estado: {
+          in: ['Pendiente', 'Evaluando']
+        }
+      },
+      data: {
+        estado: 'Rechazada',
+        observaciones: `Cancelada por el usuario. Motivo: ${motivo || 'No especificado'}`,
+        fechaEvaluacion: new Date()
+      }
+    });
+
+    if (solicitudActualizada.count === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se pudo cancelar la solicitud. Verifica que sea tuya y esté en estado pendiente.'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Solicitud cancelada exitosamente',
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error cancelando solicitud:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cancelando solicitud',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+    });
+  }
+}));
+
+// PUT /api/solicitudes/:id/estado - Actualizar estado de solicitud (Admin)
 router.put('/:id/estado', catchAsync(async (req, res) => {
   const solicitudId = parseInt(req.params.id);
   const { estado, observaciones } = req.body;
@@ -333,78 +422,22 @@ router.put('/:id/estado', catchAsync(async (req, res) => {
       success: true,
       message: 'Estado actualizado exitosamente',
       data: {
-        id: solicitudActualizada.id,
-        estado: solicitudActualizada.estado,
-        observaciones: solicitudActualizada.observaciones,
-        fechaEvaluacion: solicitudActualizada.fechaEvaluacion
+        solicitud: {
+          id: solicitudActualizada.id,
+          estado: solicitudActualizada.estado,
+          observaciones: solicitudActualizada.observaciones,
+          fechaEvaluacion: solicitudActualizada.fechaEvaluacion
+        }
       },
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
     console.error('❌ Error actualizando estado:', error);
-    
-    if (error.code === 'P2025') {
-      return res.status(404).json({
-        success: false,
-        message: 'Solicitud no encontrada'
-      });
-    }
-
     res.status(500).json({
       success: false,
-      message: 'Error actualizando el estado de la solicitud'
-    });
-  }
-}));
-
-// DELETE /api/solicitudes/:id - Cancelar solicitud
-router.delete('/:id', catchAsync(async (req, res) => {
-  const { userId } = req.user;
-  const solicitudId = parseInt(req.params.id);
-
-  console.log(`🗑️ Cancelando solicitud ${solicitudId} para usuario ${userId}`);
-
-  try {
-    const solicitud = await prisma.solicitudPrestamo.findFirst({
-      where: {
-        id: solicitudId,
-        usuarioId: userId,
-        estado: 'Pendiente'
-      }
-    });
-
-    if (!solicitud) {
-      return res.status(404).json({
-        success: false,
-        message: 'Solicitud no encontrada o no se puede cancelar'
-      });
-    }
-
-    const solicitudCancelada = await prisma.solicitudPrestamo.update({
-      where: { id: solicitudId },
-      data: {
-        estado: 'Rechazada',
-        observaciones: 'Cancelada por el usuario',
-        fechaEvaluacion: new Date()
-      }
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Solicitud cancelada exitosamente',
-      data: {
-        id: solicitudCancelada.id,
-        estado: solicitudCancelada.estado
-      },
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('❌ Error cancelando solicitud:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error cancelando la solicitud'
+      message: 'Error actualizando estado de solicitud',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
     });
   }
 }));
