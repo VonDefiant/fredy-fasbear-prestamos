@@ -90,6 +90,7 @@
               rows="4"
               required
               minlength="10"
+              maxlength="500"
             ></textarea>
             <div class="char-counter">
               {{ formulario.descripcion.length }}/500 caracteres
@@ -189,7 +190,11 @@
               rows="4"
               required
               minlength="20"
+              maxlength="300"
             ></textarea>
+            <div class="char-counter">
+              {{ formulario.especificacionesTecnicas.length }}/300 caracteres
+            </div>
           </div>
         </div>
       </div>
@@ -219,13 +224,13 @@
               </svg>
               <h3>Sube fotos de tu artículo</h3>
               <p>Arrastra las imágenes aquí o <button type="button" @click="$refs.fileInput.click()" class="upload-button">selecciona archivos</button></p>
-              <small>Máximo 5 fotos, 5MB cada una. Formatos: JPG, PNG, WEBP</small>
+              <small>Máximo 6 fotos, 5MB cada una. Formatos: JPG, PNG, WEBP</small>
             </div>
           </div>
 
           <!-- Previsualización de imágenes -->
           <div v-if="formulario.fotos.length > 0" class="fotos-preview">
-            <h4>Fotos seleccionadas ({{ formulario.fotos.length }}/5)</h4>
+            <h4>Fotos seleccionadas ({{ formulario.fotos.length }}/6)</h4>
             <div class="fotos-grid">
               <div v-for="(foto, index) in formulario.fotos" :key="index" class="foto-item">
                 <img :src="foto.preview" :alt="`Foto ${index + 1}`" class="foto-thumbnail">
@@ -263,37 +268,57 @@
           </div>
         </div>
 
-        <!-- Documento técnico para electrónicos -->
-        <div v-if="tipoSeleccionado && tipoSeleccionado.requiereElectronico" class="documento-section">
-          <h3>Documentación Técnica (Opcional pero recomendado)</h3>
-          <div class="upload-area documento-upload">
+        <!-- Documentación Técnica - SIEMPRE VISIBLE -->
+        <div class="documento-section">
+          <h3>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="section-icon">
+              <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2"/>
+              <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            Documentación Complementaria (Opcional)
+          </h3>
+          <p class="section-description">
+            Sube documentos que ayuden a valorar mejor tu artículo: facturas, certificados, manuales, garantías, etc.
+          </p>
+          
+          <div class="upload-area documento-upload" @click="$refs.documentoInput.click()">
             <input 
               ref="documentoInput" 
               type="file" 
-              accept=".pdf,.doc,.docx,.txt"
+              accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
               @change="handleDocumentoSelect"
               class="file-input"
             >
             <div class="upload-content">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" class="upload-doc-icon">
                 <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2"/>
                 <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                <path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2"/>
               </svg>
-              <p>Sube documento con especificaciones técnicas</p>
-              <button type="button" @click="$refs.documentoInput.click()" class="upload-button">Seleccionar archivo</button>
-              <small>PDF, DOC, DOCX o TXT</small>
+              <h4>Subir Documentación</h4>
+              <p>Haz clic para seleccionar archivos o arrastra aquí</p>
+              <div class="file-types">
+                <span class="file-type">📄 PDF</span>
+                <span class="file-type">📝 DOC</span>
+                <span class="file-type">🖼️ IMG</span>
+                <span class="file-type">📃 TXT</span>
+              </div>
+              <small>Hasta 10MB por archivo</small>
             </div>
           </div>
           
           <div v-if="formulario.documentoTecnico" class="documento-selected">
-            <div class="documento-info">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2"/>
-                <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
-              </svg>
-              <div>
+            <div class="documento-item">
+              <div class="documento-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2"/>
+                  <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </div>
+              <div class="documento-details">
                 <span class="documento-nombre">{{ formulario.documentoTecnico.name }}</span>
                 <span class="documento-tamaño">{{ formatFileSize(formulario.documentoTecnico.size) }}</span>
+                <span class="documento-tipo">{{ getFileTypeLabel(formulario.documentoTecnico.type) }}</span>
               </div>
               <button type="button" @click="removerDocumento" class="documento-remove">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -301,6 +326,72 @@
                   <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
                 </svg>
               </button>
+            </div>
+          </div>
+
+          <!-- Ejemplos de documentos útiles -->
+          <div class="documentos-ejemplos">
+            <h5>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Documentos útiles para el avalúo:
+            </h5>
+            <div class="ejemplos-grid">
+              <div class="ejemplo-item">
+                <svg class="ejemplo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2"/>
+                  <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                  <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"/>
+                  <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Factura de compra</span>
+              </div>
+              <div class="ejemplo-item">
+                <svg class="ejemplo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 15S4 12 8 12S12 15 12 15S12 12 16 12S20 15 20 15V3H4V15Z" stroke="currentColor" stroke-width="2"/>
+                  <path d="M16 6H20" stroke="currentColor" stroke-width="2"/>
+                  <path d="M16 10H20" stroke="currentColor" stroke-width="2"/>
+                  <path d="M4 6H8" stroke="currentColor" stroke-width="2"/>
+                  <path d="M4 10H8" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Certificado de autenticidad</span>
+              </div>
+              <div class="ejemplo-item">
+                <svg class="ejemplo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 19.5C4 18.1193 5.11929 17 6.5 17H20" stroke="currentColor" stroke-width="2"/>
+                  <path d="M6.5 2H20V22H6.5C5.11929 22 4 20.8807 4 19.5V4.5C4 3.11929 5.11929 2 6.5 2Z" stroke="currentColor" stroke-width="2"/>
+                  <line x1="9" y1="7" x2="17" y2="7" stroke="currentColor" stroke-width="2"/>
+                  <line x1="9" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2"/>
+                  <line x1="9" y1="15" x2="13" y2="15" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Manual del usuario</span>
+              </div>
+              <div class="ejemplo-item">
+                <svg class="ejemplo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+                  <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Garantía vigente</span>
+              </div>
+              <div class="ejemplo-item">
+                <svg class="ejemplo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+                  <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="11" cy="11" r="3" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Evaluación previa</span>
+              </div>
+              <div class="ejemplo-item">
+                <svg class="ejemplo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M16 4H18C18.5304 4 19.0391 4.21071 19.4142 4.58579C19.7893 4.96086 20 5.46957 20 6V20C20 20.5304 19.7893 21.0391 19.4142 21.4142C19.0391 21.7893 18.5304 22 18 22H6C5.46957 22 4.96086 21.7893 4.58579 21.4142C4.21071 21.0391 4 20.5304 4 20V6C4 5.46957 4.21071 4.96086 4.58579 4.58579C4.96086 4.21071 5.46957 4 6 4H8" stroke="currentColor" stroke-width="2"/>
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Ficha técnica</span>
+              </div>
             </div>
           </div>
         </div>
@@ -345,6 +436,7 @@
                 <option value="4">4 meses</option>
                 <option value="5">5 meses</option>
                 <option value="6">6 meses</option>
+                <option value="12">12 meses</option>
               </select>
             </div>
           </div>
@@ -368,6 +460,14 @@
                   <span>Pagos cada semana</span>
                 </div>
               </label>
+              <label class="radio-option">
+                <input type="radio" v-model="formulario.modalidadPago" value="al_vencimiento" @change="calcularPlanPagos" required>
+                <span class="radio-custom"></span>
+                <div class="radio-content">
+                  <strong>Al vencimiento</strong>
+                  <span>Pago único al final</span>
+                </div>
+              </label>
             </div>
           </div>
 
@@ -381,7 +481,7 @@
               </div>
               <div class="resumen-item">
                 <span class="resumen-label">Tasa de interés:</span>
-                <span class="resumen-valor">{{ planPagosCalculado.tasaInteres }}% {{ formulario.modalidadPago }}</span>
+                <span class="resumen-valor">{{ planPagosCalculado.tasaInteres }}% {{ formulario.modalidadPago === 'mensual' ? 'mensual' : formulario.modalidadPago === 'semanal' ? 'semanal' : 'total' }}</span>
               </div>
               <div class="resumen-item">
                 <span class="resumen-label">Total de intereses:</span>
@@ -398,7 +498,7 @@
               <div class="cuotas-lista">
                 <div v-for="(cuota, index) in planPagosCalculado.cuotas" :key="index" class="cuota-item">
                   <span class="cuota-numero">{{ index + 1 }}</span>
-                  <span class="cuota-fecha">{{ formatDate(cuota.fecha) }}</span>
+                  <span class="cuota-fecha">{{ formatDate(cuota.fechaVencimiento) }}</span>
                   <span class="cuota-monto">Q{{ formatCurrency(cuota.monto) }}</span>
                 </div>
               </div>
@@ -451,6 +551,10 @@
                 <span class="label">Fotos adjuntas:</span>
                 <span class="value">{{ formulario.fotos.length }} imagen(es)</span>
               </div>
+              <div v-if="formulario.documentoTecnico" class="resumen-row">
+                <span class="label">Documento técnico:</span>
+                <span class="value">{{ formulario.documentoTecnico.name }}</span>
+              </div>
             </div>
           </div>
 
@@ -473,7 +577,7 @@
               </div>
               <div class="resumen-row">
                 <span class="label">Modalidad:</span>
-                <span class="value">Pagos {{ formulario.modalidadPago }}es</span>
+                <span class="value">{{ formatModalidadPago(formulario.modalidadPago) }}</span>
               </div>
               <div class="resumen-row">
                 <span class="label">Total a pagar:</span>
@@ -637,7 +741,7 @@ const planPagosCalculado = ref({
   tasaInteres: 5 
 })
 
-// CARGAR TIPOS DE ARTÍCULOS DESDE LA API
+// CARGAR TIPOS DE ARTÍCULOS DESDE LA API - MEJORADO
 const cargarTiposArticulos = async () => {
   cargandoTipos.value = true
   errorCargandoTipos.value = false
@@ -648,6 +752,10 @@ const cargarTiposArticulos = async () => {
     const { getToken } = useAuth()
     const token = getToken()
     
+    if (!token) {
+      throw new Error('No hay token de autenticación disponible')
+    }
+    
     const response = await fetch('http://localhost:3001/api/solicitudes/categorias', {
       method: 'GET',
       headers: {
@@ -657,64 +765,96 @@ const cargarTiposArticulos = async () => {
     })
     
     if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`)
+      const errorText = await response.text()
+      throw new Error(`Error ${response.status}: ${errorText}`)
     }
     
     const result = await response.json()
-    console.log('✅ Tipos cargados:', result)
+    console.log('✅ Respuesta completa:', result)
     
-    if (result.success && result.data) {
-      // Mapear los tipos de artículos desde la API
+    // Verificar estructura de respuesta mejorada
+    if (result.success && result.data && Array.isArray(result.data)) {
       tiposArticulos.value = result.data.map(tipo => ({
         id: tipo.id,
-        nombre: tipo.nombre,
-        categoria: obtenerCategoria(tipo.nombre),
-        porcentajeMinAvaluo: parseFloat(tipo.porcentajeMinAvaluo),
-        porcentajeMaxAvaluo: parseFloat(tipo.porcentajeMaxAvaluo),
-        requiereElectronico: tipo.requiereElectronico,
-        iconoSvg: obtenerIconoSvg(tipo.nombre)
+        nombre: tipo.nombre || 'Sin nombre',
+        categoria: obtenerCategoria(tipo.nombre || ''),
+        porcentajeMinAvaluo: parseFloat(tipo.porcentajeMinAvaluo) || 30,
+        porcentajeMaxAvaluo: parseFloat(tipo.porcentajeMaxAvaluo) || 70,
+        requiereElectronico: Boolean(tipo.requiereElectronico),
+        iconoSvg: obtenerIconoSvg(tipo.nombre || '')
       }))
       
       console.log('📦 Tipos procesados:', tiposArticulos.value)
     } else {
-      throw new Error('Formato de respuesta inválido')
+      throw new Error('Formato de respuesta inválido o datos vacíos')
     }
     
   } catch (error) {
     console.error('❌ Error cargando tipos de artículos:', error)
     errorCargandoTipos.value = true
     
-    // Fallback: usar tipos básicos predeterminados
+    // Fallback mejorado con más tipos
     tiposArticulos.value = [
       {
         id: 1,
-        nombre: 'Joyería General',
-        categoria: 'Joyería',
+        nombre: 'Smartphone',
+        categoria: 'Electrónicos',
         porcentajeMinAvaluo: 30,
-        porcentajeMaxAvaluo: 70,
+        porcentajeMaxAvaluo: 50,
+        requiereElectronico: true,
+        iconoSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>'
+      },
+      {
+        id: 2,
+        nombre: 'Laptop',
+        categoria: 'Electrónicos',
+        porcentajeMinAvaluo: 40,
+        porcentajeMaxAvaluo: 60,
+        requiereElectronico: true,
+        iconoSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>'
+      },
+      {
+        id: 3,
+        nombre: 'Anillo de Oro',
+        categoria: 'Joyería',
+        porcentajeMinAvaluo: 60,
+        porcentajeMaxAvaluo: 80,
         requiereElectronico: false,
         iconoSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H18L20 7L12 21L4 7L6 3Z"/></svg>'
+      },
+      {
+        id: 4,
+        nombre: 'Reloj',
+        categoria: 'Joyería',
+        porcentajeMinAvaluo: 50,
+        porcentajeMaxAvaluo: 70,
+        requiereElectronico: false,
+        iconoSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>'
       }
     ]
+    
+    console.log('🔄 Usando tipos de fallback:', tiposArticulos.value)
   } finally {
     cargandoTipos.value = false
   }
 }
 
-// Funciones auxiliares para mapear datos
+// Funciones auxiliares mejoradas para mapear datos
 const obtenerCategoria = (nombre) => {
   const nombreLower = nombre.toLowerCase()
   
-  if (nombreLower.includes('oro') || nombreLower.includes('plata') || nombreLower.includes('joya') || nombreLower.includes('reloj') || nombreLower.includes('diamante')) {
-    return 'Joyería'
-  } else if (nombreLower.includes('celular') || nombreLower.includes('computadora') || nombreLower.includes('electro') || nombreLower.includes('televisor')) {
+  if (nombreLower.includes('smartphone') || nombreLower.includes('celular') || nombreLower.includes('iphone') || nombreLower.includes('teléfono') || nombreLower.includes('android')) {
+    return 'Teléfonos'
+  } else if (nombreLower.includes('laptop') || nombreLower.includes('computadora') || nombreLower.includes('pc') || nombreLower.includes('tablet') || nombreLower.includes('macbook')) {
+    return 'Computadoras'
+  } else if (nombreLower.includes('televisor') || nombreLower.includes('tv') || nombreLower.includes('audio') || nombreLower.includes('cámara') || nombreLower.includes('parlante')) {
     return 'Electrónicos'
-  } else if (nombreLower.includes('auto') || nombreLower.includes('vehiculo') || nombreLower.includes('moto')) {
+  } else if (nombreLower.includes('oro') || nombreLower.includes('plata') || nombreLower.includes('anillo') || nombreLower.includes('collar') || nombreLower.includes('joya') || nombreLower.includes('reloj')) {
+    return 'Joyería'
+  } else if (nombreLower.includes('vehículo') || nombreLower.includes('carro') || nombreLower.includes('moto') || nombreLower.includes('auto') || nombreLower.includes('camioneta')) {
     return 'Vehículos'
-  } else if (nombreLower.includes('herramienta')) {
+  } else if (nombreLower.includes('herramienta') || nombreLower.includes('taladro') || nombreLower.includes('sierra')) {
     return 'Herramientas'
-  } else if (nombreLower.includes('hogar') || nombreLower.includes('electrodomestico')) {
-    return 'Hogar'
   } else {
     return 'Otros'
   }
@@ -723,13 +863,15 @@ const obtenerCategoria = (nombre) => {
 const obtenerIconoSvg = (nombre) => {
   const nombreLower = nombre.toLowerCase()
   
-  if (nombreLower.includes('oro') || nombreLower.includes('joya')) {
-    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H18L20 7L12 21L4 7L6 3Z"/><path d="M6 7L12 13L18 7"/></svg>'
-  } else if (nombreLower.includes('celular')) {
+  if (nombreLower.includes('smartphone') || nombreLower.includes('celular') || nombreLower.includes('teléfono') || nombreLower.includes('iphone')) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>'
-  } else if (nombreLower.includes('computadora')) {
+  } else if (nombreLower.includes('laptop') || nombreLower.includes('computadora') || nombreLower.includes('macbook')) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>'
+  } else if (nombreLower.includes('oro') || nombreLower.includes('joya') || nombreLower.includes('anillo') || nombreLower.includes('collar')) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H18L20 7L12 21L4 7L6 3Z"/><path d="M6 7L12 13L18 7"/></svg>'
+  } else if (nombreLower.includes('televisor') || nombreLower.includes('tv')) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>'
-  } else if (nombreLower.includes('auto') || nombreLower.includes('vehiculo')) {
+  } else if (nombreLower.includes('vehículo') || nombreLower.includes('carro') || nombreLower.includes('auto') || nombreLower.includes('moto')) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17C7 18.1046 6.10457 19 5 19C3.89543 19 3 18.1046 3 17C3 15.8954 3.89543 15 5 15C6.10457 15 7 15.8954 7 17Z"/><path d="M21 17C21 18.1046 20.1046 19 19 19C17.8954 19 17 18.1046 17 17C17 15.8954 17.8954 15 19 15C20.1046 15 21 15.8954 21 17Z"/><path d="M5 17H17M5 17V7C5 6.44772 5.44772 6 6 6H15L17 8V17"/></svg>'
   } else if (nombreLower.includes('reloj')) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>'
@@ -767,12 +909,18 @@ const tipoSeleccionado = computed(() => {
 const puedeAvanzar = computed(() => {
   switch (pasoActual.value) {
     case 1:
-      return formulario.value.tipoArticulo && 
-             formulario.value.descripcion.length >= 10 && 
-             formulario.value.estadoFisico && 
-             formulario.value.valorEstimado &&
-             (!tipoSeleccionado.value?.requiereElectronico || 
-              (formulario.value.marca && formulario.value.especificacionesTecnicas.length >= 20))
+      const paso1Basico = formulario.value.tipoArticulo && 
+                          formulario.value.descripcion.length >= 10 && 
+                          formulario.value.estadoFisico && 
+                          formulario.value.valorEstimado
+      
+      if (!tipoSeleccionado.value?.requiereElectronico) {
+        return paso1Basico
+      } else {
+        return paso1Basico && 
+               formulario.value.marca && 
+               formulario.value.especificacionesTecnicas.length >= 20
+      }
     
     case 2:
       return formulario.value.fotos.length > 0
@@ -780,7 +928,9 @@ const puedeAvanzar = computed(() => {
     case 3:
       return formulario.value.montoSolicitado && 
              formulario.value.plazoMeses && 
-             formulario.value.modalidadPago
+             formulario.value.modalidadPago &&
+             parseFloat(formulario.value.montoSolicitado) >= rangoAvaluoCalculado.value.min &&
+             parseFloat(formulario.value.montoSolicitado) <= rangoAvaluoCalculado.value.max
     
     default:
       return true
@@ -798,78 +948,118 @@ onMounted(() => {
 
 // Métodos
 const onTipoArticuloChange = () => {
+  // Limpiar campos específicos de electrónicos si cambia a un tipo que no los requiere
+  if (!tipoSeleccionado.value?.requiereElectronico) {
+    formulario.value.marca = ''
+    formulario.value.modelo = ''
+    formulario.value.especificacionesTecnicas = ''
+  }
   calcularRangoAvaluo()
 }
 
 const calcularRangoAvaluo = () => {
   if (tipoSeleccionado.value && formulario.value.valorEstimado) {
     const valor = parseFloat(formulario.value.valorEstimado)
-    const min = Math.round(valor * (tipoSeleccionado.value.porcentajeMinAvaluo / 100))
-    const max = Math.round(valor * (tipoSeleccionado.value.porcentajeMaxAvaluo / 100))
-    
-    rangoAvaluoCalculado.value = { min, max }
-    
-    // Ajustar monto solicitado si está fuera del rango
-    if (formulario.value.montoSolicitado) {
+    if (valor > 0) {
+      const min = Math.round(valor * (tipoSeleccionado.value.porcentajeMinAvaluo / 100))
+      const max = Math.round(valor * (tipoSeleccionado.value.porcentajeMaxAvaluo / 100))
+      
+      rangoAvaluoCalculado.value = { min, max }
+      
+      // Ajustar monto solicitado si está fuera del rango
       const montoActual = parseFloat(formulario.value.montoSolicitado)
-      if (montoActual > max) {
-        formulario.value.montoSolicitado = max.toString()
-      } else if (montoActual < min) {
-        formulario.value.montoSolicitado = min.toString()
+      if (montoActual > 0) {
+        if (montoActual > max) {
+          formulario.value.montoSolicitado = max.toString()
+        } else if (montoActual < min) {
+          formulario.value.montoSolicitado = min.toString()
+        }
+      }
+      
+      // Recalcular plan de pagos si ya hay datos
+      if (formulario.value.montoSolicitado && formulario.value.plazoMeses) {
+        calcularPlanPagos()
       }
     }
   }
 }
 
+// Cálculo de plan de pagos MEJORADO con modalidad "al_vencimiento"
 const calcularPlanPagos = () => {
   if (formulario.value.montoSolicitado && formulario.value.plazoMeses && formulario.value.modalidadPago) {
     const monto = parseFloat(formulario.value.montoSolicitado)
     const plazo = parseInt(formulario.value.plazoMeses)
     const tasaInteres = 5 // 5% mensual
     
-    let numeroCuotas
-    let tasaPorCuota
+    let cuotas = []
+    let totalIntereses = 0
+    let totalPagar = 0
     
-    if (formulario.value.modalidadPago === 'semanal') {
-      numeroCuotas = plazo * 4
-      tasaPorCuota = tasaInteres / 4
-    } else {
-      numeroCuotas = plazo
-      tasaPorCuota = tasaInteres
-    }
-    
-    const interesTotal = monto * (tasaInteres / 100) * plazo
-    const totalPagar = monto + interesTotal
-    const montoCuota = totalPagar / numeroCuotas
-    
-    const cuotas = []
-    const fechaInicio = new Date()
-    
-    for (let i = 0; i < numeroCuotas; i++) {
-      const fechaCuota = new Date(fechaInicio)
-      if (formulario.value.modalidadPago === 'semanal') {
-        fechaCuota.setDate(fechaCuota.getDate() + (i * 7))
-      } else {
-        fechaCuota.setMonth(fechaCuota.getMonth() + i)
+    if (formulario.value.modalidadPago === 'mensual') {
+      // Pago mensual con intereses
+      const interesMensual = monto * (tasaInteres / 100)
+      const cuotaMensual = (monto / plazo) + interesMensual
+      
+      for (let i = 1; i <= plazo; i++) {
+        const fechaVencimiento = new Date()
+        fechaVencimiento.setMonth(fechaVencimiento.getMonth() + i)
+        
+        cuotas.push({
+          numero: i,
+          monto: cuotaMensual,
+          fechaVencimiento: fechaVencimiento.toISOString()
+        })
       }
       
-      cuotas.push({
-        numero: i + 1,
-        fecha: fechaCuota.toISOString(),
-        monto: montoCuota
-      })
+      totalIntereses = interesMensual * plazo
+      totalPagar = monto + totalIntereses
+      
+    } else if (formulario.value.modalidadPago === 'semanal') {
+      // Pago semanal
+      const numeroCuotas = plazo * 4 // 4 semanas por mes
+      const interesSemanal = monto * (tasaInteres / 100) / 4 // Interés semanal
+      const cuotaSemanal = (monto / numeroCuotas) + interesSemanal
+      
+      for (let i = 1; i <= numeroCuotas; i++) {
+        const fechaVencimiento = new Date()
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + (i * 7))
+        
+        cuotas.push({
+          numero: i,
+          monto: cuotaSemanal,
+          fechaVencimiento: fechaVencimiento.toISOString()
+        })
+      }
+      
+      totalIntereses = interesSemanal * numeroCuotas
+      totalPagar = monto + totalIntereses
+      
+    } else if (formulario.value.modalidadPago === 'al_vencimiento') {
+      // Pago único al final con interés compuesto
+      const interesTotal = monto * (tasaInteres / 100) * plazo
+      const fechaVencimiento = new Date()
+      fechaVencimiento.setMonth(fechaVencimiento.getMonth() + plazo)
+      
+      cuotas = [{
+        numero: 1,
+        monto: monto + interesTotal,
+        fechaVencimiento: fechaVencimiento.toISOString()
+      }]
+      
+      totalIntereses = interesTotal
+      totalPagar = monto + interesTotal
     }
     
     planPagosCalculado.value = {
       cuotas,
-      totalIntereses: interesTotal,
+      totalIntereses,
       totalPagar,
       tasaInteres
     }
   }
 }
 
-// Manejo de archivos
+// Manejo de archivos MEJORADO
 const handleFileSelect = (event) => {
   const files = Array.from(event.target.files)
   procesarArchivos(files)
@@ -882,9 +1072,11 @@ const handleDrop = (event) => {
 }
 
 const procesarArchivos = (files) => {
+  const maxFotos = 6 // Incrementado a 6 fotos
+  
   files.forEach(file => {
-    if (formulario.value.fotos.length >= 5) {
-      alert('Máximo 5 fotos permitidas')
+    if (formulario.value.fotos.length >= maxFotos) {
+      alert(`Máximo ${maxFotos} fotos permitidas`)
       return
     }
     
@@ -909,6 +1101,9 @@ const procesarArchivos = (files) => {
     }
     reader.readAsDataURL(file)
   })
+  
+  // Limpiar el input para permitir seleccionar los mismos archivos de nuevo
+  event.target.value = ''
 }
 
 const removerFoto = (index) => {
@@ -918,10 +1113,27 @@ const removerFoto = (index) => {
 const handleDocumentoSelect = (event) => {
   const file = event.target.files[0]
   if (file) {
-    if (file.size > 10 * 1024 * 1024) {
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'image/jpeg',
+      'image/jpg',
+      'image/png'
+    ]
+    
+    if (file.size > maxSize) {
       alert('El documento es muy grande. Máximo 10MB.')
       return
     }
+    
+    if (!allowedTypes.includes(file.type)) {
+      alert('Formato de archivo no permitido. Use PDF, DOC, DOCX, TXT, JPG o PNG.')
+      return
+    }
+    
     formulario.value.documentoTecnico = file
   }
 }
@@ -943,7 +1155,7 @@ const pasoAnterior = () => {
   }
 }
 
-// Procesamiento del formulario - CONECTADO AL BACKEND
+// Procesamiento del formulario - MANTENIDO IGUAL
 const procesarFormulario = async () => {
   if (!formularioValido.value) return
   
@@ -1044,7 +1256,7 @@ const procesarFormulario = async () => {
   }
 }
 
-// Funciones de utilidad
+// Funciones de utilidad MEJORADAS
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('es-GT', {
     minimumFractionDigits: 2,
@@ -1079,26 +1291,53 @@ const formatEstadoFisico = (estado) => {
   return estados[estado] || estado
 }
 
-// Limpiar formulario al cerrar
+const formatModalidadPago = (modalidad) => {
+  const modalidades = {
+    'mensual': 'Pagos mensuales',
+    'semanal': 'Pagos semanales',
+    'al_vencimiento': 'Pago al vencimiento'
+  }
+  return modalidades[modalidad] || modalidad
+}
+
+const getFileTypeLabel = (mimeType) => {
+  const tipos = {
+    'application/pdf': 'Documento PDF',
+    'application/msword': 'Documento Word',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Documento Word',
+    'text/plain': 'Archivo de Texto',
+    'image/jpeg': 'Imagen JPEG',
+    'image/jpg': 'Imagen JPG', 
+    'image/png': 'Imagen PNG'
+  }
+  return tipos[mimeType] || 'Documento'
+}
+
+// Limpiar formulario al cerrar MEJORADO
+const limpiarFormulario = () => {
+  // Reset formulario
+  Object.keys(formulario.value).forEach(key => {
+    if (key === 'fotos') {
+      formulario.value[key] = []
+    } else if (key === 'documentoTecnico') {
+      formulario.value[key] = null
+    } else if (key === 'modalidadPago') {
+      formulario.value[key] = 'mensual'
+    } else if (key === 'aceptaTerminos') {
+      formulario.value[key] = false
+    } else {
+      formulario.value[key] = ''
+    }
+  })
+  pasoActual.value = 1
+  rangoAvaluoCalculado.value = { min: 0, max: 0 }
+  planPagosCalculado.value = { cuotas: [], totalIntereses: 0, totalPagar: 0, tasaInteres: 5 }
+}
+
+// Watch para limpiar formulario al cerrar
 watch(() => props.visible, (newValue) => {
   if (!newValue) {
-    // Reset formulario
-    Object.keys(formulario.value).forEach(key => {
-      if (key === 'fotos') {
-        formulario.value[key] = []
-      } else if (key === 'documentoTecnico') {
-        formulario.value[key] = null
-      } else if (key === 'modalidadPago') {
-        formulario.value[key] = 'mensual'
-      } else if (key === 'aceptaTerminos') {
-        formulario.value[key] = false
-      } else {
-        formulario.value[key] = ''
-      }
-    })
-    pasoActual.value = 1
-    rangoAvaluoCalculado.value = { min: 0, max: 0 }
-    planPagosCalculado.value = { cuotas: [], totalIntereses: 0, totalPagar: 0, tasaInteres: 5 }
+    limpiarFormulario()
   }
 })
 
@@ -1108,17 +1347,24 @@ watch(() => props.visible, (newValue) => {
     cargarTiposArticulos()
   }
 })
+
+// Watch para recalcular avalúo cuando cambie el valor estimado
+watch(() => formulario.value.valorEstimado, () => {
+  if (formulario.value.valorEstimado && tipoSeleccionado.value) {
+    calcularRangoAvaluo()
+  }
+})
 </script>
 
 <style scoped>
-/* Estilos del formulario - Incluye estilos para loading */
+/* Manteniendo EXACTAMENTE los estilos originales con la paleta dorada */
 .formulario-empeno {
   background: white;
   border-radius: 12px;
   overflow: hidden;
 }
 
-/* Progress Header */
+/* Progress Header - Colores ORIGINALES (dorados) */
 .progress-header {
   background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
   color: white;
@@ -1649,7 +1895,7 @@ watch(() => props.visible, (newValue) => {
   margin-bottom: 0.25rem;
 }
 
-/* Documento section */
+/* Documento section MEJORADA */
 .documento-section {
   margin-top: 2rem;
   padding-top: 2rem;
@@ -1657,30 +1903,98 @@ watch(() => props.visible, (newValue) => {
 }
 
 .documento-section h3 {
-  margin: 0 0 1rem;
+  margin: 0 0 0.5rem;
   color: #2C3E50;
-}
-
-.documento-selected {
-  margin-top: 1rem;
-}
-
-.documento-info {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: #F8F9FA;
-  border-radius: 8px;
-  border-left: 4px solid #27AE60;
+  gap: 0.5rem;
+  font-size: 1.2rem;
 }
 
-.documento-info svg {
-  color: #27AE60;
+.section-icon {
+  color: #D4AF37;
   flex-shrink: 0;
 }
 
-.documento-info div {
+.section-description {
+  margin: 0 0 1.5rem;
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.upload-area.documento-upload {
+  padding: 2rem;
+  background: linear-gradient(135deg, #FFF9E6 0%, #FFFBF0 100%);
+  border: 2px dashed #D4AF37;
+  transition: all 0.3s ease;
+}
+
+.upload-area.documento-upload:hover {
+  border-color: #B8941F;
+  background: linear-gradient(135deg, #FFF6D6 0%, #FFF9E6 100%);
+  transform: translateY(-1px);
+}
+
+.upload-doc-icon {
+  color: #D4AF37;
+  margin-bottom: 1rem;
+}
+
+.upload-content h4 {
+  margin: 0 0 0.5rem;
+  color: #2C3E50;
+  font-size: 1.1rem;
+}
+
+.file-types {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.file-type {
+  background: rgba(212, 175, 55, 0.1);
+  color: #B8941F;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.documento-selected {
+  margin-top: 1.5rem;
+}
+
+.documento-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  border: 2px solid #E0E0E0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.documento-item:hover {
+  border-color: #D4AF37;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+}
+
+.documento-icon {
+  background: linear-gradient(135deg, #D4AF37 0%, #F4D03F 100%);
+  color: white;
+  padding: 0.75rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.documento-details {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -1688,26 +2002,103 @@ watch(() => props.visible, (newValue) => {
 }
 
 .documento-nombre {
-  font-weight: 500;
+  font-weight: 600;
   color: #2C3E50;
+  font-size: 1rem;
 }
 
 .documento-tamaño {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: #666;
 }
 
+.documento-tipo {
+  font-size: 0.8rem;
+  color: #D4AF37;
+  font-weight: 500;
+}
+
 .documento-remove {
-  background: #E74C3C;
+  background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
   color: white;
   border: none;
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.documento-remove:hover {
+  background: linear-gradient(135deg, #C0392B 0%, #A93226 100%);
+  transform: scale(1.05);
+}
+
+/* Ejemplos de documentos */
+.documentos-ejemplos {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #F0F8FF;
+  border-radius: 8px;
+  border-left: 4px solid #3498DB;
+}
+
+.documentos-ejemplos h5 {
+  margin: 0 0 1rem;
+  color: #2C3E50;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.documentos-ejemplos h5 svg {
+  color: #3498DB;
+  flex-shrink: 0;
+}
+
+.ejemplos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.ejemplo-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #E0E0E0;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.ejemplo-item:hover {
+  border-color: #3498DB;
+  background: #EBF8FF;
+  transform: translateY(-1px);
+}
+
+.ejemplo-icon {
+  color: #3498DB;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.ejemplo-item:hover .ejemplo-icon {
+  color: #2980B9;
+  transform: scale(1.1);
+}
+
+.ejemplo-item span:last-child {
+  color: #2C3E50;
+  font-weight: 500;
 }
 
 /* Plan de pagos */
