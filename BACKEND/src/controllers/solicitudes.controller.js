@@ -120,6 +120,7 @@ export default {
         const solicitudCreada = await tx.solicitudPrestamo.create({
           data: {
             usuarioId: parseInt(userId),
+            fechaSolicitud: new Date(),
             estado: 'Pendiente',
             observaciones: `Solicitud de préstamo por Q${montoSolicitado} a ${plazoMeses} meses`
           }

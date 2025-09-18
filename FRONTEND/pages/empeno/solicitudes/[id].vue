@@ -193,7 +193,7 @@
               </div>
               <div class="info-content">
                 <span class="info-label">Fecha de Solicitud</span>
-                <span class="info-value">{{ formatDateLong(solicitud.fecha_solicitud) }}</span>
+                <span class="info-value">{{ formatDateLong(solicitud.fechaSolicitud) }}</span>
               </div>
             </div>
 
