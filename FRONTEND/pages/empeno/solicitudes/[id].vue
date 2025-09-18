@@ -78,7 +78,7 @@
           <div class="step" :class="{ active: true, completed: ['Evaluando', 'Aprobada', 'Rechazada'].includes(solicitud.estado) }">
             <span class="step-number">1</span>
             <span class="step-label">Solicitud Enviada</span>
-            <span class="step-date">{{ formatDate(solicitud.fecha_solicitud) }}</span>
+            <span class="step-date">{{ formatDate(solicitud.fechaSolicitud) }}</span>
           </div>
           <div class="step" :class="{ active: ['Evaluando', 'Aprobada', 'Rechazada'].includes(solicitud.estado), completed: ['Aprobada', 'Rechazada'].includes(solicitud.estado) }">
             <span class="step-number">2</span>
@@ -153,304 +153,341 @@
         </div>
       </div>
 
-      <!-- Contenido Principal -->
-      <div class="detalle-content">
+      <!-- Navegación de pestañas -->
+      <div class="pestanas-navegacion">
+        <button 
+          @click="pestanaActiva = 'informacion'"
+          :class="['btn-pestana', { active: pestanaActiva === 'informacion' }]"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="currentColor" stroke-width="2"/>
+            <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Información General
+        </button>
         
-        <!-- Información General -->
-        <div class="info-section">
-          <div class="section-header">
-            <h2>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-                <path d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22" stroke="currentColor" stroke-width="2"/>
-              </svg>
-              Información General
-            </h2>
+        <button 
+          @click="pestanaActiva = 'archivos'"
+          :class="['btn-pestana', { active: pestanaActiva === 'archivos' }]"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M21.44 11.05L12.25 20.24C11.84 20.65 11.84 21.28 12.25 21.69C12.66 22.1 13.29 22.1 13.7 21.69L22.89 12.5C24.46 10.93 24.46 8.37 22.89 6.8C21.32 5.23 18.76 5.23 17.19 6.8L7.71 16.28C6.53 17.46 6.53 19.34 7.71 20.52C8.89 21.7 10.77 21.7 11.95 20.52L20.83 11.64" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Archivos Adjuntos
+          <span v-if="archivos.length" class="contador-badge">{{ archivos.length }}</span>
+        </button>
+      </div>
+
+      <!-- Contenido de pestañas -->
+      <div class="pestanas-contenido">
+        <!-- Pestaña: Información General -->
+        <div v-if="pestanaActiva === 'informacion'" class="detalle-content">
+          
+          <!-- Información General -->
+          <div class="info-section">
+            <div class="section-header">
+              <h2>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                  <path d="M12 1V3M12 21V23M4.22 4.22L5.64 5.64M18.36 18.36L19.78 19.78M1 12H3M21 12H23M4.22 19.78L5.64 18.36M18.36 5.64L19.78 4.22" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                Información General
+              </h2>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-card">
+                <div class="info-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </div>
+                <div class="info-content">
+                  <span class="info-label">Número de Solicitud</span>
+                  <span class="info-value">{{ solicitud.numero }}</span>
+                </div>
+              </div>
+
+              <div class="info-card">
+                <div class="info-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+                    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
+                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </div>
+                <div class="info-content">
+                  <span class="info-label">Fecha de Solicitud</span>
+                  <span class="info-value">{{ formatDateLong(solicitud.fechaSolicitud) }}</span>
+                </div>
+              </div>
+
+              <div class="info-card">
+                <div class="info-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </div>
+                <div class="info-content">
+                  <span class="info-label">Estado Actual</span>
+                  <span class="info-value">{{ formatearEstado(solicitud.estado) }}</span>
+                </div>
+              </div>
+
+              <div class="info-card" v-if="solicitud.fecha_evaluacion">
+                <div class="info-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 11H15M9 15H15M17 21L20 18L17 15M3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V12.5" stroke="currentColor" stroke-width="2" fill="none"/>
+                  </svg>
+                </div>
+                <div class="info-content">
+                  <span class="info-label">Fecha de Evaluación</span>
+                  <span class="info-value">{{ formatDateLong(solicitud.fecha_evaluacion) }}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="info-grid">
-            <div class="info-card">
-              <div class="info-icon">
+          <!-- Artículos Incluidos -->
+          <div class="articulos-section">
+            <div class="section-header">
+              <h2>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
-                  <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                  <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
+                  <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
                 </svg>
-              </div>
-              <div class="info-content">
-                <span class="info-label">Número de Solicitud</span>
-                <span class="info-value">{{ solicitud.numero }}</span>
+                Artículos Incluidos
+                <span class="items-count" v-if="solicitud.articulos">
+                  ({{ solicitud.articulos.length }} {{ solicitud.articulos.length === 1 ? 'artículo' : 'artículos' }})
+                </span>
+              </h2>
+            </div>
+
+            <div class="articulos-grid" v-if="solicitud.articulos && solicitud.articulos.length > 0">
+              <div v-for="articulo in solicitud.articulos" :key="articulo.id_articulo" class="articulo-card">
+                <div class="articulo-header">
+                  <div class="articulo-tipo">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
+                      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    {{ articulo.tipo_articulo?.nombre || 'Artículo' }}
+                  </div>
+                  <div class="articulo-estado" :class="`estado-${articulo.estado_fisico?.toLowerCase()}`">
+                    {{ formatearEstadoFisico(articulo.estado_fisico) }}
+                  </div>
+                </div>
+
+                <div class="articulo-content">
+                  <h4 class="articulo-titulo">{{ articulo.descripcion || 'Sin descripción' }}</h4>
+
+                  <div class="articulo-details">
+                    <div class="detail-row" v-if="articulo.marca">
+                      <span class="detail-label">Marca:</span>
+                      <span class="detail-value">{{ articulo.marca }}</span>
+                    </div>
+                    <div class="detail-row" v-if="articulo.modelo">
+                      <span class="detail-label">Modelo:</span>
+                      <span class="detail-value">{{ articulo.modelo }}</span>
+                    </div>
+                    <div class="detail-row" v-if="articulo.serie">
+                      <span class="detail-label">Serie:</span>
+                      <span class="detail-value">{{ articulo.serie }}</span>
+                    </div>
+                    <div class="detail-row" v-if="articulo.color">
+                      <span class="detail-label">Color:</span>
+                      <span class="detail-value">{{ articulo.color }}</span>
+                    </div>
+                    <div class="detail-row" v-if="articulo.valor_estimado_cliente">
+                      <span class="detail-label">Valor Estimado:</span>
+                      <span class="detail-value currency">{{ formatCurrency(articulo.valor_estimado_cliente) }}</span>
+                    </div>
+                  </div>
+
+                  <div class="articulo-specs" v-if="articulo.especificaciones_tecnicas">
+                    <h5>Especificaciones Técnicas:</h5>
+                    <p>{{ articulo.especificaciones_tecnicas }}</p>
+                  </div>
+
+                  <!-- Media (Fotos y Documentos) -->
+                  <div class="articulo-media" v-if="articulo.documentos && articulo.documentos.length > 0">
+                    
+                    <!-- Fotos -->
+                    <div class="media-section" v-if="obtenerFotos(articulo.documentos).length > 0">
+                      <div class="media-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                          <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="2"/>
+                          <polyline points="21,15 16,10 5,21" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        Fotos ({{ obtenerFotos(articulo.documentos).length }})
+                      </div>
+                      <div class="fotos-grid">
+                        <div 
+                          v-for="(foto, index) in obtenerFotos(articulo.documentos)" 
+                          :key="index" 
+                          class="foto-item"
+                          @click="abrirVisualizadorImagen(foto, obtenerFotos(articulo.documentos))"
+                        >
+                          <img 
+                            :src="construirUrlArchivo(foto.ruta_archivo)" 
+                            :alt="foto.nombre_original"
+                            @error="manejarErrorImagen"
+                          />
+                          <div class="foto-overlay">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                              <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Documentos -->
+                    <div class="media-section" v-if="obtenerDocumentos(articulo.documentos).length > 0">
+                      <div class="media-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                          <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                        Documentos ({{ obtenerDocumentos(articulo.documentos).length }})
+                      </div>
+                      <div class="documentos-list">
+                        <div 
+                          v-for="(documento, index) in obtenerDocumentos(articulo.documentos)" 
+                          :key="index" 
+                          class="documento-item"
+                          @click="abrirDocumento(documento)"
+                        >
+                          <div class="documento-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                              <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                              <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                          </div>
+                          <div class="documento-info">
+                            <div class="documento-nombre">{{ documento.nombre_original }}</div>
+                            <div class="documento-tipo">{{ obtenerTipoDocumento(documento.tipo_mime) }}</div>
+                            <div class="documento-tamaño" v-if="documento.tamaño">{{ formatFileSize(documento.tamaño) }}</div>
+                          </div>
+                          <div class="documento-actions">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                              <path d="M18 13V19C18 20.1 17.1 21 16 21H5C3.9 21 3 20.1 3 19V8C3 6.9 3.9 6 5 6H11" stroke="currentColor" stroke-width="2"/>
+                              <path d="M15 3H21V9" stroke="currentColor" stroke-width="2"/>
+                              <path d="M10 14L21 3" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="info-card">
-              <div class="info-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
-                  <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
-                  <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </div>
-              <div class="info-content">
-                <span class="info-label">Fecha de Solicitud</span>
-                <span class="info-value">{{ formatDateLong(solicitud.fechaSolicitud) }}</span>
-              </div>
-            </div>
-
-            <div class="info-card">
-              <div class="info-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                  <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </div>
-              <div class="info-content">
-                <span class="info-label">Estado Actual</span>
-                <span class="info-value">{{ formatearEstado(solicitud.estado) }}</span>
-              </div>
-            </div>
-
-            <div class="info-card" v-if="solicitud.fecha_evaluacion">
-              <div class="info-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 11H15M9 15H15M17 21L20 18L17 15M3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V12.5" stroke="currentColor" stroke-width="2" fill="none"/>
-                </svg>
-              </div>
-              <div class="info-content">
-                <span class="info-label">Fecha de Evaluación</span>
-                <span class="info-value">{{ formatDateLong(solicitud.fecha_evaluacion) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Artículos Incluidos -->
-        <div class="articulos-section">
-          <div class="section-header">
-            <h2>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <div class="empty-articulos" v-else>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
                 <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
                 <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
               </svg>
-              Artículos Incluidos
-              <span class="items-count" v-if="solicitud.articulos">
-                ({{ solicitud.articulos.length }} {{ solicitud.articulos.length === 1 ? 'artículo' : 'artículos' }})
-              </span>
-            </h2>
-          </div>
-
-          <div class="articulos-grid" v-if="solicitud.articulos && solicitud.articulos.length > 0">
-            <div v-for="articulo in solicitud.articulos" :key="articulo.id_articulo" class="articulo-card">
-              <div class="articulo-header">
-                <div class="articulo-tipo">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-                    <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
-                    <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                  {{ articulo.tipo_articulo?.nombre || 'Artículo' }}
-                </div>
-                <div class="articulo-estado" :class="`estado-${articulo.estado_fisico?.toLowerCase()}`">
-                  {{ formatearEstadoFisico(articulo.estado_fisico) }}
-                </div>
-              </div>
-
-              <div class="articulo-content">
-                <h4 class="articulo-titulo">{{ articulo.descripcion || 'Sin descripción' }}</h4>
-
-                <div class="articulo-details">
-                  <div class="detail-row" v-if="articulo.marca">
-                    <span class="detail-label">Marca:</span>
-                    <span class="detail-value">{{ articulo.marca }}</span>
-                  </div>
-                  <div class="detail-row" v-if="articulo.modelo">
-                    <span class="detail-label">Modelo:</span>
-                    <span class="detail-value">{{ articulo.modelo }}</span>
-                  </div>
-                  <div class="detail-row" v-if="articulo.serie">
-                    <span class="detail-label">Serie:</span>
-                    <span class="detail-value">{{ articulo.serie }}</span>
-                  </div>
-                  <div class="detail-row" v-if="articulo.color">
-                    <span class="detail-label">Color:</span>
-                    <span class="detail-value">{{ articulo.color }}</span>
-                  </div>
-                  <div class="detail-row" v-if="articulo.valor_estimado_cliente">
-                    <span class="detail-label">Valor Estimado:</span>
-                    <span class="detail-value currency">{{ formatCurrency(articulo.valor_estimado_cliente) }}</span>
-                  </div>
-                </div>
-
-                <div class="articulo-specs" v-if="articulo.especificaciones_tecnicas">
-                  <h5>Especificaciones Técnicas:</h5>
-                  <p>{{ articulo.especificaciones_tecnicas }}</p>
-                </div>
-
-                <!-- Media (Fotos y Documentos) -->
-                <div class="articulo-media" v-if="articulo.documentos && articulo.documentos.length > 0">
-                  
-                  <!-- Fotos -->
-                  <div class="media-section" v-if="obtenerFotos(articulo.documentos).length > 0">
-                    <div class="media-title">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="2"/>
-                        <polyline points="21,15 16,10 5,21" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                      Fotos ({{ obtenerFotos(articulo.documentos).length }})
-                    </div>
-                    <div class="fotos-grid">
-                      <div 
-                        v-for="(foto, index) in obtenerFotos(articulo.documentos)" 
-                        :key="index" 
-                        class="foto-item"
-                        @click="abrirVisualizadorImagen(foto, obtenerFotos(articulo.documentos))"
-                      >
-                        <img 
-                          :src="construirUrlArchivo(foto.ruta_archivo)" 
-                          :alt="foto.nombre_original"
-                          @error="manejarErrorImagen"
-                        />
-                        <div class="foto-overlay">
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                            <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
-                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Documentos -->
-                  <div class="media-section" v-if="obtenerDocumentos(articulo.documentos).length > 0">
-                    <div class="media-title">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
-                        <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                      Documentos ({{ obtenerDocumentos(articulo.documentos).length }})
-                    </div>
-                    <div class="documentos-list">
-                      <div 
-                        v-for="(documento, index) in obtenerDocumentos(articulo.documentos)" 
-                        :key="index" 
-                        class="documento-item"
-                        @click="abrirDocumento(documento)"
-                      >
-                        <div class="documento-icon">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                            <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
-                            <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
-                          </svg>
-                        </div>
-                        <div class="documento-info">
-                          <div class="documento-nombre">{{ documento.nombre_original }}</div>
-                          <div class="documento-tipo">{{ obtenerTipoDocumento(documento.tipo_mime) }}</div>
-                          <div class="documento-tamaño" v-if="documento.tamaño">{{ formatFileSize(documento.tamaño) }}</div>
-                        </div>
-                        <div class="documento-actions">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                            <path d="M18 13V19C18 20.1 17.1 21 16 21H5C3.9 21 3 20.1 3 19V8C3 6.9 3.9 6 5 6H11" stroke="currentColor" stroke-width="2"/>
-                            <path d="M15 3H21V9" stroke="currentColor" stroke-width="2"/>
-                            <path d="M10 14L21 3" stroke="currentColor" stroke-width="2"/>
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <p>No se encontraron artículos en esta solicitud</p>
             </div>
           </div>
 
-          <div class="empty-articulos" v-else>
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
-              <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            <p>No se encontraron artículos en esta solicitud</p>
+          <!-- Acciones Disponibles -->
+          <div class="actions-section">
+            <div class="section-header">
+              <h2>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 11H15M9 15H15M17 21L20 18L17 15M3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V12.5" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+                Acciones Disponibles
+              </h2>
+            </div>
+
+            <div class="actions-grid">
+              
+              <!-- Acciones para Pendiente/Evaluando -->
+              <template v-if="['Pendiente', 'Evaluando'].includes(solicitud.estado)">
+                <button @click="confirmarCancelacion" class="action-button danger" :disabled="loadingAction">
+                  <div class="action-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                      <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+                      <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="action-content">
+                    <span class="action-title">{{ loadingAction ? 'Cancelando...' : 'Cancelar Solicitud' }}</span>
+                    <span class="action-description">Cancela esta solicitud antes de que sea evaluada</span>
+                  </div>
+                </button>
+              </template>
+
+              <!-- Acciones para Aprobada -->
+              <template v-if="solicitud.estado === 'Aprobada'">
+                <button @click="aceptarOferta" class="action-button success" :disabled="loadingAction">
+                  <div class="action-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" fill="none"/>
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                    </svg>
+                  </div>
+                  <div class="action-content">
+                    <span class="action-title">{{ loadingAction ? 'Procesando...' : 'Aceptar Oferta' }}</span>
+                    <span class="action-description">Procede con la aceptación del préstamo</span>
+                  </div>
+                </button>
+              </template>
+
+              <!-- Acción universal: Nueva solicitud -->
+              <template v-if="['Rechazada', 'Completada'].includes(solicitud.estado)">
+                <button @click="crearNuevaSolicitud" class="action-button primary">
+                  <div class="action-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2"/>
+                      <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="action-content">
+                    <span class="action-title">Nueva Solicitud</span>
+                    <span class="action-description">Crear una nueva solicitud de empeño</span>
+                  </div>
+                </button>
+              </template>
+
+              <!-- Botón universal: Volver al inicio -->
+              <button @click="volverAlInicio" class="action-button secondary">
+                <div class="action-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" stroke-width="2"/>
+                    <polyline points="9,22 9,12 15,12 15,22" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </div>
+                <div class="action-content">
+                  <span class="action-title">Volver al Panel</span>
+                  <span class="action-description">Regresar a la lista de solicitudes</span>
+                </div>
+              </button>
+
+            </div>
           </div>
         </div>
 
-        <!-- Acciones Disponibles -->
-        <div class="actions-section">
-          <div class="section-header">
-            <h2>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M9 11H15M9 15H15M17 21L20 18L17 15M3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V12.5" stroke="currentColor" stroke-width="2" fill="none"/>
-              </svg>
-              Acciones Disponibles
-            </h2>
-          </div>
-
-          <div class="actions-grid">
-            
-            <!-- Acciones para Pendiente/Evaluando -->
-            <template v-if="['Pendiente', 'Evaluando'].includes(solicitud.estado)">
-              <button @click="confirmarCancelacion" class="action-button danger" :disabled="loadingAction">
-                <div class="action-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                    <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
-                    <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </div>
-                <div class="action-content">
-                  <span class="action-title">{{ loadingAction ? 'Cancelando...' : 'Cancelar Solicitud' }}</span>
-                  <span class="action-description">Cancela esta solicitud antes de que sea evaluada</span>
-                </div>
-              </button>
-            </template>
-
-            <!-- Acciones para Aprobada -->
-            <template v-if="solicitud.estado === 'Aprobada'">
-              <button @click="aceptarOferta" class="action-button success" :disabled="loadingAction">
-                <div class="action-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" fill="none"/>
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
-                  </svg>
-                </div>
-                <div class="action-content">
-                  <span class="action-title">{{ loadingAction ? 'Procesando...' : 'Aceptar Oferta' }}</span>
-                  <span class="action-description">Procede con la aceptación del préstamo</span>
-                </div>
-              </button>
-            </template>
-
-            <!-- Acción universal: Nueva solicitud -->
-            <template v-if="['Rechazada', 'Completada'].includes(solicitud.estado)">
-              <button @click="crearNuevaSolicitud" class="action-button primary">
-                <div class="action-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2"/>
-                    <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                </div>
-                <div class="action-content">
-                  <span class="action-title">Nueva Solicitud</span>
-                  <span class="action-description">Crear una nueva solicitud de empeño</span>
-                </div>
-              </button>
-            </template>
-
-            <!-- Botón universal: Volver al inicio -->
-            <button @click="volverAlInicio" class="action-button secondary">
-              <div class="action-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" stroke-width="2"/>
-                  <polyline points="9,22 9,12 15,12 15,22" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </div>
-              <div class="action-content">
-                <span class="action-title">Volver al Panel</span>
-                <span class="action-description">Regresar a la lista de solicitudes</span>
-              </div>
-            </button>
-
-          </div>
+        <!-- Pestaña: Archivos Adjuntos -->
+        <div v-if="pestanaActiva === 'archivos'" class="archivos-pestana">
+          <ArchivosAdjuntos 
+            :archivos="archivos"
+            :loading="loading"
+          />
         </div>
       </div>
     </div>
@@ -620,6 +657,9 @@
 </template>
 
 <script setup>
+// Importar el componente de archivos adjuntos
+import ArchivosAdjuntos from '~/pages/empeno/solicitudes/ArchivosAdjuntos.vue'
+
 // Proteger la ruta con middleware
 definePageMeta({
   middleware: 'auth'
@@ -647,6 +687,9 @@ const solicitud = ref(null)
 const loadingAction = ref(false)
 const loadingCancelacion = ref(false)
 
+// Estado para pestañas
+const pestanaActiva = ref('informacion') // 'informacion' o 'archivos'
+
 // Modal de confirmación
 const mostrarConfirmacionCancelacion = ref(false)
 const motivoCancelacion = ref('')
@@ -667,6 +710,11 @@ const notification = ref({
 // ===== COMPUTED =====
 const solicitudId = computed(() => {
   return parseInt(route.params.id)
+})
+
+// Computed para archivos adjuntos
+const archivos = computed(() => {
+  return solicitud.value?.documentos || []
 })
 
 // ===== MÉTODOS DE UTILIDAD =====
@@ -1323,6 +1371,66 @@ onMounted(async () => {
 .rejection-content strong,
 .approval-content strong {
   font-weight: 600;
+}
+
+/* ===== PESTAÑAS ===== */
+.pestanas-navegacion {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding: 0 1rem;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.btn-pestana {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--color-gris-acero);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 8px 8px 0 0;
+  position: relative;
+}
+
+.btn-pestana:hover {
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--color-dorado-vintage);
+}
+
+.btn-pestana.active {
+  color: var(--color-dorado-vintage);
+  border-bottom-color: var(--color-dorado-vintage);
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.contador-badge {
+  background: var(--color-dorado-vintage);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.pestanas-contenido {
+  animation: fadeIn 0.3s ease;
+}
+
+.archivos-pestana {
+  margin: 0 1rem 2rem 1rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ===== CONTENIDO PRINCIPAL ===== */
@@ -2311,6 +2419,27 @@ onMounted(async () => {
   .viewer-nav {
     width: 40px;
     height: 40px;
+  }
+
+  .pestanas-navegacion {
+    padding: 0 0.5rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .pestanas-navegacion::-webkit-scrollbar {
+    display: none;
+  }
+
+  .btn-pestana {
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+    font-size: 0.875rem;
+  }
+
+  .archivos-pestana {
+    margin: 0 0.5rem 1rem 0.5rem;
   }
 }
 
