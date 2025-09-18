@@ -1,6 +1,6 @@
 <!--
   Archivo: pages/empeno/index.vue
-  Página principal de empéños/préstamos - ARREGLADO COMPLETO
+  Página principal de empéños/préstamos - DISEÑO ORIGINAL + FUNCIONALIDAD CANCELAR
 -->
 <template>
   <div class="empenos-page">
@@ -234,10 +234,11 @@
                   >
                     {{ loadingOperaciones ? 'Procesando...' : 'Pagar' }}
                   </button>
+                  <!-- BOTÓN CANCELAR MEJORADO -->
                   <button 
                     class="btn-action warning" 
-                    @click="cancelarSolicitud(item)" 
-                    v-if="item.tipo === 'solicitud' && item.estado === 'Pendiente'"
+                    @click="confirmarCancelacion(item)" 
+                    v-if="item.tipo === 'solicitud' && ['Pendiente', 'Evaluando'].includes(item.estado)"
                     :disabled="loadingOperaciones"
                   >
                     {{ loadingOperaciones ? 'Cancelando...' : 'Cancelar' }}
@@ -379,6 +380,85 @@
       </div>
     </div>
 
+    <!-- MODAL DE CONFIRMACIÓN DE CANCELACIÓN -->
+    <div class="modal-overlay" v-if="mostrarConfirmacionCancelacion" @click="cerrarConfirmacionCancelacion">
+      <div class="modal-content confirmation-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Confirmar Cancelación</h3>
+          <button class="modal-close" @click="cerrarConfirmacionCancelacion">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+              <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="warning-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <path d="M10.29 3.86L1.82 18A2 2 0 0 0 3.64 21H20.36A2 2 0 0 0 22.18 18L13.71 3.86A2 2 0 0 0 10.29 3.86Z" stroke="currentColor" stroke-width="2" fill="none"/>
+              <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2"/>
+              <circle cx="12" cy="17" r="1" fill="currentColor"/>
+            </svg>
+          </div>
+          
+          <div class="warning-content">
+            <h4>¿Estás seguro de que deseas cancelar esta solicitud?</h4>
+            <p>
+              Esta acción no se puede deshacer. La solicitud será marcada como cancelada 
+              y no podrá ser procesada.
+            </p>
+
+            <div class="solicitud-info" v-if="solicitudACancel">
+              <div class="info-row">
+                <span>Artículo:</span>
+                <span>{{ getItemTitulo(solicitudACancel) }}</span>
+              </div>
+              <div class="info-row">
+                <span>Estado actual:</span>
+                <span class="status-badge" :class="`status-${solicitudACancel.estado?.toLowerCase()}`">
+                  {{ solicitudACancel.estado }}
+                </span>
+              </div>
+              <div class="info-row">
+                <span>Fecha de solicitud:</span>
+                <span>{{ formatDate(solicitudACancel.fecha) }}</span>
+              </div>
+            </div>
+
+            <div class="motivo-section">
+              <label for="motivoCancelacion">Motivo de cancelación (opcional):</label>
+              <textarea 
+                id="motivoCancelacion"
+                v-model="motivoCancelacion"
+                placeholder="Escribe el motivo por el cual deseas cancelar esta solicitud..."
+                rows="3"
+              ></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="cerrarConfirmacionCancelacion" class="btn-secondary">
+            No, mantener solicitud
+          </button>
+          <button 
+            @click="ejecutarCancelacion" 
+            :disabled="loadingCancelacion"
+            class="btn-danger"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" v-if="!loadingCancelacion">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+              <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="spinning" v-else>
+              <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" fill="none"/>
+            </svg>
+            {{ loadingCancelacion ? 'Cancelando...' : 'Sí, cancelar solicitud' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast notifications -->
     <div v-if="notification.show" class="notification-toast" :class="notification.type">
       <div class="notification-content">
@@ -420,7 +500,7 @@ useHead({
 // ===== COMPOSABLES Y DEPENDENCIAS =====
 const { user } = useAuth()
 const { api } = useApi()
-const { crearSolicitudEmpeno } = useSolicitudes() // AGREGAR ESTA LÍNEA
+const { crearSolicitudEmpeno } = useSolicitudes()
 
 // Importar el componente del formulario
 import FormularioNuevoEmpeno from '~/pages/empeno/FormularioNuevoEmpeno.vue'
@@ -434,7 +514,13 @@ const filtroEstado = ref('')
 const loadingData = ref(true)
 const loadingOperaciones = ref(false)
 const loadingSimulacion = ref(false)
+const loadingCancelacion = ref(false)
 const error = ref(null)
+
+// Modal de confirmación para cancelación
+const mostrarConfirmacionCancelacion = ref(false)
+const solicitudACancel = ref(null)
+const motivoCancelacion = ref('')
 
 // Datos combinados (solicitudes + préstamos)
 const solicitudes = ref([])
@@ -790,25 +876,86 @@ const pagarPrestamo = async (prestamo) => {
   }
 }
 
-const cancelarSolicitud = async (solicitud) => {
+// ===== MÉTODOS DE CANCELACIÓN MEJORADOS =====
+const confirmarCancelacion = (solicitud) => {
+  console.log('⚠️ Iniciando confirmación de cancelación:', solicitud)
+  
+  // Verificar que la solicitud puede ser cancelada
+  if (!['Pendiente', 'Evaluando'].includes(solicitud.estado)) {
+    mostrarNotificacion('Esta solicitud no puede ser cancelada en su estado actual', 'warning')
+    return
+  }
+  
+  solicitudACancel.value = solicitud
+  motivoCancelacion.value = ''
+  mostrarConfirmacionCancelacion.value = true
+}
+
+const cerrarConfirmacionCancelacion = () => {
+  mostrarConfirmacionCancelacion.value = false
+  solicitudACancel.value = null
+  motivoCancelacion.value = ''
+}
+
+const ejecutarCancelacion = async () => {
+  if (!solicitudACancel.value) {
+    mostrarNotificacion('Error: No se encontró la solicitud a cancelar', 'error')
+    return
+  }
+
   try {
-    loadingOperaciones.value = true
-    console.log('❌ Cancelando solicitud:', solicitud.id)
+    loadingCancelacion.value = true
     
-    const response = await api(`/solicitudes/${solicitud.id}/cancelar`, {
+    console.log('❌ Cancelando solicitud:', {
+      id: solicitudACancel.value.id,
+      motivo: motivoCancelacion.value
+    })
+    
+    const response = await api(`/solicitudes/${solicitudACancel.value.id}/cancelar`, {
       method: 'PUT',
-      body: { motivo: 'Cancelada por el usuario' }
+      body: { 
+        motivo: motivoCancelacion.value || 'Cancelada por el usuario desde la interfaz web'
+      }
     })
     
     if (response.success) {
-      mostrarNotificacion('Solicitud cancelada exitosamente', 'success')
+      mostrarNotificacion(
+        'Solicitud cancelada exitosamente', 
+        'success'
+      )
+      
+      // Cerrar el modal
+      cerrarConfirmacionCancelacion()
+      
+      // Recargar los datos para reflejar el cambio
       await cargarDatos()
+      
+      console.log('✅ Solicitud cancelada exitosamente')
+    } else {
+      throw new Error(response.message || 'Error desconocido al cancelar')
     }
+    
   } catch (error) {
     console.error('❌ Error cancelando solicitud:', error)
-    mostrarNotificacion('Error al cancelar la solicitud', 'error')
+    
+    let mensajeError = 'Error al cancelar la solicitud'
+    
+    // Personalizar mensaje de error según el tipo
+    if (error.message) {
+      if (error.message.includes('estado')) {
+        mensajeError = 'La solicitud no puede ser cancelada en su estado actual'
+      } else if (error.message.includes('autorizado')) {
+        mensajeError = 'No tienes permisos para cancelar esta solicitud'
+      } else if (error.message.includes('encontrada')) {
+        mensajeError = 'La solicitud no fue encontrada'
+      } else {
+        mensajeError = error.message
+      }
+    }
+    
+    mostrarNotificacion(mensajeError, 'error')
   } finally {
-    loadingOperaciones.value = false
+    loadingCancelacion.value = false
   }
 }
 
@@ -887,6 +1034,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* MANTENER TODOS LOS ESTILOS ORIGINALES + ESTILOS PARA MODAL DE CANCELACIÓN */
+
 /* Mantener todos los estilos originales con mejoras */
 .empenos-page {
   min-height: 100vh;
@@ -1588,6 +1737,30 @@ onUnmounted(() => {
   transform: translateY(-1px);
 }
 
+.btn-danger {
+  background: #E74C3C;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-danger:hover {
+  background: #C0392B;
+  transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .full-width {
   width: 100%;
 }
@@ -1625,6 +1798,10 @@ onUnmounted(() => {
   max-height: 95vh;
   width: 95%;
   position: relative;
+}
+
+.confirmation-modal {
+  max-width: 600px;
 }
 
 /* ARREGLO DEL SCROLL - CONTENEDOR ESPECIAL */
@@ -1708,6 +1885,114 @@ onUnmounted(() => {
 
 .modal-body {
   padding: 1.5rem;
+}
+
+.modal-footer {
+  padding: 1.5rem;
+  border-top: 1px solid #E0E0E0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+/* === ESTILOS ESPECÍFICOS DEL MODAL DE CANCELACIÓN === */
+.warning-icon {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #F39C12;
+}
+
+.warning-content h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2C3E50;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.warning-content p {
+  color: #666;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.solicitud-info {
+  background: #F8F9FA;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #E0E0E0;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.info-row:not(:last-child) {
+  border-bottom: 1px solid #E0E0E0;
+}
+
+.info-row span:first-child {
+  font-weight: 500;
+  color: #666;
+}
+
+.info-row span:last-child {
+  font-weight: 600;
+  color: #2C3E50;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-pendiente {
+  background: rgba(243, 156, 18, 0.1);
+  color: #F39C12;
+}
+
+.status-evaluando {
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498DB;
+}
+
+.motivo-section {
+  margin-top: 1.5rem;
+}
+
+.motivo-section label {
+  display: block;
+  font-weight: 500;
+  color: #2C3E50;
+  margin-bottom: 0.5rem;
+}
+
+.motivo-section textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #E0E0E0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.3s ease;
+}
+
+.motivo-section textarea:focus {
+  outline: none;
+  border-color: #D4AF37;
 }
 
 /* Calculator form */
@@ -1887,6 +2172,11 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.1);
 }
 
+/* Spinning animation */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .header-container {
@@ -1954,6 +2244,16 @@ onUnmounted(() => {
 
   .step-label {
     font-size: 0.6rem;
+  }
+
+  .modal-footer {
+    flex-direction: column;
+  }
+
+  .modal-footer .btn-secondary,
+  .modal-footer .btn-danger {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

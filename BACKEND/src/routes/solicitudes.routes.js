@@ -359,7 +359,7 @@ router.put('/:id/cancelar', catchAsync(async (req, res) => {
         id: solicitudId,
         usuarioId: userId,
         estado: {
-          in: ['Pendiente', 'Evaluando']
+        in: ['Pendiente'] 
         }
       },
       data: {

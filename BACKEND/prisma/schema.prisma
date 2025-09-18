@@ -23,6 +23,7 @@ enum Estado {
 
 enum EstadoSolicitud {
   Pendiente
+  Evaluando 
   Aprobada
   Rechazada
 }
