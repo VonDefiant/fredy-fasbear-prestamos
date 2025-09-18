@@ -32,7 +32,7 @@
         </button>
         <button @click="volverAlInicio" class="btn-secondary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2"/>
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2"/>
           </svg>
           Volver al Inicio
         </button>
@@ -78,12 +78,12 @@
           <div class="step" :class="{ active: true, completed: ['Evaluando', 'Aprobada', 'Rechazada'].includes(solicitud.estado) }">
             <span class="step-number">1</span>
             <span class="step-label">Solicitud Enviada</span>
-            <span class="step-date">{{ formatDate(solicitud.fechaSolicitud) }}</span>
+            <span class="step-date">{{ formatDate(solicitud.fecha_solicitud) }}</span>
           </div>
           <div class="step" :class="{ active: ['Evaluando', 'Aprobada', 'Rechazada'].includes(solicitud.estado), completed: ['Aprobada', 'Rechazada'].includes(solicitud.estado) }">
             <span class="step-number">2</span>
             <span class="step-label">En Evaluación</span>
-            <span class="step-date" v-if="solicitud.fechaEvaluacion">{{ formatDate(solicitud.fechaEvaluacion) }}</span>
+            <span class="step-date" v-if="solicitud.fecha_evaluacion">{{ formatDate(solicitud.fecha_evaluacion) }}</span>
           </div>
           <div class="step" :class="{ 
             active: ['Aprobada', 'Rechazada'].includes(solicitud.estado), 
@@ -92,26 +92,26 @@
           }">
             <span class="step-number">
               <svg v-if="solicitud.estado === 'Rechazada'" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
                 <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+                <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
               </svg>
               <svg v-else-if="solicitud.estado === 'Aprobada'" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" fill="none"/>
+                <polyline points="20,6 9,17 4,12" stroke="currentColor" stroke-width="2"/>
               </svg>
               <span v-else>3</span>
             </span>
             <span class="step-label">
-              {{ solicitud.estado === 'Rechazada' ? 'Rechazada' : solicitud.estado === 'Aprobada' ? 'Aprobada' : 'Evaluación Final' }}
+              {{ solicitud.estado === 'Rechazada' ? 'Rechazada' : solicitud.estado === 'Aprobada' ? 'Aprobada' : 'Resultado' }}
             </span>
-            <span class="step-date" v-if="solicitud.fechaEvaluacion && ['Aprobada', 'Rechazada'].includes(solicitud.estado)">
-              {{ formatDate(solicitud.fechaEvaluacion) }}
+            <span class="step-date" v-if="solicitud.fecha_evaluacion && ['Aprobada', 'Rechazada'].includes(solicitud.estado)">
+              {{ formatDate(solicitud.fecha_evaluacion) }}
             </span>
           </div>
         </div>
       </div>
 
-      <!-- Alerta para solicitudes rechazadas -->
-      <div class="rejection-alert" v-if="solicitud.estado === 'Rechazada'">
+      <!-- Alertas según estado -->
+      <div v-if="solicitud.estado === 'Rechazada'" class="rejection-alert">
         <div class="rejection-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -121,21 +121,19 @@
         </div>
         <div class="rejection-content">
           <h3>Solicitud Rechazada</h3>
-          <p v-if="solicitud.observaciones && !solicitud.observaciones.includes('Cancelada por el usuario')">
-            <strong>Motivo del rechazo:</strong> {{ solicitud.observaciones }}
+          <p>
+            Lamentablemente, tu solicitud <strong>{{ solicitud.numero }}</strong> no pudo ser aprobada en esta ocasión.
           </p>
-          <p v-else-if="solicitud.observaciones && solicitud.observaciones.includes('Cancelada por el usuario')">
-            Esta solicitud fue <strong>cancelada</strong> por tu solicitud el {{ formatDate(solicitud.fechaEvaluacion) }}.
+          <p v-if="solicitud.observaciones">
+            <strong>Motivo:</strong> {{ solicitud.observaciones }}
           </p>
-          <p v-else>
-            No se especificó un motivo detallado para el rechazo. 
-            Puedes contactarnos para más información o crear una nueva solicitud con las mejoras necesarias.
+          <p>
+            Puedes crear una nueva solicitud con diferentes artículos o condiciones.
           </p>
         </div>
       </div>
 
-      <!-- Alerta para solicitudes aprobadas -->
-      <div class="approval-alert" v-if="solicitud.estado === 'Aprobada'">
+      <div v-if="solicitud.estado === 'Aprobada'" class="approval-alert">
         <div class="approval-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -145,7 +143,8 @@
         <div class="approval-content">
           <h3>¡Solicitud Aprobada!</h3>
           <p>
-            Tu solicitud ha sido aprobada. Ahora puedes revisar la oferta y proceder con la aceptación del préstamo.
+            Tu solicitud <strong>{{ solicitud.numero }}</strong> ha sido aprobada.
+            Ahora puedes revisar la oferta y proceder con la aceptación del préstamo.
             Te contactaremos pronto para coordinar la entrega del artículo y la firma del contrato.
           </p>
           <p v-if="solicitud.observaciones">
@@ -194,11 +193,11 @@
               </div>
               <div class="info-content">
                 <span class="info-label">Fecha de Solicitud</span>
-                <span class="info-value">{{ formatDateLong(solicitud.fechaSolicitud) }}</span>
+                <span class="info-value">{{ formatDateLong(solicitud.fecha_solicitud) }}</span>
               </div>
             </div>
 
-            <div class="info-card" v-if="solicitud.fechaEvaluacion">
+            <div class="info-card">
               <div class="info-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -206,44 +205,43 @@
                 </svg>
               </div>
               <div class="info-content">
-                <span class="info-label">Fecha de Evaluación</span>
-                <span class="info-value">{{ formatDateLong(solicitud.fechaEvaluacion) }}</span>
+                <span class="info-label">Estado Actual</span>
+                <span class="info-value">{{ formatearEstado(solicitud.estado) }}</span>
               </div>
             </div>
 
-            <div class="info-card">
+            <div class="info-card" v-if="solicitud.fecha_evaluacion">
               <div class="info-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 21V19C20 16.79 18.21 15 16 15H8C5.79 15 4 16.79 4 19V21" stroke="currentColor" stroke-width="2"/>
-                  <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                  <path d="M9 11H15M9 15H15M17 21L20 18L17 15M3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V12.5" stroke="currentColor" stroke-width="2" fill="none"/>
                 </svg>
               </div>
               <div class="info-content">
-                <span class="info-label">Solicitante</span>
-                <span class="info-value">{{ solicitud.usuario?.nombre || 'No especificado' }}</span>
+                <span class="info-label">Fecha de Evaluación</span>
+                <span class="info-value">{{ formatDateLong(solicitud.fecha_evaluacion) }}</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Artículos Empeñados -->
+        <!-- Artículos Incluidos -->
         <div class="articulos-section">
           <div class="section-header">
             <h2>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2"/>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
+                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
               </svg>
-              Artículos en Empeño
-              <span class="items-count">({{ solicitud.articulos?.length || 0 }})</span>
+              Artículos Incluidos
+              <span class="items-count" v-if="solicitud.articulos">
+                ({{ solicitud.articulos.length }} {{ solicitud.articulos.length === 1 ? 'artículo' : 'artículos' }})
+              </span>
             </h2>
           </div>
 
-          <div class="articulos-grid" v-if="solicitud.articulos?.length">
-            <div 
-              v-for="(articulo, index) in solicitud.articulos" 
-              :key="articulo.id || index"
-              class="articulo-card"
-            >
+          <div class="articulos-grid" v-if="solicitud.articulos && solicitud.articulos.length > 0">
+            <div v-for="articulo in solicitud.articulos" :key="articulo.id_articulo" class="articulo-card">
               <div class="articulo-header">
                 <div class="articulo-tipo">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -251,16 +249,16 @@
                     <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
                     <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
                   </svg>
-                  {{ articulo.tipo || 'Artículo' }}
+                  {{ articulo.tipo_articulo?.nombre || 'Artículo' }}
                 </div>
-                <div class="articulo-estado" :class="`estado-${articulo.estadoFisico?.toLowerCase()}`">
-                  {{ formatearEstadoFisico(articulo.estadoFisico) }}
+                <div class="articulo-estado" :class="`estado-${articulo.estado_fisico?.toLowerCase()}`">
+                  {{ formatearEstadoFisico(articulo.estado_fisico) }}
                 </div>
               </div>
 
               <div class="articulo-content">
                 <h4 class="articulo-titulo">{{ articulo.descripcion || 'Sin descripción' }}</h4>
-                
+
                 <div class="articulo-details">
                   <div class="detail-row" v-if="articulo.marca">
                     <span class="detail-label">Marca:</span>
@@ -278,15 +276,89 @@
                     <span class="detail-label">Color:</span>
                     <span class="detail-value">{{ articulo.color }}</span>
                   </div>
-                  <div class="detail-row" v-if="articulo.valorEstimadoCliente">
+                  <div class="detail-row" v-if="articulo.valor_estimado_cliente">
                     <span class="detail-label">Valor Estimado:</span>
-                    <span class="detail-value currency">{{ formatCurrency(articulo.valorEstimadoCliente) }}</span>
+                    <span class="detail-value currency">{{ formatCurrency(articulo.valor_estimado_cliente) }}</span>
                   </div>
                 </div>
 
-                <div class="articulo-specs" v-if="articulo.especificacionesTecnicas">
+                <div class="articulo-specs" v-if="articulo.especificaciones_tecnicas">
                   <h5>Especificaciones Técnicas:</h5>
-                  <p>{{ articulo.especificacionesTecnicas }}</p>
+                  <p>{{ articulo.especificaciones_tecnicas }}</p>
+                </div>
+
+                <!-- Media (Fotos y Documentos) -->
+                <div class="articulo-media" v-if="articulo.documentos && articulo.documentos.length > 0">
+                  
+                  <!-- Fotos -->
+                  <div class="media-section" v-if="obtenerFotos(articulo.documentos).length > 0">
+                    <div class="media-title">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" stroke-width="2"/>
+                        <polyline points="21,15 16,10 5,21" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                      Fotos ({{ obtenerFotos(articulo.documentos).length }})
+                    </div>
+                    <div class="fotos-grid">
+                      <div 
+                        v-for="(foto, index) in obtenerFotos(articulo.documentos)" 
+                        :key="index" 
+                        class="foto-item"
+                        @click="abrirVisualizadorImagen(foto, obtenerFotos(articulo.documentos))"
+                      >
+                        <img 
+                          :src="construirUrlArchivo(foto.ruta_archivo)" 
+                          :alt="foto.nombre_original"
+                          @error="manejarErrorImagen"
+                        />
+                        <div class="foto-overlay">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                            <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Documentos -->
+                  <div class="media-section" v-if="obtenerDocumentos(articulo.documentos).length > 0">
+                    <div class="media-title">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                        <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                      Documentos ({{ obtenerDocumentos(articulo.documentos).length }})
+                    </div>
+                    <div class="documentos-list">
+                      <div 
+                        v-for="(documento, index) in obtenerDocumentos(articulo.documentos)" 
+                        :key="index" 
+                        class="documento-item"
+                        @click="abrirDocumento(documento)"
+                      >
+                        <div class="documento-icon">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                            <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/>
+                          </svg>
+                        </div>
+                        <div class="documento-info">
+                          <div class="documento-nombre">{{ documento.nombre_original }}</div>
+                          <div class="documento-tipo">{{ obtenerTipoDocumento(documento.tipo_mime) }}</div>
+                          <div class="documento-tamaño" v-if="documento.tamaño">{{ formatFileSize(documento.tamaño) }}</div>
+                        </div>
+                        <div class="documento-actions">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M18 13V19C18 20.1 17.1 21 16 21H5C3.9 21 3 20.1 3 19V8C3 6.9 3.9 6 5 6H11" stroke="currentColor" stroke-width="2"/>
+                            <path d="M15 3H21V9" stroke="currentColor" stroke-width="2"/>
+                            <path d="M10 14L21 3" stroke="currentColor" stroke-width="2"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -327,7 +399,7 @@
                 </div>
                 <div class="action-content">
                   <span class="action-title">{{ loadingAction ? 'Cancelando...' : 'Cancelar Solicitud' }}</span>
-                  <span class="action-description">Cancelar esta solicitud permanentemente</span>
+                  <span class="action-description">Cancela esta solicitud antes de que sea evaluada</span>
                 </div>
               </button>
             </template>
@@ -343,43 +415,43 @@
                 </div>
                 <div class="action-content">
                   <span class="action-title">{{ loadingAction ? 'Procesando...' : 'Aceptar Oferta' }}</span>
-                  <span class="action-description">Proceder con el préstamo aprobado</span>
+                  <span class="action-description">Procede con la aceptación del préstamo</span>
                 </div>
               </button>
             </template>
 
-            <!-- Acciones para Rechazada -->
-            <template v-if="solicitud.estado === 'Rechazada'">
+            <!-- Acción universal: Nueva solicitud -->
+            <template v-if="['Rechazada', 'Completada'].includes(solicitud.estado)">
               <button @click="crearNuevaSolicitud" class="action-button primary">
                 <div class="action-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 9V5C14 4.45 13.55 4 13 4H5C4.45 4 4 4.45 4 5V19C4 19.55 4.45 20 5 20H13C13.55 20 14 19.55 14 19V15" stroke="currentColor" stroke-width="2" fill="none"/>
-                    <path d="M3 9H21L18 6M21 9L18 12" stroke="currentColor" stroke-width="2"/>
+                    <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2"/>
+                    <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2"/>
                   </svg>
                 </div>
                 <div class="action-content">
                   <span class="action-title">Nueva Solicitud</span>
-                  <span class="action-description">Crear una nueva solicitud mejorada</span>
+                  <span class="action-description">Crear una nueva solicitud de empeño</span>
                 </div>
               </button>
             </template>
 
-            <!-- Acción siempre disponible -->
+            <!-- Botón universal: Volver al inicio -->
             <button @click="volverAlInicio" class="action-button secondary">
               <div class="action-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M3 9L12 2L21 9V20C21 20.55 20.55 21 20 21H4C3.45 21 3 20.55 3 20V9Z" stroke="currentColor" stroke-width="2" fill="none"/>
+                  <path d="M3 9L12 2L21 9V20C21 20.5304 20.7893 21.0391 20.4142 21.4142C20.0391 21.7893 19.5304 22 19 22H5C4.46957 22 3.96086 21.7893 3.58579 21.4142C3.21071 21.0391 3 20.5304 3 20V9Z" stroke="currentColor" stroke-width="2"/>
                   <polyline points="9,22 9,12 15,12 15,22" stroke="currentColor" stroke-width="2"/>
                 </svg>
               </div>
               <div class="action-content">
-                <span class="action-title">Volver al Inicio</span>
-                <span class="action-description">Regresar a la lista de empéños</span>
+                <span class="action-title">Volver al Panel</span>
+                <span class="action-description">Regresar a la lista de solicitudes</span>
               </div>
             </button>
+
           </div>
         </div>
-
       </div>
     </div>
 
@@ -387,9 +459,9 @@
     <div class="modal-overlay" v-if="mostrarConfirmacionCancelacion" @click="cerrarConfirmacionCancelacion">
       <div class="modal-container" @click.stop>
         <div class="modal-header">
-          <h3>Confirmar Cancelación</h3>
+          <h3>Cancelar Solicitud</h3>
           <button @click="cerrarConfirmacionCancelacion" class="modal-close">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
               <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
               <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
             </svg>
@@ -447,6 +519,74 @@
       </div>
     </div>
 
+    <!-- MODAL VISUALIZADOR DE IMÁGENES -->
+    <div class="modal-overlay" v-if="imagenVisualizando" @click="cerrarVisualizadorImagen">
+      <div class="image-viewer" @click.stop>
+        <div class="viewer-header">
+          <div class="viewer-title">
+            <h3>{{ tituloImagenVisualizando }}</h3>
+            <span class="image-counter">{{ indiceImagenActual + 1 }} de {{ imagenesVisualizando.length }}</span>
+          </div>
+          <button @click="cerrarVisualizadorImagen" class="viewer-close">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+              <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="viewer-content">
+          <button 
+            v-if="imagenesVisualizando.length > 1"
+            @click="imagenAnterior" 
+            class="viewer-nav prev"
+            :disabled="indiceImagenActual === 0"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <polyline points="15,18 9,12 15,6" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+          
+          <div class="image-container">
+            <img 
+              :src="construirUrlArchivo(imagenVisualizando.ruta_archivo)" 
+              :alt="tituloImagenVisualizando"
+              @error="manejarErrorImagen"
+            />
+          </div>
+          
+          <button 
+            v-if="imagenesVisualizando.length > 1"
+            @click="imagenSiguiente" 
+            class="viewer-nav next"
+            :disabled="indiceImagenActual === imagenesVisualizando.length - 1"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <polyline points="9,18 15,12 9,6" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="viewer-footer" v-if="imagenesVisualizando.length > 1">
+          <div class="thumbnails">
+            <button 
+              v-for="(imagen, index) in imagenesVisualizando" 
+              :key="index"
+              @click="cambiarImagen(index)"
+              class="thumbnail"
+              :class="{ active: index === indiceImagenActual }"
+            >
+              <img 
+                :src="construirUrlArchivo(imagen.ruta_archivo)" 
+                :alt="`Miniatura ${index + 1}`"
+                @error="manejarErrorImagen"
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Sistema de notificaciones -->
     <div class="notification-container" v-if="notification.show">
       <div class="notification" :class="`notification-${notification.type}`">
@@ -490,6 +630,7 @@ const route = useRoute()
 const { user } = useAuth()
 const { api } = useApi()
 const { obtenerDetalleSolicitud, cancelarSolicitud } = useSolicitudes()
+const config = useRuntimeConfig()
 
 // ===== META TAGS =====
 useHead({
@@ -509,6 +650,12 @@ const loadingCancelacion = ref(false)
 // Modal de confirmación
 const mostrarConfirmacionCancelacion = ref(false)
 const motivoCancelacion = ref('')
+
+// Visualizador de imágenes
+const imagenVisualizando = ref(null)
+const imagenesVisualizando = ref([])
+const indiceImagenActual = ref(0)
+const tituloImagenVisualizando = ref('')
 
 // Sistema de notificaciones
 const notification = ref({
@@ -553,6 +700,13 @@ const formatDateLong = (dateString) => {
   })
 }
 
+const formatFileSize = (bytes) => {
+  if (!bytes) return ''
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+}
+
 const formatearEstado = (estado) => {
   const estados = {
     'Pendiente': 'Pendiente de Evaluación',
@@ -574,6 +728,32 @@ const formatearEstadoFisico = (estado) => {
   return estados[estado] || estado || 'No especificado'
 }
 
+const obtenerTipoDocumento = (tipoMime) => {
+  const tipos = {
+    'application/pdf': 'PDF',
+    'application/msword': 'Word',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word',
+    'text/plain': 'Texto',
+    'image/jpeg': 'Imagen',
+    'image/jpg': 'Imagen',
+    'image/png': 'Imagen'
+  }
+  return tipos[tipoMime] || 'Documento'
+}
+
+const construirUrlArchivo = (rutaArchivo) => {
+  if (!rutaArchivo) return '/images/placeholder.jpg'
+  
+  // Si ya es una URL completa, devolverla tal como está
+  if (rutaArchivo.startsWith('http')) {
+    return rutaArchivo
+  }
+  
+  // Construir URL con la base del API
+  const baseUrl = config.public.apiBase.replace('/api', '')
+  return `${baseUrl}${rutaArchivo}`
+}
+
 const mostrarNotificacion = (message, type = 'success') => {
   notification.value = {
     show: true,
@@ -584,6 +764,64 @@ const mostrarNotificacion = (message, type = 'success') => {
   setTimeout(() => {
     notification.value.show = false
   }, 5000)
+}
+
+// ===== MÉTODOS DE GESTIÓN DE ARCHIVOS =====
+const manejarErrorImagen = (event) => {
+  event.target.src = '/images/error-image.svg'
+  console.warn('Error cargando imagen:', event.target.src)
+}
+
+const obtenerFotos = (documentos) => {
+  if (!documentos || !Array.isArray(documentos)) return []
+  return documentos.filter(doc => 
+    doc.tipo_mime && doc.tipo_mime.startsWith('image/')
+  )
+}
+
+const obtenerDocumentos = (documentos) => {
+  if (!documentos || !Array.isArray(documentos)) return []
+  return documentos.filter(doc => 
+    doc.tipo_mime && !doc.tipo_mime.startsWith('image/')
+  )
+}
+
+const abrirVisualizadorImagen = (imagen, todasLasImagenes) => {
+  imagenVisualizando.value = imagen
+  imagenesVisualizando.value = todasLasImagenes || [imagen]
+  indiceImagenActual.value = todasLasImagenes ? todasLasImagenes.findIndex(img => img === imagen) : 0
+  tituloImagenVisualizando.value = imagen.nombre_original || 'Imagen del artículo'
+}
+
+const cerrarVisualizadorImagen = () => {
+  imagenVisualizando.value = null
+  imagenesVisualizando.value = []
+  indiceImagenActual.value = 0
+  tituloImagenVisualizando.value = ''
+}
+
+const imagenAnterior = () => {
+  if (indiceImagenActual.value > 0) {
+    indiceImagenActual.value--
+    imagenVisualizando.value = imagenesVisualizando.value[indiceImagenActual.value]
+  }
+}
+
+const imagenSiguiente = () => {
+  if (indiceImagenActual.value < imagenesVisualizando.value.length - 1) {
+    indiceImagenActual.value++
+    imagenVisualizando.value = imagenesVisualizando.value[indiceImagenActual.value]
+  }
+}
+
+const cambiarImagen = (index) => {
+  indiceImagenActual.value = index
+  imagenVisualizando.value = imagenesVisualizando.value[index]
+}
+
+const abrirDocumento = (documento) => {
+  const url = construirUrlArchivo(documento.ruta_archivo)
+  window.open(url, '_blank')
 }
 
 // ===== MÉTODOS DE CARGA DE DATOS =====
@@ -667,13 +905,13 @@ const ejecutarCancelacion = async () => {
     loadingCancelacion.value = true
     
     console.log('❌ Cancelando solicitud:', {
-      id: solicitud.value.id,
+      id: solicitud.value.id_solicitud,
       numero: solicitud.value.numero,
       motivo: motivoCancelacion.value
     })
     
     const response = await cancelarSolicitud(
-      solicitud.value.id,
+      solicitud.value.id_solicitud,
       motivoCancelacion.value || 'Cancelada por el usuario desde la página de detalle'
     )
     
@@ -725,10 +963,26 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* ===== VARIABLES CSS CON PALETA CORPORATIVA ===== */
+:root {
+  /* Colores principales del logo */
+  --color-negro-carbon: #1A1A1A;
+  --color-blanco-perla: #F5F5F5;
+  --color-gris-acero: #4A4A4A;
+  --color-azul-marino: #2C3E50;
+  
+  /* Colores complementarios */
+  --color-dorado-vintage: #D4AF37;
+  --color-dorado-claro: #F4D03F;
+  --color-rojo-granate: #8B0000;
+  --color-marron-chocolate: #3E2723;
+  --color-verde-bosque: #1B4332;
+}
+
 /* ===== ESTILOS BASE ===== */
 .detalle-solicitud-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, var(--color-azul-marino) 0%, var(--color-gris-acero) 50%, var(--color-negro-carbon) 100%);
   padding: 2rem 0;
 }
 
@@ -742,6 +996,7 @@ onMounted(async () => {
   min-height: 60vh;
   text-align: center;
   padding: 2rem;
+  color: var(--color-blanco-perla);
 }
 
 .loading-spinner {
@@ -749,23 +1004,23 @@ onMounted(async () => {
 }
 
 .loading-spinner svg {
-  color: #3b82f6;
+  color: var(--color-dorado-vintage);
 }
 
 .error-icon {
   margin-bottom: 1.5rem;
-  color: #ef4444;
+  color: var(--color-rojo-granate);
 }
 
 .error-container h2 {
   font-size: 1.5rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-blanco-perla);
   margin-bottom: 0.5rem;
 }
 
 .error-container p {
-  color: #6b7280;
+  color: var(--color-gris-acero);
   margin-bottom: 2rem;
 }
 
@@ -785,17 +1040,17 @@ onMounted(async () => {
 
 /* ===== HEADER ===== */
 .detalle-header {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  background: var(--color-blanco-perla);
+  border-radius: 20px;
+  box-shadow: 0 15px 35px rgba(26, 26, 26, 0.2);
   margin-bottom: 2rem;
   overflow: hidden;
 }
 
 .header-navigation {
   padding: 1rem 2rem;
-  border-bottom: 1px solid #f3f4f6;
-  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
 }
 
 .btn-back {
@@ -805,16 +1060,17 @@ onMounted(async () => {
   padding: 0.5rem 1rem;
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--color-gris-acero);
   font-size: 0.875rem;
   cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  border-radius: 8px;
+  transition: all 0.3s ease;
 }
 
 .btn-back:hover {
-  background: #e5e7eb;
-  color: #374151;
+  background: var(--color-dorado-vintage);
+  color: var(--color-blanco-perla);
+  transform: translateX(-2px);
 }
 
 .header-content {
@@ -822,7 +1078,7 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 2rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .header-info h1 {
@@ -831,16 +1087,16 @@ onMounted(async () => {
   gap: 0.75rem;
   font-size: 2rem;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--color-negro-carbon);
   margin-bottom: 0.5rem;
 }
 
 .header-info h1 svg {
-  color: #3b82f6;
+  color: var(--color-dorado-vintage);
 }
 
 .header-info p {
-  color: #6b7280;
+  color: var(--color-gris-acero);
   margin: 0;
 }
 
@@ -867,39 +1123,39 @@ onMounted(async () => {
 }
 
 .status-pendiente {
-  background: #fef3c7;
-  color: #d97706;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: var(--color-marron-chocolate);
 }
 
 .status-pendiente .status-dot {
-  background: #f59e0b;
+  background: var(--color-dorado-vintage);
 }
 
 .status-evaluando {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: var(--color-azul-marino);
 }
 
 .status-evaluando .status-dot {
-  background: #3b82f6;
+  background: var(--color-azul-marino);
 }
 
 .status-aprobada {
-  background: #d1fae5;
-  color: #047857;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: var(--color-verde-bosque);
 }
 
 .status-aprobada .status-dot {
-  background: #10b981;
+  background: var(--color-verde-bosque);
 }
 
 .status-rechazada {
-  background: #fee2e2;
-  color: #dc2626;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: var(--color-rojo-granate);
 }
 
 .status-rechazada .status-dot {
-  background: #ef4444;
+  background: var(--color-rojo-granate);
 }
 
 /* ===== PROGRESS STEPS ===== */
@@ -909,7 +1165,7 @@ onMounted(async () => {
   align-items: flex-start;
   padding: 2rem;
   position: relative;
-  background: #f8fafc;
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
 }
 
 .progress-steps::before {
@@ -919,7 +1175,7 @@ onMounted(async () => {
   left: 20%;
   right: 20%;
   height: 2px;
-  background: #e5e7eb;
+  background: linear-gradient(90deg, var(--color-gris-acero), var(--color-dorado-vintage));
   z-index: 1;
 }
 
@@ -930,7 +1186,7 @@ onMounted(async () => {
   gap: 0.75rem;
   position: relative;
   z-index: 2;
-  background: #f8fafc;
+  background: var(--color-blanco-perla);
   padding: 0 1rem;
   text-align: center;
   flex: 1;
@@ -940,58 +1196,58 @@ onMounted(async () => {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 3px solid #e5e7eb;
+  border: 3px solid var(--color-gris-acero);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
   font-size: 1rem;
-  color: #9ca3af;
-  background: white;
+  color: var(--color-gris-acero);
+  background: var(--color-blanco-perla);
   transition: all 0.3s ease;
 }
 
 .step.active .step-number {
-  border-color: #3b82f6;
-  color: #3b82f6;
+  border-color: var(--color-dorado-vintage);
+  color: var(--color-dorado-vintage);
 }
 
 .step.completed .step-number {
-  background: #10b981;
-  border-color: #10b981;
-  color: white;
+  background: var(--color-verde-bosque);
+  border-color: var(--color-verde-bosque);
+  color: var(--color-blanco-perla);
 }
 
 .step.rejected .step-number {
-  background: #ef4444;
-  border-color: #ef4444;
-  color: white;
+  background: var(--color-rojo-granate);
+  border-color: var(--color-rojo-granate);
+  color: var(--color-blanco-perla);
 }
 
 .step-label {
   font-weight: 500;
-  color: #6b7280;
+  color: var(--color-gris-acero);
   font-size: 0.875rem;
 }
 
 .step.active .step-label {
-  color: #3b82f6;
+  color: var(--color-dorado-vintage);
   font-weight: 600;
 }
 
 .step.completed .step-label {
-  color: #10b981;
+  color: var(--color-verde-bosque);
   font-weight: 600;
 }
 
 .step.rejected .step-label {
-  color: #ef4444;
+  color: var(--color-rojo-granate);
   font-weight: 600;
 }
 
 .step-date {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--color-gris-acero);
   margin-top: 0.25rem;
 }
 
@@ -1009,22 +1265,22 @@ onMounted(async () => {
 
 .rejection-alert {
   background: linear-gradient(135deg, #fef2f2, #fee2e2);
-  border-left-color: #ef4444;
+  border-left-color: var(--color-rojo-granate);
 }
 
 .approval-alert {
   background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-  border-left-color: #10b981;
+  border-left-color: var(--color-verde-bosque);
 }
 
 .rejection-icon {
-  color: #dc2626;
+  color: var(--color-rojo-granate);
   margin-top: 0.25rem;
   flex-shrink: 0;
 }
 
 .approval-icon {
-  color: #059669;
+  color: var(--color-verde-bosque);
   margin-top: 0.25rem;
   flex-shrink: 0;
 }
@@ -1037,11 +1293,11 @@ onMounted(async () => {
 }
 
 .rejection-content h3 {
-  color: #dc2626;
+  color: var(--color-rojo-granate);
 }
 
 .approval-content h3 {
-  color: #059669;
+  color: var(--color-verde-bosque);
 }
 
 .rejection-content p,
@@ -1052,11 +1308,11 @@ onMounted(async () => {
 }
 
 .rejection-content p {
-  color: #7f1d1d;
+  color: var(--color-marron-chocolate);
 }
 
 .approval-content p {
-  color: #064e3b;
+  color: var(--color-verde-bosque);
 }
 
 .rejection-content p:not(:last-child),
@@ -1079,16 +1335,16 @@ onMounted(async () => {
 .info-section,
 .articulos-section,
 .actions-section {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  background: var(--color-blanco-perla);
+  border-radius: 20px;
+  box-shadow: 0 15px 35px rgba(26, 26, 26, 0.2);
   overflow: hidden;
 }
 
 .section-header {
   padding: 1.5rem 2rem;
-  border-bottom: 1px solid #f3f4f6;
-  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
 }
 
 .section-header h2 {
@@ -1097,18 +1353,18 @@ onMounted(async () => {
   gap: 0.75rem;
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-negro-carbon);
   margin: 0;
 }
 
 .section-header h2 svg {
-  color: #3b82f6;
+  color: var(--color-dorado-vintage);
 }
 
 .items-count {
   font-size: 0.875rem;
   font-weight: 400;
-  color: #6b7280;
+  color: var(--color-gris-acero);
 }
 
 /* ===== INFORMACIÓN GENERAL ===== */
@@ -1124,22 +1380,23 @@ onMounted(async () => {
   align-items: center;
   gap: 1rem;
   padding: 1.5rem;
-  background: #f8fafc;
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
   border-radius: 12px;
   border: 1px solid #e5e7eb;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
 }
 
 .info-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 25px rgba(26, 26, 26, 0.15);
+  border-color: var(--color-dorado-vintage);
 }
 
 .info-icon {
   padding: 1rem;
-  background: #3b82f6;
+  background: var(--color-dorado-vintage);
   border-radius: 12px;
-  color: white;
+  color: var(--color-blanco-perla);
   flex-shrink: 0;
 }
 
@@ -1152,13 +1409,13 @@ onMounted(async () => {
 .info-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--color-gris-acero);
 }
 
 .info-value {
   font-size: 1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-negro-carbon);
 }
 
 /* ===== ARTÍCULOS ===== */
@@ -1170,17 +1427,17 @@ onMounted(async () => {
 }
 
 .articulo-card {
-  border: 2px solid #f3f4f6;
+  border: 2px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.3s ease;
-  background: white;
+  background: var(--color-blanco-perla);
 }
 
 .articulo-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  border-color: #e5e7eb;
+  box-shadow: 0 8px 25px rgba(26, 26, 26, 0.15);
+  border-color: var(--color-dorado-vintage);
 }
 
 .articulo-header {
@@ -1188,8 +1445,8 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
-  background: #f8fafc;
-  border-bottom: 1px solid #f3f4f6;
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .articulo-tipo {
@@ -1198,7 +1455,7 @@ onMounted(async () => {
   gap: 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #3b82f6;
+  color: var(--color-dorado-vintage);
 }
 
 .articulo-estado {
@@ -1209,23 +1466,23 @@ onMounted(async () => {
 }
 
 .estado-excelente {
-  background: #d1fae5;
-  color: #047857;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: var(--color-verde-bosque);
 }
 
 .estado-bueno {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: var(--color-azul-marino);
 }
 
 .estado-regular {
-  background: #fef3c7;
-  color: #d97706;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: var(--color-marron-chocolate);
 }
 
 .estado-malo {
-  background: #fee2e2;
-  color: #dc2626;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: var(--color-rojo-granate);
 }
 
 .articulo-content {
@@ -1235,7 +1492,7 @@ onMounted(async () => {
 .articulo-titulo {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-negro-carbon);
   margin-bottom: 1rem;
 }
 
@@ -1254,41 +1511,181 @@ onMounted(async () => {
 }
 
 .detail-label {
-  color: #6b7280;
+  color: var(--color-gris-acero);
   font-weight: 500;
 }
 
 .detail-value {
-  color: #1f2937;
+  color: var(--color-negro-carbon);
   font-weight: 600;
 }
 
 .detail-value.currency {
-  color: #059669;
+  color: var(--color-dorado-vintage);
   font-weight: 700;
 }
 
 .articulo-specs {
   padding: 1rem;
-  background: #f8fafc;
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+  margin-bottom: 1.5rem;
 }
 
 .articulo-specs h5 {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-negro-carbon);
   margin: 0 0 0.5rem 0;
 }
 
 .articulo-specs p {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--color-gris-acero);
   margin: 0;
   line-height: 1.5;
 }
 
+/* ===== MEDIA (FOTOS Y DOCUMENTOS) ===== */
+.articulo-media {
+  margin-top: 1rem;
+}
+
+.media-section {
+  margin-bottom: 1.5rem;
+}
+
+.media-section:last-child {
+  margin-bottom: 0;
+}
+
+.media-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-negro-carbon);
+  margin-bottom: 1rem;
+}
+
+.media-title svg {
+  color: var(--color-dorado-vintage);
+}
+
+/* ===== GALERÍA DE FOTOS ===== */
+.fotos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+.foto-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.foto-item:hover {
+  transform: scale(1.05);
+  border-color: var(--color-dorado-vintage);
+}
+
+.foto-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: all 0.3s ease;
+}
+
+.foto-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 26, 26, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  color: var(--color-blanco-perla);
+}
+
+.foto-item:hover .foto-overlay {
+  opacity: 1;
+}
+
+/* ===== LISTA DE DOCUMENTOS ===== */
+.documentos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.documento-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.documento-item:hover {
+  transform: translateX(4px);
+  border-color: var(--color-dorado-vintage);
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+}
+
+.documento-icon {
+  padding: 0.75rem;
+  background: var(--color-azul-marino);
+  border-radius: 8px;
+  color: var(--color-blanco-perla);
+  flex-shrink: 0;
+}
+
+.documento-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.documento-nombre {
+  font-weight: 600;
+  color: var(--color-negro-carbon);
+  font-size: 0.875rem;
+}
+
+.documento-tipo {
+  font-size: 0.75rem;
+  color: var(--color-gris-acero);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.documento-tamaño {
+  font-size: 0.75rem;
+  color: var(--color-gris-acero);
+}
+
+.documento-actions {
+  color: var(--color-dorado-vintage);
+  flex-shrink: 0;
+}
+
+/* ===== ESTADO VACÍO ===== */
 .empty-articulos {
   display: flex;
   flex-direction: column;
@@ -1296,12 +1693,13 @@ onMounted(async () => {
   justify-content: center;
   padding: 4rem 2rem;
   text-align: center;
-  color: #6b7280;
+  color: var(--color-gris-acero);
 }
 
 .empty-articulos svg {
   margin-bottom: 1rem;
-  color: #d1d5db;
+  color: var(--color-gris-acero);
+  opacity: 0.5;
 }
 
 /* ===== ACCIONES ===== */
@@ -1319,7 +1717,7 @@ onMounted(async () => {
   padding: 1.5rem;
   border: 2px solid transparent;
   border-radius: 12px;
-  background: white;
+  background: var(--color-blanco-perla);
   cursor: pointer;
   transition: all 0.3s ease;
   text-align: left;
@@ -1327,7 +1725,7 @@ onMounted(async () => {
 
 .action-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 25px rgba(26, 26, 26, 0.15);
 }
 
 .action-button:disabled {
@@ -1336,17 +1734,17 @@ onMounted(async () => {
 }
 
 .action-button.primary {
-  border-color: #3b82f6;
-  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-color: var(--color-dorado-vintage);
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
 }
 
 .action-button.primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #dbeafe, #bae6fd);
+  background: linear-gradient(135deg, #fde68a, #fcd34d);
 }
 
 .action-button.secondary {
-  border-color: #6b7280;
-  background: linear-gradient(135deg, #f9fafb, #f3f4f6);
+  border-color: var(--color-gris-acero);
+  background: linear-gradient(135deg, var(--color-blanco-perla), #f3f4f6);
 }
 
 .action-button.secondary:hover:not(:disabled) {
@@ -1354,21 +1752,21 @@ onMounted(async () => {
 }
 
 .action-button.success {
-  border-color: #10b981;
-  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border-color: var(--color-verde-bosque);
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
 }
 
 .action-button.success:hover:not(:disabled) {
-  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  background: linear-gradient(135deg, #a7f3d0, #6ee7b7);
 }
 
 .action-button.danger {
-  border-color: #ef4444;
-  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border-color: var(--color-rojo-granate);
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
 }
 
 .action-button.danger:hover:not(:disabled) {
-  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  background: linear-gradient(135deg, #fecaca, #fca5a5);
 }
 
 .action-icon {
@@ -1378,23 +1776,23 @@ onMounted(async () => {
 }
 
 .action-button.primary .action-icon {
-  background: #3b82f6;
-  color: white;
+  background: var(--color-dorado-vintage);
+  color: var(--color-blanco-perla);
 }
 
 .action-button.secondary .action-icon {
-  background: #6b7280;
-  color: white;
+  background: var(--color-gris-acero);
+  color: var(--color-blanco-perla);
 }
 
 .action-button.success .action-icon {
-  background: #10b981;
-  color: white;
+  background: var(--color-verde-bosque);
+  color: var(--color-blanco-perla);
 }
 
 .action-button.danger .action-icon {
-  background: #ef4444;
-  color: white;
+  background: var(--color-rojo-granate);
+  color: var(--color-blanco-perla);
 }
 
 .action-content {
@@ -1406,12 +1804,12 @@ onMounted(async () => {
 .action-title {
   font-size: 1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-negro-carbon);
 }
 
 .action-description {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--color-gris-acero);
 }
 
 /* ===== MODAL ===== */
@@ -1421,7 +1819,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(26, 26, 26, 0.8);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -1431,9 +1829,9 @@ onMounted(async () => {
 }
 
 .modal-container {
-  background: white;
+  background: var(--color-blanco-perla);
   border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 25px 50px rgba(26, 26, 26, 0.25);
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
@@ -1445,20 +1843,20 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .modal-header h3 {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-negro-carbon);
   margin: 0;
 }
 
 .modal-close {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--color-gris-acero);
   cursor: pointer;
   padding: 0.5rem;
   border-radius: 6px;
@@ -1467,7 +1865,7 @@ onMounted(async () => {
 
 .modal-close:hover {
   background: #f3f4f6;
-  color: #374151;
+  color: var(--color-negro-carbon);
 }
 
 .modal-content {
@@ -1477,19 +1875,19 @@ onMounted(async () => {
 .warning-icon {
   text-align: center;
   margin-bottom: 1.5rem;
-  color: #f59e0b;
+  color: var(--color-dorado-vintage);
 }
 
 .warning-content h4 {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-negro-carbon);
   margin-bottom: 1rem;
   text-align: center;
 }
 
 .warning-content p {
-  color: #6b7280;
+  color: var(--color-gris-acero);
   margin-bottom: 1.5rem;
   text-align: center;
   line-height: 1.6;
@@ -1502,7 +1900,7 @@ onMounted(async () => {
 .motivo-section label {
   display: block;
   font-weight: 500;
-  color: #374151;
+  color: var(--color-negro-carbon);
   margin-bottom: 0.5rem;
 }
 
@@ -1515,11 +1913,12 @@ onMounted(async () => {
   font-size: 0.875rem;
   resize: vertical;
   min-height: 80px;
+  transition: border-color 0.3s ease;
 }
 
 .motivo-section textarea:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--color-dorado-vintage);
 }
 
 .modal-footer {
@@ -1527,7 +1926,155 @@ onMounted(async () => {
   gap: 1rem;
   justify-content: flex-end;
   padding: 1.5rem;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* ===== VISUALIZADOR DE IMÁGENES ===== */
+.image-viewer {
+  background: var(--color-negro-carbon);
+  border-radius: 16px;
+  max-width: 95vw;
+  max-height: 95vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: var(--color-blanco-perla);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.viewer-title h3 {
+  color: var(--color-negro-carbon);
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.image-counter {
+  color: var(--color-gris-acero);
+  font-size: 0.875rem;
+}
+
+.viewer-close {
+  background: none;
+  border: none;
+  color: var(--color-gris-acero);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.viewer-close:hover {
+  background: #f3f4f6;
+  color: var(--color-negro-carbon);
+}
+
+.viewer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  position: relative;
+  min-height: 400px;
+  background: var(--color-negro-carbon);
+}
+
+.image-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-height: 70vh;
+}
+
+.image-container img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.viewer-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(245, 245, 245, 0.9);
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-negro-carbon);
+  transition: all 0.3s ease;
+}
+
+.viewer-nav:hover:not(:disabled) {
+  background: var(--color-blanco-perla);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.viewer-nav:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.viewer-nav.prev {
+  left: 1rem;
+}
+
+.viewer-nav.next {
+  right: 1rem;
+}
+
+.viewer-footer {
+  padding: 1rem;
+  background: var(--color-blanco-perla);
+  border-top: 1px solid #e5e7eb;
+}
+
+.thumbnails {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+
+.thumbnail {
+  width: 60px;
+  height: 60px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.thumbnail.active {
+  border-color: var(--color-dorado-vintage);
+}
+
+.thumbnail:hover {
+  transform: scale(1.05);
+  border-color: var(--color-dorado-vintage);
+}
+
+.thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* ===== BOTONES ===== */
@@ -1543,35 +2090,38 @@ onMounted(async () => {
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   text-decoration: none;
 }
 
 .btn-primary {
-  background: #3b82f6;
-  color: white;
+  background: var(--color-dorado-vintage);
+  color: var(--color-blanco-perla);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #2563eb;
+  background: var(--color-dorado-claro);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: #6b7280;
-  color: white;
+  background: var(--color-gris-acero);
+  color: var(--color-blanco-perla);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #4b5563;
+  background: var(--color-negro-carbon);
+  transform: translateY(-1px);
 }
 
 .btn-danger {
-  background: #ef4444;
-  color: white;
+  background: var(--color-rojo-granate);
+  color: var(--color-blanco-perla);
 }
 
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
+  transform: translateY(-1px);
 }
 
 .btn-primary:disabled,
@@ -1579,6 +2129,7 @@ onMounted(async () => {
 .btn-danger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
 }
 
 /* ===== NOTIFICACIONES ===== */
@@ -1596,7 +2147,7 @@ onMounted(async () => {
   max-width: 400px;
   padding: 1rem 1.5rem;
   border-radius: 12px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 25px 50px rgba(26, 26, 26, 0.25);
   backdrop-filter: blur(10px);
   animation: slideIn 0.3s ease;
 }
@@ -1613,18 +2164,18 @@ onMounted(async () => {
 }
 
 .notification-success {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.9));
-  color: white;
+  background: linear-gradient(135deg, rgba(27, 67, 50, 0.95), rgba(5, 150, 105, 0.95));
+  color: var(--color-blanco-perla);
 }
 
 .notification-error {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(220, 38, 38, 0.9));
-  color: white;
+  background: linear-gradient(135deg, rgba(139, 0, 0, 0.95), rgba(220, 38, 38, 0.95));
+  color: var(--color-blanco-perla);
 }
 
 .notification-info {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(37, 99, 235, 0.9));
-  color: white;
+  background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(59, 130, 246, 0.95));
+  color: var(--color-blanco-perla);
 }
 
 .notification-content {
@@ -1718,6 +2269,10 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
   
+  .fotos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+  
   .actions-grid {
     grid-template-columns: 1fr;
     padding: 1rem;
@@ -1745,6 +2300,17 @@ onMounted(async () => {
   
   .notification {
     max-width: 100%;
+  }
+  
+  .image-viewer {
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .viewer-nav {
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -1780,6 +2346,10 @@ onMounted(async () => {
   
   .action-icon {
     padding: 0.75rem;
+  }
+  
+  .fotos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   }
 }
 </style>
