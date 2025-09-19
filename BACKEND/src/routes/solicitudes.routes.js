@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs/promises';
 
-
+// Importar servicios y middlewares
 import { 
   validateFileTypes, 
   uploadService 
@@ -13,6 +13,7 @@ import {
 
 import { catchAsync } from '../middleware/errorHandler.js';
 import { authenticateToken } from '../middleware/auth.js';
+import calculadoraService from '../services/calculadora.service.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -69,6 +70,29 @@ router.get('/categorias', catchAsync(async (req, res) => {
   }
 }));
 
+// GET /api/solicitudes/limites - NUEVA RUTA PARA OBTENER LÍMITES DINÁMICOS
+router.get('/limites', catchAsync(async (req, res) => {
+  console.log('Obteniendo límites del sistema');
+  
+  try {
+    const limites = await calculadoraService.obtenerLimitesActuales();
+    
+    res.status(200).json({
+      success: true,
+      data: limites,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error obteniendo límites:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo límites del sistema',
+      error: error.message
+    });
+  }
+}));
+
 // GET /api/solicitudes
 router.get('/', catchAsync(async (req, res) => {
   const userId = req.user.id;
@@ -114,16 +138,22 @@ router.get('/', catchAsync(async (req, res) => {
       const articulo = solicitud.articulos?.[0];
       return {
         id: solicitud.id,
-        numero: `SOL-2024-${String(solicitud.id).padStart(6, '0')}`,
+        numero: `SOL-2025-${String(solicitud.id).padStart(6, '0')}`,
         estado: solicitud.estado,
         fechaSolicitud: solicitud.fechaSolicitud,
         fechaEvaluacion: solicitud.fechaEvaluacion,
         observaciones: solicitud.observaciones,
+        // ✨ CAMPOS NUEVOS EN LISTADO
+        montoSolicitado: solicitud.montoSolicitado ? parseFloat(solicitud.montoSolicitado) : null,
+        plazoMeses: solicitud.plazoMeses,
+        modalidadPago: solicitud.modalidadPago,
+        totalAPagar: solicitud.totalAPagar ? parseFloat(solicitud.totalAPagar) : null,
         articulos: solicitud.articulos.map(art => ({
           id: art.id,
           descripcion: art.descripcion,
           marca: art.marca,
           modelo: art.modelo,
+          estadoFisico: art.estadoFisico,
           valorEstimadoCliente: art.valorEstimadoCliente,
           tipoArticulo: art.tipoArticulo?.nombre
         }))
@@ -154,9 +184,8 @@ router.get('/', catchAsync(async (req, res) => {
   }
 }));
 
-// POST /api/solicitudes - CORREGIDO SIN CONFLICTO DE MIDDLEWARES
+// POST /api/solicitudes - VERSIÓN COMPLETA CON CAMPOS NUEVOS Y PARÁMETROS DINÁMICOS
 router.post('/', 
-  // SOLO validar tipos, el fileUpload ya está aplicado globalmente
   validateFileTypes,
   catchAsync(async (req, res) => {
     const userId = req.user.id;
@@ -168,9 +197,9 @@ router.post('/',
       marca,
       modelo,
       especificacionesTecnicas,
-      montoSolicitado,
-      plazoMeses,
-      modalidadPago,
+      montoSolicitado,      // ✨ NUEVO
+      plazoMeses,           // ✨ NUEVO  
+      modalidadPago,        // ✨ NUEVO
       aceptaTerminos
     } = req.body;
 
@@ -179,12 +208,9 @@ router.post('/',
       tipoArticulo,
       descripcion: descripcion?.substring(0, 50) + '...',
       valorEstimado,
-      montoSolicitado,
-      plazoMeses
-    });
-    console.log('Archivos recibidos:', {
-      fotos: req.files?.fotos ? (Array.isArray(req.files.fotos) ? req.files.fotos.length : 1) : 0,
-      documentoTecnico: req.files?.documentoTecnico ? 'Si' : 'No'
+      montoSolicitado,      // ✨ NUEVO
+      plazoMeses,           // ✨ NUEVO
+      modalidadPago         // ✨ NUEVO
     });
 
     try {
@@ -203,6 +229,15 @@ router.post('/',
         });
       }
 
+      // ✨ VALIDAR MONTO SOLICITADO CON PARÁMETROS DINÁMICOS
+      const validacionMonto = await calculadoraService.validarMontoSolicitud(montoSolicitado, valorEstimado);
+      if (!validacionMonto.esValido) {
+        return res.status(400).json({
+          success: false,
+          message: validacionMonto.mensaje
+        });
+      }
+
       // Verificar que el tipo de artículo existe
       const tipoArticuloExiste = await prisma.tipoArticulo.findUnique({
         where: { id: parseInt(tipoArticulo) }
@@ -215,7 +250,22 @@ router.post('/',
         });
       }
 
-      // PROCESAR ARCHIVOS ADJUNTOS - Los archivos ya están procesados por el middleware global
+      // ✨ CALCULAR DETALLES DEL PRÉSTAMO CON PARÁMETROS DINÁMICOS
+      const calculosPrestamo = await calculadoraService.calcularPrestamo(
+        montoSolicitado, 
+        plazoMeses || 1, 
+        modalidadPago || 'mensual'
+      );
+
+      console.log('Cálculos del préstamo:', {
+        montoSolicitado: calculosPrestamo.montoSolicitado,
+        totalAPagar: calculosPrestamo.totalAPagar,
+        interesTotal: calculosPrestamo.interesTotal,
+        montoPorPago: calculosPrestamo.montoPorPago,
+        comisionApertura: calculosPrestamo.comisionApertura
+      });
+
+      // PROCESAR ARCHIVOS ADJUNTOS
       const fotosGuardadas = [];
       let documentoGuardado = null;
 
@@ -238,7 +288,6 @@ router.post('/',
           const nombreArchivo = `foto_${timestamp}_${i + 1}${extension}`;
           const rutaDestino = path.join(fotoDir, nombreArchivo);
           
-          // Mover archivo desde temp a destino final
           await foto.mv(rutaDestino);
           
           fotosGuardadas.push({
@@ -261,7 +310,6 @@ router.post('/',
         const nombreArchivo = `doc_${timestamp}${extension}`;
         const rutaDestino = path.join(docDir, nombreArchivo);
         
-        // Mover archivo desde temp a destino final
         await doc.mv(rutaDestino);
         
         documentoGuardado = {
@@ -273,16 +321,22 @@ router.post('/',
         };
       }
 
-      // GUARDAR EN BASE DE DATOS CON TRANSACCIÓN
+      // ✨ GUARDAR EN BASE DE DATOS CON TODOS LOS CAMPOS NUEVOS
       const resultado = await prisma.$transaction(async (tx) => {
         
-        // 1. Crear la solicitud de préstamo
+        // 1. Crear la solicitud de préstamo CON CAMPOS NUEVOS
         const solicitudCreada = await tx.solicitudPrestamo.create({
           data: {
             usuarioId: userId,
             fechaSolicitud: new Date(),
             estado: 'Pendiente',
-            observaciones: `Solicitud de préstamo por Q${montoSolicitado} a ${plazoMeses} meses`
+            observaciones: `Solicitud de préstamo por Q${montoSolicitado} a ${plazoMeses} meses (${modalidadPago})`,
+            // ✨ CAMPOS NUEVOS CON VALORES CALCULADOS
+            montoSolicitado: calculosPrestamo.montoSolicitado,
+            plazoMeses: calculosPrestamo.plazoMeses,
+            modalidadPago: calculosPrestamo.modalidadPago,
+            totalAPagar: calculosPrestamo.totalAPagar,
+            tasaInteres: calculosPrestamo.tasaInteres
           }
         });
 
@@ -323,7 +377,6 @@ router.post('/',
             }
           });
           documentosCreados.push(docFoto);
-          console.log('Foto registrada en BD:', docFoto.id);
         }
 
         // Guardar documento técnico en la tabla documento
@@ -340,13 +393,13 @@ router.post('/',
             }
           });
           documentosCreados.push(docTecnico);
-          console.log('Documento técnico registrado en BD:', docTecnico.id);
         }
 
         return {
           solicitud: solicitudCreada,
           articulo: articuloCreado,
-          documentos: documentosCreados
+          documentos: documentosCreados,
+          calculosPrestamo
         };
       });
 
@@ -357,10 +410,11 @@ router.post('/',
         numero: numeroSolicitud,
         solicitudId: resultado.solicitud.id,
         articuloId: resultado.articulo.id,
-        documentos: resultado.documentos.length
+        documentos: resultado.documentos.length,
+        totalAPagar: resultado.calculosPrestamo.totalAPagar
       });
 
-      // RESPUESTA CORREGIDA PARA COINCIDIR CON EL FRONTEND
+      // ✨ RESPUESTA COMPLETA CON TODOS LOS DATOS CALCULADOS
       res.status(201).json({
         success: true,
         message: 'Solicitud de empéño creada exitosamente',
@@ -375,13 +429,21 @@ router.post('/',
             id: resultado.articulo.id,
             tipoArticulo: tipoArticuloExiste.nombre,
             descripcion: resultado.articulo.descripcion,
+            estadoFisico: resultado.articulo.estadoFisico,
             valorEstimadoCliente: resultado.articulo.valorEstimadoCliente
           },
           prestamo: {
-            montoSolicitado: parseFloat(montoSolicitado),
-            plazoMeses: parseInt(plazoMeses),
-            modalidadPago: modalidadPago
+            montoSolicitado: resultado.calculosPrestamo.montoSolicitado,
+            plazoMeses: resultado.calculosPrestamo.plazoMeses,
+            modalidadPago: resultado.calculosPrestamo.modalidadPago,
+            tasaInteres: resultado.calculosPrestamo.tasaInteres,
+            totalAPagar: resultado.calculosPrestamo.totalAPagar,
+            montoPorPago: resultado.calculosPrestamo.montoPorPago,
+            interesTotal: resultado.calculosPrestamo.interesTotal,
+            comisionApertura: resultado.calculosPrestamo.comisionApertura,
+            numeroPagos: resultado.calculosPrestamo.numeroPagos
           },
+          planPagos: resultado.calculosPrestamo.planPagos,
           archivosSubidos: {
             fotos: fotosGuardadas.length,
             documentoTecnico: documentoGuardado ? 1 : 0,
@@ -417,7 +479,7 @@ router.post('/',
   })
 );
 
-// GET /api/solicitudes/:id
+// GET /api/solicitudes/:id - VERSIÓN COMPLETA CON TODOS LOS CAMPOS
 router.get('/:id', catchAsync(async (req, res) => {
   const userId = req.user.id;
   const solicitudId = parseInt(req.params.id);
@@ -441,7 +503,8 @@ router.get('/:id', catchAsync(async (req, res) => {
             id: true,
             nombre: true,
             apellido: true,
-            email: true
+            email: true,
+            telefono: true
           }
         }
       }
@@ -454,17 +517,63 @@ router.get('/:id', catchAsync(async (req, res) => {
       });
     }
 
+    // ✨ CALCULAR PLAN DE PAGOS SI HAY DATOS DE PRÉSTAMO
+    let planPagos = null;
+    let resumenFinanciero = null;
+
+    if (solicitud.montoSolicitado && solicitud.plazoMeses) {
+      try {
+        const calculosPrestamo = await calculadoraService.calcularPrestamo(
+          parseFloat(solicitud.montoSolicitado),
+          solicitud.plazoMeses,
+          solicitud.modalidadPago || 'mensual'
+        );
+        
+        planPagos = calculosPrestamo.planPagos;
+        resumenFinanciero = {
+          montoSolicitado: parseFloat(solicitud.montoSolicitado),
+          totalAPagar: parseFloat(solicitud.totalAPagar || calculosPrestamo.totalAPagar),
+          interesTotal: calculosPrestamo.interesTotal,
+          montoPorPago: calculosPrestamo.montoPorPago,
+          tasaInteres: parseFloat(solicitud.tasaInteres || calculosPrestamo.tasaInteres),
+          numeroPagos: calculosPrestamo.numeroPagos,
+          comisionApertura: calculosPrestamo.comisionApertura
+        };
+      } catch (calcError) {
+        console.warn('Error calculando plan de pagos:', calcError.message);
+      }
+    }
+
+    // ✨ RESPUESTA COMPLETA CON TODOS LOS CAMPOS
     const solicitudDetallada = {
+      // Información básica de la solicitud
       id: solicitud.id,
       numero: `SOL-2025-${String(solicitud.id).padStart(6, '0')}`,
       estado: solicitud.estado,
       fechaSolicitud: solicitud.fechaSolicitud,
       fechaEvaluacion: solicitud.fechaEvaluacion,
       observaciones: solicitud.observaciones,
+      
+      // Información del usuario
       usuario: {
+        id: solicitud.usuario.id,
         nombre: `${solicitud.usuario.nombre} ${solicitud.usuario.apellido}`,
-        email: solicitud.usuario.email
+        email: solicitud.usuario.email,
+        telefono: solicitud.usuario.telefono
       },
+      
+      // ✨ INFORMACIÓN COMPLETA DEL PRÉSTAMO SOLICITADO
+      prestamo: {
+        montoSolicitado: solicitud.montoSolicitado ? parseFloat(solicitud.montoSolicitado) : null,
+        plazoMeses: solicitud.plazoMeses,
+        modalidadPago: solicitud.modalidadPago,
+        totalAPagar: solicitud.totalAPagar ? parseFloat(solicitud.totalAPagar) : null,
+        tasaInteres: solicitud.tasaInteres ? parseFloat(solicitud.tasaInteres) : null,
+        resumenFinanciero,
+        planPagos
+      },
+      
+      // Información de artículos (mejorada)
       articulos: solicitud.articulos.map(articulo => ({
         id: articulo.id,
         tipo: articulo.tipoArticulo.nombre,
@@ -473,10 +582,26 @@ router.get('/:id', catchAsync(async (req, res) => {
         modelo: articulo.modelo,
         serie: articulo.serie,
         color: articulo.color,
-        estadoFisico: articulo.estadoFisico,
+        estadoFisico: articulo.estadoFisico, // ✨ ESTADO FÍSICO
         valorEstimadoCliente: parseFloat(articulo.valorEstimadoCliente || 0),
-        especificacionesTecnicas: articulo.especificacionesTecnicas
-      }))
+        especificacionesTecnicas: articulo.especificacionesTecnicas,
+        
+        // ✨ ANÁLISIS DEL VALOR ESTIMADO
+        analisisValor: solicitud.montoSolicitado ? {
+          porcentajeSolicitado: parseFloat(((parseFloat(solicitud.montoSolicitado) / parseFloat(articulo.valorEstimadoCliente || 1)) * 100).toFixed(2)),
+          esMontoRazonable: parseFloat(solicitud.montoSolicitado) <= parseFloat(articulo.valorEstimadoCliente || 0) * 0.8
+        } : null
+      })),
+      
+      // ✨ ESTADÍSTICAS Y MÉTRICAS
+      estadisticas: {
+        tiempoEspera: solicitud.fechaEvaluacion ? 
+          Math.ceil((new Date(solicitud.fechaEvaluacion) - new Date(solicitud.fechaSolicitud)) / (1000 * 60 * 60 * 24)) : 
+          Math.ceil((new Date() - new Date(solicitud.fechaSolicitud)) / (1000 * 60 * 60 * 24)),
+        esSolicitudReciente: Math.ceil((new Date() - new Date(solicitud.fechaSolicitud)) / (1000 * 60 * 60 * 24)) <= 7,
+        requiereEvaluacion: solicitud.estado === 'Pendiente',
+        puedeModificar: ['Pendiente'].includes(solicitud.estado)
+      }
     };
 
     res.status(200).json({
@@ -583,8 +708,7 @@ router.get('/:solicitudId/archivos', catchAsync(async (req, res) => {
   }
 }));
 
-// 🆕 GET /api/solicitudes/:solicitudId/archivo/:archivoId
-// ⭐ NUEVA RUTA PARA DESCARGA DE ARCHIVOS - RESUELVE EL ERROR 404
+// GET /api/solicitudes/:solicitudId/archivo/:archivoId - DESCARGA DE ARCHIVOS
 router.get('/:solicitudId/archivo/:archivoId', catchAsync(async (req, res) => {
   const { solicitudId, archivoId } = req.params;
   const userId = req.user.id;
@@ -626,13 +750,10 @@ router.get('/:solicitudId/archivo/:archivoId', catchAsync(async (req, res) => {
     // Construir la ruta del archivo - Manejar diferentes formatos de ruta
     let rutaCompleta;
     if (documento.rutaArchivo.startsWith('/uploads/')) {
-      // Si la ruta ya incluye /uploads/, remover el / inicial
       rutaCompleta = path.join(process.cwd(), documento.rutaArchivo.substring(1));
     } else if (documento.rutaArchivo.startsWith('uploads/')) {
-      // Si la ruta ya incluye uploads/ sin barra inicial
       rutaCompleta = path.join(process.cwd(), documento.rutaArchivo);
     } else {
-      // Si es solo el nombre del archivo, construir la ruta completa
       rutaCompleta = path.join(process.cwd(), 'uploads', documento.rutaArchivo);
     }
     
@@ -643,7 +764,6 @@ router.get('/:solicitudId/archivo/:archivoId', catchAsync(async (req, res) => {
       await fs.access(rutaCompleta);
     } catch (error) {
       console.error('Archivo no encontrado en el sistema:', rutaCompleta);
-      console.error('Error de acceso:', error.message);
       
       // Intentar rutas alternativas
       const rutasAlternativas = [
@@ -668,12 +788,7 @@ router.get('/:solicitudId/archivo/:archivoId', catchAsync(async (req, res) => {
       if (!archivoEncontrado) {
         return res.status(404).json({
           success: false,
-          message: 'Archivo no encontrado en el servidor',
-          debug: process.env.NODE_ENV === 'development' ? {
-            rutaOriginal: documento.rutaArchivo,
-            rutaCalculada: rutaCompleta,
-            rutasIntentadas: rutasAlternativas
-          } : undefined
+          message: 'Archivo no encontrado en el servidor'
         });
       }
     }
@@ -682,17 +797,15 @@ router.get('/:solicitudId/archivo/:archivoId', catchAsync(async (req, res) => {
     const estaImagen = documento.tipoMime && documento.tipoMime.startsWith('image/');
     
     if (estaImagen) {
-      // Para imágenes, permitir visualización inline
       res.setHeader('Content-Disposition', `inline; filename="${documento.nombreArchivo}"`);
       res.setHeader('Content-Type', documento.tipoMime);
     } else {
-      // Para documentos, forzar descarga
       res.setHeader('Content-Disposition', `attachment; filename="${documento.nombreArchivo}"`);
       res.setHeader('Content-Type', documento.tipoMime || 'application/octet-stream');
     }
 
     // Headers adicionales para cache y seguridad
-    res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache por 1 hora
+    res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     
     // Enviar el archivo
@@ -734,7 +847,7 @@ router.put('/:id/cancelar', catchAsync(async (req, res) => {
         id: solicitudId,
         usuarioId: userId,
         estado: {
-        in: ['Pendiente'] 
+          in: ['Pendiente'] 
         }
       },
       data: {

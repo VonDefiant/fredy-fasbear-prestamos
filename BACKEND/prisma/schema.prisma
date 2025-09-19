@@ -168,7 +168,13 @@ model SolicitudPrestamo {
   observaciones    String?
   fechaEvaluacion  DateTime?         @map("fecha_evaluacion")
   createdAt        DateTime          @default(now()) @map("created_at")
+    montoSolicitado  Decimal?          @map("monto_solicitado") @db.Decimal(10,2)
+  plazoMeses       Int?              @map("plazo_meses")
+  modalidadPago    String?           @map("modalidad_pago") @db.VarChar(50)
+  totalAPagar      Decimal?          @map("total_a_pagar") @db.Decimal(10,2)
+  tasaInteres      Decimal?          @map("tasa_interes") @db.Decimal(5,2)
   updatedAt        DateTime          @updatedAt @map("updated_at")
+
 
   // Relaciones
   usuario          Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
