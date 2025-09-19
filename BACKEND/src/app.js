@@ -1,6 +1,6 @@
 // ===============================================
 // Archivo: BACKEND/src/app.js
-// Archivo principal de la aplicación Fredy Fasbear Prestamos
+// Archivo principal de la aplicación Fredy Fasbear Prestamos - CORREGIDO
 // ===============================================
 
 import express from 'express';
@@ -31,27 +31,36 @@ import { requestLogger } from './middleware/requestLogger.js';
 // Crear aplicación Express
 const app = express();
 
-// ===== CONFIGURACIÓN DE SEGURIDAD =====
+// ===== CONFIGURACIÓN DE SEGURIDAD CORREGIDA =====
 
-// Helmet para headers de seguridad
+// Helmet para headers de seguridad - ACTUALIZADO PARA CORS
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // CRÍTICO: Permite archivos cross-origin
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "https:", "http:"], // Permite imágenes de cualquier protocolo
+      connectSrc: ["'self'", "http://localhost:3000", "http://127.0.0.1:3000"],
     },
   },
 }));
 
-// CORS configurado
+// CORS configurado - MEJORADO
 app.use(cors({
-  origin: process.env.FRONTEND_URL || ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    process.env.FRONTEND_URL
+  ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Disposition'] // Para descargas
 }));
 
 // ===== MIDDLEWARES GENERALES =====
@@ -99,17 +108,23 @@ app.use(fileUpload({
   preserveExtension: true
 }));
 
-// ===== SERVIR ARCHIVOS ESTÁTICOS =====
+// ===== SERVIR ARCHIVOS ESTÁTICOS - CORREGIDO =====
 
-// Servir uploads de manera segura
+// Servir uploads de manera segura con headers CORS específicos
 app.use('/uploads', express.static(join(process.cwd(), 'uploads'), {
   maxAge: '1d',
   etag: true,
   lastModified: true,
   setHeaders: (res, path) => {
+    // HEADERS CORS ESPECÍFICOS PARA ARCHIVOS ESTÁTICOS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    
     // Configurar headers de seguridad para uploads
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Cambiado de DENY a SAMEORIGIN
     
     // Permitir solo ciertos tipos de archivo
     const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx'];
@@ -117,6 +132,18 @@ app.use('/uploads', express.static(join(process.cwd(), 'uploads'), {
     
     if (!allowedExtensions.includes(ext)) {
       res.status(403).end('Tipo de archivo no permitido');
+      return;
+    }
+    
+    // Headers específicos para tipos de archivo
+    if (['.jpg', '.jpeg'].includes(ext)) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    } else if (ext === '.png') {
+      res.setHeader('Content-Type', 'image/png');
+    } else if (ext === '.webp') {
+      res.setHeader('Content-Type', 'image/webp');
+    } else if (ext === '.pdf') {
+      res.setHeader('Content-Type', 'application/pdf');
     }
   }
 }));
@@ -226,7 +253,8 @@ const server = app.listen(PORT, HOST, () => {
     console.log('   - Logging detallado habilitado');
     console.log('   - Hot reload con nodemon');
     console.log('   - CORS permisivo configurado');
-    console.log('   - Upload debugging habilitado\n');
+    console.log('   - Upload debugging habilitado');
+    console.log('   - Archivos estáticos con CORS habilitado\n');
   }
 });
 

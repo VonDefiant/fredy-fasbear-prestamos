@@ -1,5 +1,5 @@
 <!-- =============================================== -->
-<!-- Archivo: FRONTEND/components/solicitudes/ArchivosAdjuntos.vue -->
+<!-- Archivo: FRONTEND/pages/empeno/solicitudes/ArchivosAdjuntos.vue -->
 <!-- Componente para mostrar archivos adjuntos de una solicitud -->
 <!-- =============================================== -->
 
@@ -218,6 +218,10 @@ const props = defineProps({
   }
 });
 
+// ===== COMPOSABLES =====
+const config = useRuntimeConfig()
+const route = useRoute()
+
 // ===== ESTADO REACTIVO =====
 const modoVista = ref('grid'); // 'grid' o 'list'
 const filtroActivo = ref('todos');
@@ -227,9 +231,13 @@ const imagenModalAlt = ref('');
 const imagenModalTipo = ref('');
 
 // ===== COMPUTED =====
+const solicitudId = computed(() => {
+  return parseInt(route.params.id)
+})
+
 const filtrosDisponibles = computed(() => {
   const filtros = [
-    { tipo: 'todos', label: 'Todos', cantidad: props.archivos.length }
+    { tipo: 'todos', label: 'Todos', cantidad: props.archivos.length, icono: IconoTodos }
   ];
 
   // Contar tipos de documentos
@@ -244,7 +252,7 @@ const filtrosDisponibles = computed(() => {
       tipo: 'Foto_Prenda',
       label: 'Fotos',
       cantidad: tipos['Foto_Prenda'],
-      icono: 'IconoFoto'
+      icono: IconoFoto
     });
   }
 
@@ -253,14 +261,11 @@ const filtrosDisponibles = computed(() => {
       tipo: 'Especificaciones',
       label: 'Documentos',
       cantidad: tipos['Especificaciones'],
-      icono: 'IconoDocumento'
+      icono: IconoDocumento
     });
   }
 
-  return filtros.map(filtro => ({
-    ...filtro,
-    icono: getIconoFiltro(filtro.tipo)
-  }));
+  return filtros;
 });
 
 const archivosFiltrados = computed(() => {
@@ -270,7 +275,7 @@ const archivosFiltrados = computed(() => {
   return props.archivos.filter(archivo => archivo.tipoDocumento === filtroActivo.value);
 });
 
-// ===== MÉTODOS =====
+// ===== MÉTODOS PRINCIPALES =====
 const toggleModoVisualizacion = () => {
   modoVista.value = modoVista.value === 'grid' ? 'list' : 'grid';
 };
@@ -280,32 +285,61 @@ const esImagen = (archivo) => {
   return tiposImagen.includes(archivo.tipoMime) || archivo.tipoDocumento === 'Foto_Prenda';
 };
 
+// ===== FUNCIÓN PARA CONSTRUIR URLs =====
 const getUrlArchivo = (archivo) => {
-  const config = useRuntimeConfig();
-  return `${config.public.apiBaseUrl}${archivo.rutaArchivo}`;
+  if (!archivo || !archivo.rutaArchivo) {
+    // Retornar un SVG placeholder inline en lugar de una ruta que no existe
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik02MCA2MEgxNDBWMTQwSDYwVjYwWiIgZmlsbD0iI0Q1RDVENSIvPgo8cGF0aCBkPSJNODAgODBDODUuNTIyOCA4MCA5MCA4NC40NzcyIDkwIDkwQzkwIDk1LjUyMjggODUuNTIyOCAxMDAgODAgMTAwQzc0LjQ3NzIgMTAwIDcwIDk1LjUyMjggNzAgOTBDNzAgODQuNDc3MiA3NC40NzcyIDgwIDgwIDgwWiIgZmlsbD0iI0FBQUFBQSIvPgo8L3N2Zz4K';
+  }
+
+  let rutaArchivo = archivo.rutaArchivo;
+  
+  // Si ya es una URL completa, devolverla tal como está
+  if (rutaArchivo.startsWith('http')) {
+    return rutaArchivo;
+  }
+  
+  // Construir URL correctamente
+  const baseUrl = config.public.apiBase || config.public.apiBaseUrl || '';
+  
+  // Si la ruta ya incluye /uploads, no duplicarla
+  if (rutaArchivo.startsWith('/uploads')) {
+    return `${baseUrl.replace('/api', '')}${rutaArchivo}`;
+  }
+  
+  // Si no incluye /uploads, agregarla
+  return `${baseUrl.replace('/api', '')}/uploads/${rutaArchivo}`;
+};
+
+// ===== FUNCIÓN PARA URLs DE DESCARGA =====
+const getUrlDescarga = (archivo) => {
+  if (!archivo || !solicitudId.value) {
+    return '#';
+  }
+  
+  // Usar la URL de descarga del API
+  const baseUrl = config.public.apiBase || config.public.apiBaseUrl || '';
+  return `${baseUrl}/solicitudes/${solicitudId.value}/archivo/${archivo.id}`;
 };
 
 const getExtension = (nombreArchivo) => {
-  return nombreArchivo.split('.').pop().toUpperCase();
+  if (!nombreArchivo) return '';
+  return nombreArchivo.split('.').pop()?.toUpperCase() || '';
 };
 
 const formatTipoDocumento = (tipo) => {
   const tipos = {
-    'Foto_Prenda': 'Foto del artículo',
-    'Especificaciones': 'Documento técnico',
-    'Comprobante': 'Comprobante',
-    'Contrato': 'Contrato',
-    'Identificacion': 'Identificación'
+    'Foto_Prenda': 'Foto del Artículo',
+    'Especificaciones': 'Documento Técnico'
   };
   return tipos[tipo] || tipo;
 };
 
 const formatFileSize = (bytes) => {
-  if (!bytes) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  if (!bytes) return '';
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
 };
 
 const formatDate = (dateString) => {
@@ -317,29 +351,7 @@ const formatDate = (dateString) => {
   });
 };
 
-const getIconoTipo = (tipo) => {
-  // Retorna el nombre del componente de icono a usar
-  switch (tipo) {
-    case 'Foto_Prenda':
-      return 'IconoFoto';
-    case 'Especificaciones':
-      return 'IconoDocumento';
-    default:
-      return 'IconoArchivo';
-  }
-};
-
-const getIconoFiltro = (tipo) => {
-  switch (tipo) {
-    case 'Foto_Prenda':
-      return 'IconoFoto';
-    case 'Especificaciones':
-      return 'IconoDocumento';
-    default:
-      return 'IconoTodos';
-  }
-};
-
+// ===== MANEJADORES DE EVENTOS =====
 const abrirArchivo = (archivo) => {
   if (esImagen(archivo)) {
     verImagenCompleta(archivo);
@@ -362,20 +374,100 @@ const cerrarModalImagen = () => {
   imagenModalTipo.value = '';
 };
 
-const descargarArchivo = (archivo) => {
-  const url = getUrlArchivo(archivo);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = archivo.nombreArchivo;
-  link.target = '_blank';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+const descargarArchivo = async (archivo) => {
+  try {
+    // Obtener token de múltiples fuentes posibles
+    let token = null;
+    
+    // Método 1: Desde localStorage
+    token = localStorage.getItem('auth-token');
+    
+    // Método 2: Desde sessionStorage si no está en localStorage
+    if (!token) {
+      token = sessionStorage.getItem('auth-token');
+    }
+    
+    // Método 3: Desde cookies si existe
+    if (!token) {
+      const cookies = document.cookie.split(';');
+      const authCookie = cookies.find(cookie => cookie.trim().startsWith('auth-token='));
+      if (authCookie) {
+        token = authCookie.split('=')[1];
+      }
+    }
+    
+    // Método 4: Desde el composable useAuth si está disponible
+    if (!token) {
+      try {
+        const { getToken } = useAuth();
+        token = getToken?.();
+      } catch (e) {
+        // Ignorar si useAuth no está disponible
+      }
+    }
+    
+    if (!token) {
+      console.error('No se encontró token de autenticación');
+      alert('Error: No se pudo autenticar la descarga. Por favor, inicia sesión nuevamente.');
+      return;
+    }
+
+    console.log('Token encontrado para descarga:', token.substring(0, 20) + '...');
+
+    const url = getUrlDescarga(archivo);
+    console.log('URL de descarga:', url);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': '*/*'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error response:', response.status, errorText);
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = archivo.nombreArchivo;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    
+    // Limpiar después de un breve delay
+    setTimeout(() => {
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    }, 100);
+    
+    console.log('Descarga iniciada exitosamente');
+    
+  } catch (error) {
+    console.error('Error descargando archivo:', error);
+    alert(`Error al descargar el archivo: ${error.message}`);
+  }
 };
 
 const onImageError = (event) => {
-  console.warn('Error cargando imagen:', event.target.src);
-  event.target.style.display = 'none';
+  // Usar una imagen placeholder que existe o un SVG inline
+  event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik02MCA2MEgxNDBWMTQwSDYwVjYwWiIgZmlsbD0iI0Q1RDVENSIvPgo8cGF0aCBkPSJNODAgODBDODUuNTIyOCA4MCA5MCA4NC40NzcyIDkwIDkwQzkwIDk1LjUyMjggODUuNTIyOCAxMDAgODAgMTAwQzc0LjQ3NzIgMTAwIDcwIDk1LjUyMjggNzAgOTBDNzAgODQuNDc3MiA3NC40NzcyIDgwIDgwIDgwWiIgZmlsbD0iI0FBQUFBQSIvPgo8cGF0aCBkPSJNMTIwIDEyMEwxMDAgMTAwTDkwIDExMEw4MCA5MEw3MCA5MEw2MCA5MEw2MCA5MEM2MCA5MCA2MCA5MCA2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MEw2MCA5MCIgZmlsbD0iI0FBQUFBQSIvPgo8L3N2Zz4K';
+};
+
+// ===== FUNCIONES DE ICONOS =====
+const getIconoTipo = (tipoDocumento) => {
+  if (tipoDocumento === 'Foto_Prenda') {
+    return IconoFoto;
+  } else if (tipoDocumento === 'Especificaciones') {
+    return IconoDocumento;
+  }
+  return IconoArchivo;
 };
 
 // ===== COMPONENTES DE ICONOS =====

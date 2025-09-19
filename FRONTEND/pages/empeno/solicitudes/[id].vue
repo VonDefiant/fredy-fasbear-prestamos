@@ -483,14 +483,32 @@
         </div>
 
         <!-- Pestaña: Archivos Adjuntos -->
-        <div v-if="pestanaActiva === 'archivos'" class="archivos-pestana">
-          <ArchivosAdjuntos 
-            :archivos="archivos"
-            :loading="loading"
-          />
+          <div v-if="pestanaActiva === 'archivos'" class="archivos-pestana">
+            <ArchivosAdjuntos 
+              :archivos="archivos"
+              :loading="loadingArchivos"
+            /> 
+             <div v-if="!loadingArchivos && archivos.length === 0" class="archivos-estado-vacio">
+            <div class="estado-vacio-content">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" class="icono-vacio">
+                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#9CA3AF" stroke-width="2"/>
+                <polyline points="14,2 14,8 20,8" stroke="#9CA3AF" stroke-width="2"/>
+              </svg>
+              <h4>No hay archivos adjuntos</h4>
+              <p>Esta solicitud no tiene documentos o fotos adjuntas.</p>
+              
+              <button @click="refrescarArchivos" class="btn-refresh">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12C21 16.9706 16.9706 21 12 21C9.5 21 7.26 19.81 5.77 17.96" stroke="currentColor" stroke-width="2"/>
+                  <path d="M3 12L6 9L9 12" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                Refrescar archivos
+              </button>
+          </div>
         </div>
-      </div>
-    </div>
+                </div>
+          </div>
+        </div>
 
     <!-- MODAL DE CONFIRMACIÓN DE CANCELACIÓN -->
     <div class="modal-overlay" v-if="mostrarConfirmacionCancelacion" @click="cerrarConfirmacionCancelacion">
@@ -669,7 +687,11 @@ definePageMeta({
 const route = useRoute()
 const { user } = useAuth()
 const { api } = useApi()
-const { obtenerDetalleSolicitud, cancelarSolicitud } = useSolicitudes()
+const { 
+  obtenerDetalleSolicitud, 
+  cancelarSolicitud,
+  obtenerArchivosAdjuntos  // NUEVA: función para obtener archivos
+} = useSolicitudes()
 const config = useRuntimeConfig()
 
 // ===== META TAGS =====
@@ -686,6 +708,10 @@ const error = ref(null)
 const solicitud = ref(null)
 const loadingAction = ref(false)
 const loadingCancelacion = ref(false)
+
+// NUEVO: Estado para archivos adjuntos
+const archivos = ref([])
+const loadingArchivos = ref(false)
 
 // Estado para pestañas
 const pestanaActiva = ref('informacion') // 'informacion' o 'archivos'
@@ -712,10 +738,107 @@ const solicitudId = computed(() => {
   return parseInt(route.params.id)
 })
 
-// Computed para archivos adjuntos
-const archivos = computed(() => {
-  return solicitud.value?.documentos || []
-})
+// ===== NUEVA FUNCIÓN PARA CARGAR ARCHIVOS =====
+const cargarArchivosAdjuntos = async () => {
+  try {
+    loadingArchivos.value = true
+    console.log('📎 Cargando archivos adjuntos para solicitud:', solicitudId.value)
+    
+    if (!solicitudId.value || isNaN(solicitudId.value)) {
+      console.warn('❌ ID de solicitud inválido para archivos')
+      return
+    }
+    
+    const response = await obtenerArchivosAdjuntos(solicitudId.value)
+    
+    if (response.success && response.data) {
+      // El backend devuelve archivos agrupados por tipo
+      const { archivos: archivosPorTipo } = response.data
+      
+      // Convertir los archivos agrupados en un array plano para el componente
+      const todosLosArchivos = []
+      
+      // Agregar fotos
+      if (archivosPorTipo.fotos) {
+        archivosPorTipo.fotos.forEach(foto => {
+          todosLosArchivos.push({
+            id: foto.id,
+            tipoDocumento: foto.tipo,
+            nombreArchivo: foto.nombreArchivo,
+            rutaArchivo: foto.rutaArchivo,
+            fechaSubida: foto.fechaSubida,
+            tamanoArchivo: foto.tamanoArchivo,
+            tipoMime: foto.tipoMime,
+            urlDescarga: foto.urlDescarga
+          })
+        })
+      }
+      
+      // Agregar documentos
+      if (archivosPorTipo.documentos) {
+        archivosPorTipo.documentos.forEach(doc => {
+          todosLosArchivos.push({
+            id: doc.id,
+            tipoDocumento: doc.tipo,
+            nombreArchivo: doc.nombreArchivo,
+            rutaArchivo: doc.rutaArchivo,
+            fechaSubida: doc.fechaSubida,
+            tamanoArchivo: doc.tamanoArchivo,
+            tipoMime: doc.tipoMime,
+            urlDescarga: doc.urlDescarga
+          })
+        })
+      }
+      
+      // Agregar otros archivos
+      if (archivosPorTipo.otros) {
+        archivosPorTipo.otros.forEach(otro => {
+          todosLosArchivos.push({
+            id: otro.id,
+            tipoDocumento: otro.tipo,
+            nombreArchivo: otro.nombreArchivo,
+            rutaArchivo: otro.rutaArchivo,
+            fechaSubida: otro.fechaSubida,
+            tamanoArchivo: otro.tamanoArchivo,
+            tipoMime: otro.tipoMime,
+            urlDescarga: otro.urlDescarga
+          })
+        })
+      }
+      
+      archivos.value = todosLosArchivos
+      
+      console.log('✅ Archivos cargados:', {
+        total: todosLosArchivos.length,
+        fotos: archivosPorTipo.fotos?.length || 0,
+        documentos: archivosPorTipo.documentos?.length || 0,
+        otros: archivosPorTipo.otros?.length || 0
+      })
+      
+      // Si no hay archivos, mostrar información útil
+      if (todosLosArchivos.length === 0) {
+        console.log('ℹ️ No se encontraron archivos adjuntos para esta solicitud')
+      }
+      
+    } else {
+      console.warn('⚠️ No se encontraron archivos:', response.message)
+      archivos.value = []
+    }
+    
+  } catch (err) {
+    console.error('❌ Error cargando archivos adjuntos:', err)
+    // No mostramos error al usuario porque no tener archivos no es crítico
+    archivos.value = []
+  } finally {
+    loadingArchivos.value = false
+  }
+}
+
+// ===== NUEVA FUNCIÓN PARA REFRESCAR ARCHIVOS =====
+const refrescarArchivos = async () => {
+  console.log('🔄 Refrescando archivos adjuntos...')
+  await cargarArchivosAdjuntos()
+}
 
 // ===== MÉTODOS DE UTILIDAD =====
 const formatCurrency = (amount) => {
@@ -894,6 +1017,10 @@ const cargarDetalle = async () => {
       useHead({
         title: `${solicitud.value.numero} - Detalle de Solicitud`,
       })
+      
+      // NUEVA: Cargar archivos adjuntos después de cargar el detalle
+      await cargarArchivosAdjuntos()
+      
     } else {
       throw new Error(response.message || 'No se pudo cargar el detalle')
     }
@@ -1002,11 +1129,24 @@ const ejecutarCancelacion = async () => {
   }
 }
 
+// ===== WATCHERS =====
+watch(() => route.params.id, (newId, oldId) => {
+  if (newId && newId !== oldId) {
+    cargarDetalle()
+  }
+})
+
 // ===== LIFECYCLE =====
 onMounted(async () => {
   console.log('🚀 Iniciando página de detalle de solicitud...')
   console.log('📄 ID de solicitud:', solicitudId.value)
   await cargarDetalle()
+})
+
+// ===== EXPOSICIÓN DE FUNCIONES =====
+defineExpose({
+  refrescarArchivos,
+  cargarArchivosAdjuntos
 })
 </script>
 
@@ -2480,5 +2620,64 @@ onMounted(async () => {
   .fotos-grid {
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   }
+  .archivos-estado-vacio {
+  padding: 3rem 2rem;
+  text-align: center;
+  background: white;
+  border-radius: 12px;
+  margin: 1rem;
+}
+
+.estado-vacio-content {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.icono-vacio {
+  margin: 0 auto 1.5rem;
+  opacity: 0.6;
+}
+
+.estado-vacio-content h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.estado-vacio-content p {
+  color: #6B7280;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #F3F4F6;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-refresh:hover {
+  background: #E5E7EB;
+  border-color: #9CA3AF;
+  transform: translateY(-1px);
+}
+
+.btn-refresh svg {
+  transition: transform 0.2s ease;
+}
+
+.btn-refresh:hover svg {
+  transform: rotate(180deg);
+}
 }
 </style>
