@@ -47,7 +47,7 @@ const ALLOWED_MIME_TYPES = {
 // Extensiones permitidas
 const ALLOWED_EXTENSIONS = {
   images: ['.jpg', '.jpeg', '.png', '.webp'],
-  documents: ['.pdf', '.doc', '.docx']
+  documents: ['.pdf', '.doc', '.docx', '.txt']
 };
 
 // Middleware principal de upload

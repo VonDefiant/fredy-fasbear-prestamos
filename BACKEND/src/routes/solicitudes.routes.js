@@ -5,27 +5,35 @@
 
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import path from 'path';
+import fs from 'fs/promises';
+
+// SOLO importar el servicio y validador, NO el middleware principal
+import { 
+  validateFileTypes, 
+  uploadService 
+} from '../middleware/upload.js';
+
 import { catchAsync } from '../middleware/errorHandler.js';
-import { authenticateToken } from '../middleware/auth.js'; // IMPORTAR MIDDLEWARE REAL
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 // Middleware para logging
 router.use((req, res, next) => {
-  console.log(`📝 Solicitudes API: ${req.method} ${req.path}`);
+  console.log(`Solicitudes API: ${req.method} ${req.path}`);
   next();
 });
 
 // USAR MIDDLEWARE REAL DE AUTENTICACIÓN
 router.use(authenticateToken);
 
-// GET /api/solicitudes/categorias - CORREGIDO
+// GET /api/solicitudes/categorias
 router.get('/categorias', catchAsync(async (req, res) => {
-  console.log('📂 Obteniendo categorías de artículos desde BD');
+  console.log('Obteniendo categorías de artículos desde BD');
   
   try {
-    // Obtener tipos de artículo de la base de datos
     const tiposArticulo = await prisma.tipoArticulo.findMany({
       where: { estado: 'Activo' },
       select: {
@@ -38,7 +46,6 @@ router.get('/categorias', catchAsync(async (req, res) => {
       orderBy: { nombre: 'asc' }
     });
 
-    // Formatear los datos correctamente
     const categorias = tiposArticulo.map(tipo => ({
       id: tipo.id,
       nombre: tipo.nombre,
@@ -47,7 +54,7 @@ router.get('/categorias', catchAsync(async (req, res) => {
       requiereElectronico: tipo.requiereElectronico
     }));
 
-    console.log('✅ Categorías procesadas:', categorias);
+    console.log('Categorías procesadas:', categorias);
 
     res.status(200).json({
       success: true,
@@ -56,7 +63,7 @@ router.get('/categorias', catchAsync(async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ Error obteniendo categorías:', error);
+    console.error('Error obteniendo categorías:', error);
     res.status(500).json({
       success: false,
       message: 'Error obteniendo categorías de artículos',
@@ -65,13 +72,12 @@ router.get('/categorias', catchAsync(async (req, res) => {
   }
 }));
 
-// GET /api/solicitudes - CORREGIDO
+// GET /api/solicitudes
 router.get('/', catchAsync(async (req, res) => {
-  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
   const userId = req.user.id;
   const { estado, limite = 10, pagina = 1 } = req.query;
   
-  console.log(`📋 Obteniendo solicitudes para usuario: ${userId}`);
+  console.log(`Obteniendo solicitudes para usuario: ${userId}`);
 
   try {
     const whereClause = {
@@ -142,7 +148,7 @@ router.get('/', catchAsync(async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error obteniendo solicitudes:', error);
+    console.error('Error obteniendo solicitudes:', error);
     res.status(500).json({
       success: false,
       message: 'Error obteniendo solicitudes',
@@ -151,127 +157,275 @@ router.get('/', catchAsync(async (req, res) => {
   }
 }));
 
-// POST /api/solicitudes - CORREGIDO
-router.post('/', catchAsync(async (req, res) => {
-  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
-  const userId = req.user.id;
-  const {
-    tipoArticulo,
-    descripcion,
-    estadoFisico,
-    valorEstimado,
-    marca,
-    modelo,
-    especificacionesTecnicas,
-    montoSolicitado,
-    plazoMeses,
-    modalidadPago,
-    aceptaTerminos
-  } = req.body;
+// POST /api/solicitudes - CORREGIDO SIN CONFLICTO DE MIDDLEWARES
+router.post('/', 
+  // SOLO validar tipos, el fileUpload ya está aplicado globalmente
+  validateFileTypes,
+  catchAsync(async (req, res) => {
+    const userId = req.user.id;
+    const {
+      tipoArticulo,
+      descripcion,
+      estadoFisico,
+      valorEstimado,
+      marca,
+      modelo,
+      especificacionesTecnicas,
+      montoSolicitado,
+      plazoMeses,
+      modalidadPago,
+      aceptaTerminos
+    } = req.body;
 
-  console.log(`🆕 Creando nueva solicitud para usuario: ${userId}`);
-  console.log('📋 Datos recibidos:', {
-    tipoArticulo,
-    descripcion: descripcion?.substring(0, 50) + '...',
-    valorEstimado,
-    montoSolicitado,
-    plazoMeses
-  });
-
-  try {
-    // Validaciones básicas
-    if (!tipoArticulo || !descripcion || !valorEstimado || !montoSolicitado) {
-      return res.status(400).json({
-        success: false,
-        message: 'Faltan campos obligatorios: tipoArticulo, descripcion, valorEstimado, montoSolicitado'
-      });
-    }
-
-    if (!aceptaTerminos || aceptaTerminos === 'false') {
-      return res.status(400).json({
-        success: false,
-        message: 'Debe aceptar los términos y condiciones'
-      });
-    }
-
-    // Verificar que el tipo de artículo existe
-    const tipoArticuloExiste = await prisma.tipoArticulo.findUnique({
-      where: { id: parseInt(tipoArticulo) }
+    console.log(`Creando nueva solicitud para usuario: ${userId}`);
+    console.log('Datos recibidos:', {
+      tipoArticulo,
+      descripcion: descripcion?.substring(0, 50) + '...',
+      valorEstimado,
+      montoSolicitado,
+      plazoMeses
+    });
+    console.log('Archivos recibidos:', {
+      fotos: req.files?.fotos ? (Array.isArray(req.files.fotos) ? req.files.fotos.length : 1) : 0,
+      documentoTecnico: req.files?.documentoTecnico ? 'Si' : 'No'
     });
 
-    if (!tipoArticuloExiste) {
-      return res.status(400).json({
-        success: false,
-        message: 'Tipo de artículo no válido'
-      });
-    }
+    try {
+      // Validaciones básicas
+      if (!tipoArticulo || !descripcion || !valorEstimado || !montoSolicitado) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faltan campos obligatorios: tipoArticulo, descripcion, valorEstimado, montoSolicitado'
+        });
+      }
 
-    // Crear la solicitud y el artículo en una transacción
-    const result = await prisma.$transaction(async (tx) => {
-      // Crear la solicitud
-      const nuevaSolicitud = await tx.solicitudPrestamo.create({
+      if (!aceptaTerminos || aceptaTerminos === 'false') {
+        return res.status(400).json({
+          success: false,
+          message: 'Debe aceptar los términos y condiciones'
+        });
+      }
+
+      // Verificar que el tipo de artículo existe
+      const tipoArticuloExiste = await prisma.tipoArticulo.findUnique({
+        where: { id: parseInt(tipoArticulo) }
+      });
+
+      if (!tipoArticuloExiste) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tipo de artículo no válido'
+        });
+      }
+
+      // PROCESAR ARCHIVOS ADJUNTOS - Los archivos ya están procesados por el middleware global
+      const fotosGuardadas = [];
+      let documentoGuardado = null;
+
+      // Crear directorios de upload si no existen
+      const uploadDir = path.join(process.cwd(), 'uploads/solicitudes');
+      const fotoDir = path.join(uploadDir, 'fotos');
+      const docDir = path.join(uploadDir, 'documentos');
+      await fs.mkdir(fotoDir, { recursive: true });
+      await fs.mkdir(docDir, { recursive: true });
+
+      // Procesar fotos
+      if (req.files?.fotos) {
+        console.log('Procesando fotos...');
+        const fotos = Array.isArray(req.files.fotos) ? req.files.fotos : [req.files.fotos];
+        
+        for (let i = 0; i < fotos.length; i++) {
+          const foto = fotos[i];
+          const timestamp = Date.now();
+          const extension = path.extname(foto.name);
+          const nombreArchivo = `foto_${timestamp}_${i + 1}${extension}`;
+          const rutaDestino = path.join(fotoDir, nombreArchivo);
+          
+          // Mover archivo desde temp a destino final
+          await foto.mv(rutaDestino);
+          
+          fotosGuardadas.push({
+            nombre: foto.name,
+            nombreArchivo: nombreArchivo,
+            ruta: `/uploads/solicitudes/fotos/${nombreArchivo}`,
+            tamano: foto.size,
+            tipo: foto.mimetype,
+            esPrincipal: i === 0
+          });
+        }
+      }
+
+      // Procesar documento técnico
+      if (req.files?.documentoTecnico) {
+        console.log('Procesando documento técnico...');
+        const doc = req.files.documentoTecnico;
+        const timestamp = Date.now();
+        const extension = path.extname(doc.name);
+        const nombreArchivo = `doc_${timestamp}${extension}`;
+        const rutaDestino = path.join(docDir, nombreArchivo);
+        
+        // Mover archivo desde temp a destino final
+        await doc.mv(rutaDestino);
+        
+        documentoGuardado = {
+          nombre: doc.name,
+          nombreArchivo: nombreArchivo,
+          ruta: `/uploads/solicitudes/documentos/${nombreArchivo}`,
+          tamano: doc.size,
+          tipo: doc.mimetype
+        };
+      }
+
+      // GUARDAR EN BASE DE DATOS CON TRANSACCIÓN
+      const resultado = await prisma.$transaction(async (tx) => {
+        
+        // 1. Crear la solicitud de préstamo
+        const solicitudCreada = await tx.solicitudPrestamo.create({
+          data: {
+            usuarioId: userId,
+            fechaSolicitud: new Date(),
+            estado: 'Pendiente',
+            observaciones: `Solicitud de préstamo por Q${montoSolicitado} a ${plazoMeses} meses`
+          }
+        });
+
+        console.log('Solicitud creada con ID:', solicitudCreada.id);
+
+        // 2. Crear el artículo asociado
+        const articuloCreado = await tx.articulo.create({
+          data: {
+            solicitudId: solicitudCreada.id,
+            tipoArticuloId: parseInt(tipoArticulo),
+            descripcion: descripcion,
+            marca: marca || null,
+            modelo: modelo || null,
+            serie: null,
+            color: null,
+            estadoFisico: estadoFisico || 'Bueno',
+            valorEstimadoCliente: parseFloat(valorEstimado),
+            especificacionesTecnicas: especificacionesTecnicas || null
+          }
+        });
+
+        console.log('Artículo creado con ID:', articuloCreado.id);
+
+        // 3. CREAR REGISTROS DE DOCUMENTOS
+        const documentosCreados = [];
+
+        // Guardar fotos en la tabla documento
+        for (const foto of fotosGuardadas) {
+          const docFoto = await tx.documento.create({
+            data: {
+              tipoDocumento: 'Foto_Prenda',
+              nombreArchivo: foto.nombre,
+              rutaArchivo: foto.ruta,
+              idRelacionado: solicitudCreada.id,
+              tipoRelacion: 'Solicitud',
+              tamanoArchivo: BigInt(foto.tamano),
+              tipoMime: foto.tipo
+            }
+          });
+          documentosCreados.push(docFoto);
+          console.log('Foto registrada en BD:', docFoto.id);
+        }
+
+        // Guardar documento técnico en la tabla documento
+        if (documentoGuardado) {
+          const docTecnico = await tx.documento.create({
+            data: {
+              tipoDocumento: 'Especificaciones',
+              nombreArchivo: documentoGuardado.nombre,
+              rutaArchivo: documentoGuardado.ruta,
+              idRelacionado: solicitudCreada.id,
+              tipoRelacion: 'Solicitud',
+              tamanoArchivo: BigInt(documentoGuardado.tamano),
+              tipoMime: documentoGuardado.tipo
+            }
+          });
+          documentosCreados.push(docTecnico);
+          console.log('Documento técnico registrado en BD:', docTecnico.id);
+        }
+
+        return {
+          solicitud: solicitudCreada,
+          articulo: articuloCreado,
+          documentos: documentosCreados
+        };
+      });
+
+      // Generar número de solicitud para respuesta
+      const numeroSolicitud = `SOL-${new Date().getFullYear()}-${String(resultado.solicitud.id).padStart(6, '0')}`;
+
+      console.log('Solicitud procesada exitosamente:', {
+        numero: numeroSolicitud,
+        solicitudId: resultado.solicitud.id,
+        articuloId: resultado.articulo.id,
+        documentos: resultado.documentos.length
+      });
+
+      // RESPUESTA CORREGIDA PARA COINCIDIR CON EL FRONTEND
+      res.status(201).json({
+        success: true,
+        message: 'Solicitud de empéño creada exitosamente',
         data: {
-          usuarioId: userId,
-          estado: 'Pendiente',
-          observaciones: null
-        }
+          solicitud: {
+            id: resultado.solicitud.id,
+            numero: numeroSolicitud,
+            estado: resultado.solicitud.estado,
+            fechaSolicitud: resultado.solicitud.fechaSolicitud
+          },
+          articulo: {
+            id: resultado.articulo.id,
+            tipoArticulo: tipoArticuloExiste.nombre,
+            descripcion: resultado.articulo.descripcion,
+            valorEstimadoCliente: resultado.articulo.valorEstimadoCliente
+          },
+          prestamo: {
+            montoSolicitado: parseFloat(montoSolicitado),
+            plazoMeses: parseInt(plazoMeses),
+            modalidadPago: modalidadPago
+          },
+          archivosSubidos: {
+            fotos: fotosGuardadas.length,
+            documentoTecnico: documentoGuardado ? 1 : 0,
+            totalDocumentos: resultado.documentos.length
+          }
+        },
+        timestamp: new Date().toISOString()
       });
 
-      // Crear el artículo asociado
-      const nuevoArticulo = await tx.articulo.create({
-        data: {
-          solicitudId: nuevaSolicitud.id,
-          tipoArticuloId: parseInt(tipoArticulo),
-          descripcion: descripcion,
-          marca: marca || null,
-          modelo: modelo || null,
-          serie: null,
-          color: null,
-          estadoFisico: estadoFisico || 'Bueno',
-          valorEstimadoCliente: parseFloat(valorEstimado),
-          especificacionesTecnicas: especificacionesTecnicas || null
+    } catch (error) {
+      console.error('Error creando solicitud:', error);
+      
+      // Limpiar archivos subidos en caso de error
+      try {
+        for (const foto of fotosGuardadas || []) {
+          const rutaCompleta = path.join(process.cwd(), foto.ruta);
+          await fs.unlink(rutaCompleta).catch(() => {});
         }
+        if (documentoGuardado) {
+          const rutaCompleta = path.join(process.cwd(), documentoGuardado.ruta);
+          await fs.unlink(rutaCompleta).catch(() => {});
+        }
+      } catch (cleanupError) {
+        console.error('Error limpiando archivos:', cleanupError);
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor al crear la solicitud',
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
       });
+    }
+  })
+);
 
-      return { solicitud: nuevaSolicitud, articulo: nuevoArticulo };
-    });
-
-    console.log('✅ Solicitud creada exitosamente:', {
-      solicitudId: result.solicitud.id,
-      articuloId: result.articulo.id
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Solicitud creada exitosamente',
-      data: {
-        solicitud: {
-          id: result.solicitud.id,
-          numero: `SOL-2024-${String(result.solicitud.id).padStart(6, '0')}`,
-          estado: result.solicitud.estado,
-          fechaSolicitud: result.solicitud.fechaSolicitud
-        }
-      },
-      timestamp: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('❌ Error creando solicitud:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor al crear la solicitud',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
-    });
-  }
-}));
-
-// GET /api/solicitudes/:id - CORREGIDO
+// GET /api/solicitudes/:id
 router.get('/:id', catchAsync(async (req, res) => {
-  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
   const userId = req.user.id;
   const solicitudId = parseInt(req.params.id);
 
-  console.log(`📋 Obteniendo solicitud ${solicitudId} para usuario ${userId}`);
+  console.log(`Obteniendo solicitud ${solicitudId} para usuario ${userId}`);
 
   try {
     const solicitud = await prisma.solicitudPrestamo.findFirst({
@@ -305,7 +459,7 @@ router.get('/:id', catchAsync(async (req, res) => {
 
     const solicitudDetallada = {
       id: solicitud.id,
-      numero: `SOL-2024-${String(solicitud.id).padStart(6, '0')}`,
+      numero: `SOL-2025-${String(solicitud.id).padStart(6, '0')}`,
       estado: solicitud.estado,
       fechaSolicitud: solicitud.fechaSolicitud,
       fechaEvaluacion: solicitud.fechaEvaluacion,
@@ -335,7 +489,7 @@ router.get('/:id', catchAsync(async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error obteniendo solicitud:', error);
+    console.error('Error obteniendo solicitud:', error);
     res.status(500).json({
       success: false,
       message: 'Error obteniendo la solicitud',
@@ -344,14 +498,101 @@ router.get('/:id', catchAsync(async (req, res) => {
   }
 }));
 
-// PUT /api/solicitudes/:id/cancelar - CORREGIDO
+// GET /api/solicitudes/:solicitudId/archivos
+router.get('/:solicitudId/archivos', catchAsync(async (req, res) => {
+  const { solicitudId } = req.params;
+  const userId = req.user.id;
+
+  console.log(`Obteniendo archivos para solicitud: ${solicitudId}`);
+
+  try {
+    // Verificar que la solicitud pertenece al usuario
+    const solicitud = await prisma.solicitudPrestamo.findFirst({
+      where: { 
+        id: parseInt(solicitudId),
+        usuarioId: userId 
+      }
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({
+        success: false,
+        message: 'Solicitud no encontrada'
+      });
+    }
+
+    // Obtener documentos asociados
+    const documentos = await prisma.documento.findMany({
+      where: {
+        idRelacionado: parseInt(solicitudId),
+        tipoRelacion: 'Solicitud'
+      },
+      orderBy: [
+        { tipoDocumento: 'asc' },
+        { fechaSubida: 'asc' }
+      ]
+    });
+
+    const archivosFormateados = documentos.map(doc => ({
+      id: doc.id,
+      tipo: doc.tipoDocumento,
+      nombreArchivo: doc.nombreArchivo,
+      rutaArchivo: doc.rutaArchivo,
+      fechaSubida: doc.fechaSubida,
+      tamanoArchivo: doc.tamanoArchivo ? parseInt(doc.tamanoArchivo) : null,
+      tipoMime: doc.tipoMime,
+      urlDescarga: `/api/solicitudes/${solicitudId}/archivo/${doc.id}`
+    }));
+
+    // Agrupar por tipo
+    const archivosPorTipo = archivosFormateados.reduce((acc, archivo) => {
+      const tipo = archivo.tipo === 'Foto_Prenda' ? 'fotos' : 
+                   archivo.tipo === 'Especificaciones' ? 'documentos' : 'otros';
+      
+      if (!acc[tipo]) acc[tipo] = [];
+      acc[tipo].push(archivo);
+      
+      return acc;
+    }, {});
+
+    console.log('Archivos encontrados:', {
+      fotos: archivosPorTipo.fotos?.length || 0,
+      documentos: archivosPorTipo.documentos?.length || 0,
+      total: archivosFormateados.length
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        solicitudId: parseInt(solicitudId),
+        archivos: archivosPorTipo,
+        resumen: {
+          totalArchivos: archivosFormateados.length,
+          fotos: archivosPorTipo.fotos?.length || 0,
+          documentos: archivosPorTipo.documentos?.length || 0,
+          otros: archivosPorTipo.otros?.length || 0
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo archivos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error obteniendo archivos adjuntos',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+    });
+  }
+}));
+
+// PUT /api/solicitudes/:id/cancelar
 router.put('/:id/cancelar', catchAsync(async (req, res) => {
-  // CORREGIDO: Usar req.user.id en lugar de req.user.userId
   const userId = req.user.id;
   const solicitudId = parseInt(req.params.id);
   const { motivo } = req.body;
 
-  console.log(`🚫 Cancelando solicitud ${solicitudId} para usuario ${userId}`);
+  console.log(`Cancelando solicitud ${solicitudId} para usuario ${userId}`);
 
   try {
     const solicitudActualizada = await prisma.solicitudPrestamo.updateMany({
@@ -383,7 +624,7 @@ router.put('/:id/cancelar', catchAsync(async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error cancelando solicitud:', error);
+    console.error('Error cancelando solicitud:', error);
     res.status(500).json({
       success: false,
       message: 'Error cancelando solicitud',
@@ -392,12 +633,12 @@ router.put('/:id/cancelar', catchAsync(async (req, res) => {
   }
 }));
 
-// PUT /api/solicitudes/:id/estado - Actualizar estado de solicitud (Admin)
+// PUT /api/solicitudes/:id/estado
 router.put('/:id/estado', catchAsync(async (req, res) => {
   const solicitudId = parseInt(req.params.id);
   const { estado, observaciones } = req.body;
 
-  console.log(`🔄 Actualizando estado de solicitud ${solicitudId} a: ${estado}`);
+  console.log(`Actualizando estado de solicitud ${solicitudId} a: ${estado}`);
 
   try {
     const estadosValidos = ['Pendiente', 'Evaluando', 'Aprobada', 'Rechazada', 'Completada'];
@@ -433,7 +674,7 @@ router.put('/:id/estado', catchAsync(async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error actualizando estado:', error);
+    console.error('Error actualizando estado:', error);
     res.status(500).json({
       success: false,
       message: 'Error actualizando estado de solicitud',

@@ -1,0 +1,228 @@
+# Guía de implementación: Acceso a FRM600.db en Android 13+ con .NET MAUI
+
+## Resumen
+
+*SÍ es posible* acceder a /storage/emulated/0/Android/data/com.softland.fr.droid/files/FRM600.db en Android 13+ usando Storage Access Framework (SAF) con la *autorización manual del usuario*.
+
+## Proceso paso a paso
+
+### 1. Instalar paquetes NuGet necesarios
+
+xml
+<!-- En tu archivo .csproj -->
+<ItemGroup>
+  <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+  <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+</ItemGroup>
+
+
+### 2. Agregar permisos en AndroidManifest.xml
+
+xml
+<!-- Platforms/Android/AndroidManifest.xml -->
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+
+### 3. Implementar los archivos del código anterior
+
+1. Platforms/Android/StorageAccessFramework.cs
+2. Modificar Platforms/Android/MainActivity.cs
+3. Services/IDatabaseAccessService.cs
+4. Services/DatabaseAccessService.cs
+5. ViewModels/ReportsViewModel.cs
+6. Pages/ReportsPage.xaml
+
+### 4. Flujo de usuario
+
+1. *Primera vez:*
+   - El usuario abre tu app de reportes
+   - La app detecta que no tiene acceso
+   - Muestra botón "Solicitar Acceso a Base de Datos"
+   - Al presionar, se muestran instrucciones
+   - Se abre el selector de carpetas del sistema
+   - El usuario navega hasta: Android > data > com.softland.fr.droid > files
+   - Selecciona "Usar esta carpeta"
+   - La app obtiene acceso permanente
+
+2. *Siguientes veces:*
+   - La app ya tiene acceso guardado
+   - Se conecta automáticamente a FRM600.db
+   - El usuario puede generar reportes inmediatamente
+
+### 5. Instrucciones visuales para usuarios
+
+Crea una guía visual con capturas de pantalla:
+
+csharp
+// Método para mostrar instrucciones con imágenes
+private async Task ShowVisualInstructions()
+{
+    var page = new ContentPage
+    {
+        Title = "Cómo dar acceso a la base de datos",
+        Content = new ScrollView
+        {
+            Content = new VerticalStackLayout
+            {
+                Padding = 20,
+                Spacing = 15,
+                Children = 
+                {
+                    new Label 
+                    { 
+                        Text = "Sigue estos pasos:",
+                        FontSize = 18,
+                        FontAttributes = FontAttributes.Bold
+                    },
+                    new Label 
+                    { 
+                        Text = "1. En la siguiente pantalla, verás el explorador de archivos"
+                    },
+                    new Image 
+                    { 
+                        Source = "step1.png",
+                        HeightRequest = 200
+                    },
+                    new Label 
+                    { 
+                        Text = "2. Navega hasta Android > data"
+                    },
+                    new Image 
+                    { 
+                        Source = "step2.png",
+                        HeightRequest = 200
+                    },
+                    new Label 
+                    { 
+                        Text = "3. Busca y entra en com.softland.fr.droid > files"
+                    },
+                    new Image 
+                    { 
+                        Source = "step3.png",
+                        HeightRequest = 200
+                    },
+                    new Label 
+                    { 
+                        Text = "4. Presiona 'Usar esta carpeta'"
+                    },
+                    new Button
+                    {
+                        Text = "Entendido, continuar",
+                        Command = new Command(async () => 
+                        {
+                            await Navigation.PopAsync();
+                            await RequestAccessAsync();
+                        })
+                    }
+                }
+            }
+        }
+    };
+    
+    await Navigation.PushAsync(page);
+}
+
+
+## Consideraciones importantes
+
+### Ventajas de SAF
+
+✅ *Funciona en Android 13+* sin restricciones  
+✅ *Acceso persistente* (solo se configura una vez)  
+✅ *No requiere permisos especiales* como MANAGE_EXTERNAL_STORAGE  
+✅ *Seguro y aprobado por Google Play*  
+✅ *El usuario tiene control total*
+
+### Limitaciones
+
+❌ Requiere intervención manual del usuario (una sola vez)  
+❌ No se puede automatizar completamente  
+❌ El archivo .db se copia a caché para poder usarlo con SQLite
+
+### Optimizaciones recomendadas
+
+1. *Caché inteligente:*
+csharp
+private async Task<string> GetCachedDatabasePath()
+{
+    var cacheFile = Path.Combine(FileSystem.CacheDirectory, "frm600_cache.db");
+    var cacheInfo = new FileInfo(cacheFile);
+    
+    // Actualizar caché cada 24 horas
+    if (!cacheInfo.Exists || cacheInfo.LastWriteTime < DateTime.Now.AddDays(-1))
+    {
+        var dbPath = await _databaseService.GetDatabasePathAsync();
+        File.Copy(dbPath, cacheFile, true);
+    }
+    
+    return cacheFile;
+}
+
+
+2. *Verificación de integridad:*
+csharp
+private async Task<bool> VerifyDatabaseIntegrity(string dbPath)
+{
+    try
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        await connection.OpenAsync();
+        
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA integrity_check";
+        var result = await command.ExecuteScalarAsync();
+        
+        return result?.ToString() == "ok";
+    }
+    catch
+    {
+        return false;
+    }
+}
+
+
+## Código para prueba rápida
+
+csharp
+// Página simple para probar el acceso
+public partial class TestPage : ContentPage
+{
+    public TestPage()
+    {
+        Content = new VerticalStackLayout
+        {
+            Padding = 20,
+            Children = 
+            {
+                new Button
+                {
+                    Text = "Probar acceso a FRM600.db",
+                    Command = new Command(async () =>
+                    {
+                        var dbService = MauiApplication.Current.Services
+                            .GetService<IDatabaseAccessService>();
+                            
+                        if (await dbService.RequestDatabaseAccessAsync())
+                        {
+                            await DisplayAlert("Éxito", 
+                                "¡Acceso concedido! Ya puedes usar la base de datos.", 
+                                "OK");
+                        }
+                        else
+                        {
+                            await DisplayAlert("Error", 
+                                "No se pudo obtener acceso.", 
+                                "OK");
+                        }
+                    })
+                }
+            }
+        };
+    }
+}
+
+
+## Conclusión
+
+Con esta implementación, tu app de reportes *SÍ puede acceder* a la base de datos FRM600.db en Android 13+. El usuario solo necesita dar permiso una vez, y después el acceso es automático. Es la solución más práctica sin necesidad de modificar la aplicación original de Softland.

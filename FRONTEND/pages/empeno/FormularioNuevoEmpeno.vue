@@ -684,7 +684,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, reactive } from 'vue'
 
 // Props
 const props = defineProps({
@@ -706,6 +706,37 @@ const tiposArticulos = ref([])
 const cargandoTipos = ref(false)
 const errorCargandoTipos = ref(false)
 const mensajeError = ref('')
+
+// ==========================================
+// CONFIGURACIÓN DE VALIDACIÓN DE ARCHIVOS
+// ==========================================
+const ARCHIVOS_PERMITIDOS = {
+  fotos: {
+    tipos: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    extensiones: ['.jpg', '.jpeg', '.png', '.webp'],
+    tamaño: 5 * 1024 * 1024, // 5MB
+    cantidad: 6,
+    etiqueta: 'fotos'
+  },
+  documentos: {
+    tipos: [
+      'application/pdf',
+      'application/msword', 
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain'
+    ],
+    extensiones: ['.pdf', '.doc', '.docx', '.txt'],
+    tamaño: 10 * 1024 * 1024, // 10MB
+    cantidad: 1,
+    etiqueta: 'documento'
+  }
+}
+
+// Estado para errores de validación
+const erroresArchivos = reactive({
+  fotos: [],
+  documento: null
+})
 
 // Pasos del formulario
 const pasos = [
@@ -750,6 +781,117 @@ const planPagosCalculado = ref({
 })
 
 // ==========================================
+// FUNCIONES DE VALIDACIÓN MEJORADAS
+// ==========================================
+
+/**
+ * Valida si un archivo cumple con los requisitos
+ */
+const validarArchivo = (file, tipo) => {
+  const config = ARCHIVOS_PERMITIDOS[tipo]
+  const errores = []
+  
+  if (!file) {
+    return { valido: false, errores: ['No se ha seleccionado archivo'] }
+  }
+  
+  // Validar tamaño
+  if (file.size > config.tamaño) {
+    const tamañoMB = Math.round(config.tamaño / 1024 / 1024)
+    errores.push(`El archivo es muy grande. Máximo ${tamañoMB}MB permitido.`)
+  }
+  
+  // Validar tipo MIME
+  if (!config.tipos.includes(file.type)) {
+    const tiposPermitidos = config.extensiones.join(', ')
+    errores.push(`Tipo de archivo no permitido. Formatos aceptados: ${tiposPermitidos}`)
+  }
+  
+  // Validar extensión (doble verificación)
+  const extension = '.' + file.name.split('.').pop().toLowerCase()
+  if (!config.extensiones.includes(extension)) {
+    const tiposPermitidos = config.extensiones.join(', ')
+    errores.push(`Extensión de archivo no válida. Extensiones permitidas: ${tiposPermitidos}`)
+  }
+  
+  // Validar nombre de archivo
+  if (file.name.length > 255) {
+    errores.push('El nombre del archivo es muy largo. Máximo 255 caracteres.')
+  }
+  
+  // Verificar si el archivo no está corrupto (tamaño mínimo)
+  if (file.size < 100) { // Menos de 100 bytes probablemente está corrupto
+    errores.push('El archivo parece estar corrupto o vacío.')
+  }
+  
+  return {
+    valido: errores.length === 0,
+    errores
+  }
+}
+
+/**
+ * Muestra mensaje de error temporal con estilo
+ */
+const mostrarErrorArchivo = (mensaje, duracion = 5000) => {
+  // Crear elemento de notificación
+  const notification = document.createElement('div')
+  notification.className = 'notification error-archivo'
+  notification.innerHTML = `
+    <div class="notification-content">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="error-icon">
+        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+        <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+        <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <div class="notification-text">
+        <strong>Error al subir archivo</strong>
+        <p>${mensaje}</p>
+      </div>
+      <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </button>
+    </div>
+  `
+  
+  // Agregar al DOM
+  document.body.appendChild(notification)
+  
+  // Auto-eliminar después del tiempo especificado
+  setTimeout(() => {
+    if (notification.parentElement) {
+      notification.remove()
+    }
+  }, duracion)
+}
+
+/**
+ * Muestra notificación de éxito
+ */
+const mostrarExitoArchivo = (mensaje, duracion = 3000) => {
+  const notification = document.createElement('div')
+  notification.className = 'notification success-archivo'
+  notification.innerHTML = `
+    <div class="notification-content">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="success-icon">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="2"/>
+        <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <div class="notification-text">
+        <strong>Archivo cargado correctamente</strong>
+        <p>${mensaje}</p>
+      </div>
+    </div>
+  `
+  
+  document.body.appendChild(notification)
+  setTimeout(() => notification.remove(), duracion)
+}
+
+// ==========================================
 // FUNCIÓN PRINCIPAL: CARGAR TIPOS DESDE API - MEJORADA
 // ==========================================
 const cargarTiposArticulos = async () => {
@@ -758,7 +900,7 @@ const cargarTiposArticulos = async () => {
   mensajeError.value = ''
   
   try {
-    console.log('🔍 Cargando tipos de artículos desde la base de datos...')
+    console.log('Cargando tipos de artículos desde la base de datos...')
     
     // OBTENER TOKEN DE AUTENTICACIÓN
     const { getToken } = useAuth()
@@ -780,12 +922,12 @@ const cargarTiposArticulos = async () => {
     // VERIFICAR RESPUESTA
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('❌ Error HTTP:', response.status, errorText)
+      console.error('Error HTTP:', response.status, errorText)
       throw new Error(`Error del servidor (${response.status}): ${errorText}`)
     }
     
     const result = await response.json()
-    console.log('✅ Respuesta completa de la API:', result)
+    console.log('Respuesta completa de la API:', result)
     
     // PROCESAR RESPUESTA DE LA BASE DE DATOS
     if (result.success && result.data && Array.isArray(result.data)) {
@@ -804,20 +946,20 @@ const cargarTiposArticulos = async () => {
         iconoSvg: obtenerIconoSvg(tipo.nombre || '')
       }))
       
-      console.log(`📦 ${tiposArticulos.value.length} tipos de artículos cargados exitosamente:`, tiposArticulos.value)
+      console.log(`${tiposArticulos.value.length} tipos de artículos cargados exitosamente:`, tiposArticulos.value)
       
     } else {
-      console.error('❌ Formato de respuesta inválido:', result)
+      console.error('Formato de respuesta inválido:', result)
       throw new Error('Formato de respuesta inválido de la API')
     }
     
   } catch (error) {
-    console.error('❌ Error cargando tipos de artículos:', error)
+    console.error('Error cargando tipos de artículos:', error)
     errorCargandoTipos.value = true
     mensajeError.value = error.message || 'Error desconocido'
     
     // FALLBACK: Tipos de ejemplo para desarrollo/demo
-    console.log('🔄 Cargando tipos de fallback...')
+    console.log('Cargando tipos de fallback...')
     tiposArticulos.value = [
       {
         id: 'fallback_1',
@@ -1088,38 +1230,55 @@ const calcularPlanPagos = () => {
 }
 
 // ==========================================
-// MANEJO DE ARCHIVOS
+// MANEJO DE ARCHIVOS CON VALIDACIÓN MEJORADA
 // ==========================================
+
+/**
+ * Manejo mejorado de selección de fotos
+ */
 const handleFileSelect = (event) => {
   const files = Array.from(event.target.files)
-  procesarArchivos(files)
-}
-
-const handleDrop = (event) => {
-  event.preventDefault()
-  const files = Array.from(event.dataTransfer.files)
-  procesarArchivos(files)
-}
-
-const procesarArchivos = (files) => {
-  const maxFotos = 6
+  erroresArchivos.fotos = []
   
-  files.forEach(file => {
-    if (formulario.value.fotos.length >= maxFotos) {
-      alert(`Máximo ${maxFotos} fotos permitidas`)
+  if (files.length === 0) return
+  
+  // Verificar límite de cantidad
+  const totalFotos = formulario.value.fotos.length + files.length
+  if (totalFotos > ARCHIVOS_PERMITIDOS.fotos.cantidad) {
+    const mensaje = `Solo puedes subir máximo ${ARCHIVOS_PERMITIDOS.fotos.cantidad} fotos. Ya tienes ${formulario.value.fotos.length} fotos seleccionadas.`
+    mostrarErrorArchivo(mensaje)
+    event.target.value = ''
+    return
+  }
+  
+  // Validar cada archivo
+  const archivosValidos = []
+  const erroresEncontrados = []
+  
+  files.forEach((file, index) => {
+    const validacion = validarArchivo(file, 'fotos')
+    
+    if (!validacion.valido) {
+      erroresEncontrados.push(`${file.name}: ${validacion.errores.join(', ')}`)
+    } else {
+      archivosValidos.push(file)
+    }
+  })
+  
+  // Mostrar errores si los hay
+  if (erroresEncontrados.length > 0) {
+    const mensajeError = erroresEncontrados.join('\n\n')
+    mostrarErrorArchivo(mensajeError, 7000) // Mostrar más tiempo para múltiples errores
+    
+    // Si no hay archivos válidos, limpiar input
+    if (archivosValidos.length === 0) {
+      event.target.value = ''
       return
     }
-    
-    if (file.size > 5 * 1024 * 1024) {
-      alert(`El archivo ${file.name} es muy grande. Máximo 5MB.`)
-      return
-    }
-    
-    if (!file.type.startsWith('image/')) {
-      alert(`${file.name} no es una imagen válida.`)
-      return
-    }
-    
+  }
+  
+  // Procesar archivos válidos
+  archivosValidos.forEach((file) => {
     const reader = new FileReader()
     reader.onload = (e) => {
       formulario.value.fotos.push({
@@ -1132,39 +1291,84 @@ const procesarArchivos = (files) => {
     reader.readAsDataURL(file)
   })
   
+  // Mostrar confirmación si hay archivos válidos
+  if (archivosValidos.length > 0) {
+    mostrarExitoArchivo(`${archivosValidos.length} foto(s) cargada(s) correctamente`)
+  }
+  
   event.target.value = ''
+}
+
+const handleDrop = (event) => {
+  event.preventDefault()
+  const files = Array.from(event.dataTransfer.files)
+  // Simular el evento de input para reutilizar la lógica
+  const fakeEvent = { target: { files, value: '' } }
+  handleFileSelect(fakeEvent)
+}
+
+/**
+ * Manejo mejorado de selección de documentos
+ */
+const handleDocumentoSelect = (event) => {
+  const file = event.target.files[0]
+  erroresArchivos.documento = null
+  
+  if (!file) return
+  
+  // Validar archivo
+  const validacion = validarArchivo(file, 'documentos')
+  
+  if (!validacion.valido) {
+    const mensajeError = `${file.name}: ${validacion.errores.join(', ')}`
+    mostrarErrorArchivo(mensajeError)
+    erroresArchivos.documento = validacion.errores[0]
+    event.target.value = ''
+    return
+  }
+  
+  // Si es válido, guardarlo
+  formulario.value.documentoTecnico = file
+  
+  // Mostrar confirmación visual
+  mostrarExitoArchivo(`${file.name} (${formatFileSize(file.size)})`)
+}
+
+/**
+ * Validar antes de enviar formulario
+ */
+const validarArchivosAntesDeProcesar = () => {
+  let tieneErrores = false
+  const errores = []
+  
+  // Validar fotos (opcional pero si hay, deben ser válidas)
+  formulario.value.fotos.forEach((foto, index) => {
+    const validacion = validarArchivo(foto.file, 'fotos')
+    if (!validacion.valido) {
+      errores.push(`Foto ${index + 1}: ${validacion.errores.join(', ')}`)
+      tieneErrores = true
+    }
+  })
+  
+  // Validar documento (opcional pero si hay, debe ser válido)
+  if (formulario.value.documentoTecnico) {
+    const validacion = validarArchivo(formulario.value.documentoTecnico, 'documentos')
+    if (!validacion.valido) {
+      errores.push(`Documento: ${validacion.errores.join(', ')}`)
+      tieneErrores = true
+    }
+  }
+  
+  if (tieneErrores) {
+    mostrarErrorArchivo(errores.join('\n\n'), 8000)
+    return false
+  }
+  
+  return true
 }
 
 const removerFoto = (index) => {
   formulario.value.fotos.splice(index, 1)
-}
-
-const handleDocumentoSelect = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    const maxSize = 10 * 1024 * 1024
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-      'image/jpeg',
-      'image/jpg',
-      'image/png'
-    ]
-    
-    if (file.size > maxSize) {
-      alert('El documento es muy grande. Máximo 10MB.')
-      return
-    }
-    
-    if (!allowedTypes.includes(file.type)) {
-      alert('Formato de archivo no permitido. Use PDF, DOC, DOCX, TXT, JPG o PNG.')
-      return
-    }
-    
-    formulario.value.documentoTecnico = file
-  }
 }
 
 const removerDocumento = () => {
@@ -1191,6 +1395,11 @@ const pasoAnterior = () => {
 // ==========================================
 const procesarFormulario = async () => {
   if (!formularioValido.value) return
+  
+  // NUEVA VALIDACIÓN DE ARCHIVOS ANTES DE PROCESAR
+  if (!validarArchivosAntesDeProcesar()) {
+    return
+  }
   
   enviando.value = true
   
@@ -1249,14 +1458,15 @@ const procesarFormulario = async () => {
       datosFormulario.append('documentoTecnico', formulario.value.documentoTecnico)
     }
     
-    console.log('📤 Datos preparados para envío al componente padre')
+    console.log('Datos preparados para envío al componente padre')
+    console.log('Archivos validados correctamente antes del envío')
     
     // Emitir al componente padre para que maneje el envío
     emit('submit', datosFormulario)
     
   } catch (error) {
-    console.error('❌ Error preparando datos:', error)
-    alert('Error preparando los datos del formulario: ' + error.message)
+    console.error('Error preparando datos:', error)
+    mostrarErrorArchivo('Error preparando los datos del formulario: ' + error.message)
   } finally {
     enviando.value = false
   }
@@ -1341,6 +1551,8 @@ const limpiarFormulario = () => {
   pasoActual.value = 1
   rangoAvaluoCalculado.value = { min: 0, max: 0 }
   planPagosCalculado.value = { cuotas: [], totalIntereses: 0, totalPagar: 0, tasaInteres: 5 }
+  erroresArchivos.fotos = []
+  erroresArchivos.documento = null
 }
 
 // ==========================================
@@ -1360,1118 +1572,1343 @@ watch(() => formulario.value.valorEstimado, () => {
   }
 })
 </script>
-  <style scoped>
-  /* Manteniendo EXACTAMENTE los estilos originales con la paleta dorada */
-  .formulario-empeno {
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-  }
+<style scoped>
+/* ==========================================
+   FORMULARIO EMPEÑO - ESTILOS COMPLETOS
+   ========================================== */
 
-  /* Progress Header - Colores ORIGINALES (dorados) */
-  .progress-header {
-    background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
-    color: white;
-    padding: 1.5rem;
-  }
+/* Contenedor principal */
+.formulario-empeno {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+}
 
-  .progress-steps {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    position: relative;
-  }
+/* ==========================================
+   PROGRESS HEADER - COLORES DORADOS
+   ========================================== */
+.progress-header {
+  background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
+  color: white;
+  padding: 1.5rem;
+}
 
-  .step-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1;
-    position: relative;
-    z-index: 10;
-  }
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  position: relative;
+}
 
-  .step-number {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.9rem;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.7);
-    transition: all 0.3s ease;
-    position: relative;
-    z-index: 10;
-  }
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  position: relative;
+  z-index: 10;
+}
 
-  .step-indicator.active .step-number {
-    background: #D4AF37;
-    color: white;
-  }
+.step-number {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 10;
+}
 
-  .step-indicator.completed .step-number {
-    background: #27AE60;
-    color: white;
-  }
+.step-indicator.active .step-number {
+  background: #D4AF37;
+  color: white;
+}
 
-  .step-title {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.8);
-  }
+.step-indicator.completed .step-number {
+  background: #27AE60;
+  color: white;
+}
 
-  .step-indicator.active .step-title {
-    color: #D4AF37;
-    font-weight: 600;
-  }
+.step-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+}
 
-  .progress-bar {
-    height: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-    overflow: hidden;
-  }
+.step-indicator.active .step-title {
+  color: #D4AF37;
+  font-weight: 600;
+}
 
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #D4AF37, #F4D03F);
-    transition: width 0.3s ease;
-  }
+.progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
 
-  /* Loading de tipos */
-  .loading-tipos {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 1rem;
-    background: #F8F9FA;
-    border-radius: 8px;
-    border: 2px solid #E0E0E0;
-  }
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #D4AF37, #F4D03F);
+  transition: width 0.3s ease;
+}
 
-  .spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid #E0E0E0;
-    border-top: 2px solid #D4AF37;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
+/* ==========================================
+   LOADING DE TIPOS
+   ========================================== */
+.loading-tipos {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #F8F9FA;
+  border-radius: 8px;
+  border: 2px solid #E0E0E0;
+}
 
-  .error-tipos {
-    padding: 1rem;
-    background: #FFF5F5;
-    border: 2px solid #FEB2B2;
-    border-radius: 8px;
-    color: #C53030;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #E0E0E0;
+  border-top: 2px solid #D4AF37;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
 
-  .btn-retry {
-    background: none;
-    border: none;
-    color: #D4AF37;
-    text-decoration: underline;
-    cursor: pointer;
-    font-weight: 500;
-  }
+.error-tipos {
+  padding: 1rem;
+  background: #FFF5F5;
+  border: 2px solid #FEB2B2;
+  border-radius: 8px;
+  color: #C53030;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 
-  /* Formulario Content */
-  .formulario-contenido {
-    padding: 2rem;
-  }
+.btn-retry {
+  background: none;
+  border: none;
+  color: #D4AF37;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 500;
+}
 
-  .paso-contenido {
-    min-height: 400px;
-  }
+/* ==========================================
+   FORMULARIO CONTENIDO
+   ========================================== */
+.formulario-contenido {
+  padding: 2rem;
+}
 
-  .paso-header {
-    text-align: center;
-    margin-bottom: 2rem;
-  }
+.paso-contenido {
+  min-height: 400px;
+}
 
-  .paso-header h2 {
-    margin: 0 0 0.5rem;
-    color: #2C3E50;
-    font-size: 1.8rem;
-    font-weight: 600;
-  }
+.paso-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
 
-  .paso-header p {
-    margin: 0;
-    color: #666;
-    font-size: 1rem;
-  }
+.paso-header h2 {
+  margin: 0 0 0.5rem;
+  color: #2C3E50;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
 
-  /* Form Elements */
-  .form-grid {
-    display: grid;
-    gap: 1.5rem;
-  }
+.paso-header p {
+  margin: 0;
+  color: #666;
+  font-size: 1rem;
+}
 
-  .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
+/* ==========================================
+   ELEMENTOS DE FORMULARIO
+   ========================================== */
+.form-grid {
+  display: grid;
+  gap: 1.5rem;
+}
 
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
 
-  .form-label {
-    font-weight: 600;
-    color: #2C3E50;
-    font-size: 0.9rem;
-  }
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
 
-  .form-label.required::after {
-    content: ' *';
-    color: #E74C3C;
-  }
+.form-label {
+  font-weight: 600;
+  color: #2C3E50;
+  font-size: 0.9rem;
+}
 
-  .form-input,
-  .form-select,
-  .form-textarea {
-    padding: 0.75rem;
-    border: 2px solid #E0E0E0;
-    border-radius: 8px;
-    font-size: 1rem;
-    transition: border-color 0.3s ease;
-    font-family: inherit;
-  }
+.form-label.required::after {
+  content: ' *';
+  color: #E74C3C;
+}
 
-  .form-input:focus,
-  .form-select:focus,
-  .form-textarea:focus {
-    outline: none;
-    border-color: #D4AF37;
-  }
+.form-input,
+.form-select,
+.form-textarea {
+  padding: 0.75rem;
+  border: 2px solid #E0E0E0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+  font-family: inherit;
+}
 
-  .form-textarea {
-    resize: vertical;
-    min-height: 100px;
-  }
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #D4AF37;
+}
 
-  .input-group {
-    position: relative;
-    display: flex;
-  }
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
 
-  .input-prefix {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #666;
-    font-weight: 600;
-    z-index: 2;
-  }
+.input-group {
+  position: relative;
+  display: flex;
+}
 
-  .input-group .form-input {
-    padding-left: 2rem;
-  }
+.input-prefix {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-weight: 600;
+  z-index: 2;
+}
 
-  .char-counter {
-    font-size: 0.8rem;
-    color: #888;
-    text-align: right;
-  }
+.input-group .form-input {
+  padding-left: 2rem;
+}
 
-  /* Tipo de artículo */
-  .tipo-info {
-    background: #F8F9FA;
-    padding: 0.75rem;
-    border-radius: 6px;
-    border-left: 4px solid #D4AF37;
-  }
+.char-counter {
+  font-size: 0.8rem;
+  color: #888;
+  text-align: right;
+}
 
-  .tipo-icon {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
+/* ==========================================
+   TIPO DE ARTÍCULO
+   ========================================== */
+.tipo-info {
+  background: #F8F9FA;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 4px solid #D4AF37;
+}
 
-  .tipo-svg {
-    width: 20px;
-    height: 20px;
-    color: #D4AF37;
-  }
+.tipo-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
 
-  .tipo-svg-small {
-    width: 16px;
-    height: 16px;
-    color: #D4AF37;
-    display: inline-block;
-    vertical-align: middle;
-    margin-right: 0.25rem;
-  }
+.tipo-svg {
+  width: 20px;
+  height: 20px;
+  color: #D4AF37;
+}
 
-  .tipo-nombre {
-    font-weight: 600;
-    color: #2C3E50;
-  }
+.tipo-svg-small {
+  width: 16px;
+  height: 16px;
+  color: #D4AF37;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.25rem;
+}
 
-  .avaluo-range {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+.tipo-nombre {
+  font-weight: 600;
+  color: #2C3E50;
+}
 
-  .range-label {
-    font-size: 0.9rem;
-    color: #666;
-  }
+.avaluo-range {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-  .range-value {
-    font-weight: 600;
-    color: #D4AF37;
-  }
+.range-label {
+  font-size: 0.9rem;
+  color: #666;
+}
 
-  .avaluo-calculado {
-    background: rgba(212, 175, 55, 0.1);
-    padding: 1rem;
-    border-radius: 8px;
-    border-left: 4px solid #D4AF37;
-  }
+.range-value {
+  font-weight: 600;
+  color: #D4AF37;
+}
 
-  .avaluo-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+.avaluo-calculado {
+  background: rgba(212, 175, 55, 0.1);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #D4AF37;
+}
 
-  .range-hint {
-    font-size: 0.8rem;
-    color: #666;
-    margin-top: 0.25rem;
-  }
+.avaluo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
-  /* Radio buttons */
-  .radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
+.range-hint {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
 
-  .radio-group.horizontal {
-    flex-direction: row;
-    gap: 1.5rem;
-  }
+/* ==========================================
+   RADIO BUTTONS
+   ========================================== */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
 
-  .radio-option {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 1rem;
-    border: 2px solid #E0E0E0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-  }
+.radio-group.horizontal {
+  flex-direction: row;
+  gap: 1.5rem;
+}
 
-  .radio-option:hover {
-    border-color: #D4AF37;
-    background: rgba(212, 175, 55, 0.05);
-  }
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 2px solid #E0E0E0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
 
-  .radio-option input[type="radio"] {
-    display: none;
-  }
+.radio-option:hover {
+  border-color: #D4AF37;
+  background: rgba(212, 175, 55, 0.05);
+}
 
-  .radio-custom {
-    width: 20px;
-    height: 20px;
-    border: 2px solid #E0E0E0;
-    border-radius: 50%;
-    position: relative;
-    transition: all 0.3s ease;
-  }
+.radio-option input[type="radio"] {
+  display: none;
+}
 
-  .radio-option input[type="radio"]:checked + .radio-custom {
-    border-color: #D4AF37;
-    background: #D4AF37;
-  }
+.radio-custom {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #E0E0E0;
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.3s ease;
+}
 
-  .radio-option input[type="radio"]:checked + .radio-custom::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 8px;
-    height: 8px;
-    background: white;
-    border-radius: 50%;
-  }
+.radio-option input[type="radio"]:checked + .radio-custom {
+  border-color: #D4AF37;
+  background: #D4AF37;
+}
 
-  .radio-content {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
+.radio-option input[type="radio"]:checked + .radio-custom::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+}
 
-  .radio-content strong {
-    color: #2C3E50;
-    font-size: 0.9rem;
-  }
+.radio-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
 
-  .radio-content span {
-    color: #666;
-    font-size: 0.8rem;
-  }
+.radio-content strong {
+  color: #2C3E50;
+  font-size: 0.9rem;
+}
 
-  /* Upload Area */
-  .upload-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
+.radio-content span {
+  color: #666;
+  font-size: 0.8rem;
+}
 
-  .upload-area {
-    border: 2px dashed #D0D0D0;
-    border-radius: 12px;
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-  }
+/* ==========================================
+   ÁREAS DE UPLOAD MEJORADAS
+   ========================================== */
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
 
-  .upload-area:hover {
-    border-color: #D4AF37;
-    background: rgba(212, 175, 55, 0.05);
-  }
+.upload-area {
+  position: relative;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
 
-  .upload-area.documento-upload {
-    padding: 1.5rem;
-  }
+.upload-area:hover {
+  border-color: #3b82f6;
+  background-color: #f8fafc;
+}
 
-  .file-input {
-    position: absolute;
+.upload-area.drag-over {
+  border-color: #10b981;
+  background-color: #ecfdf5;
+  transform: scale(1.02);
+}
+
+.upload-area.error {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+.upload-area.error .upload-content {
+  color: #dc2626;
+}
+
+.upload-area.documento-upload {
+  padding: 2rem;
+  background: linear-gradient(135deg, #FFF9E6 0%, #FFFBF0 100%);
+  border: 2px dashed #D4AF37;
+  transition: all 0.3s ease;
+}
+
+.upload-area.documento-upload:hover {
+  border-color: #B8941F;
+  background: linear-gradient(135deg, #FFF6D6 0%, #FFF9E6 100%);
+  transform: translateY(-1px);
+}
+
+.file-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.upload-icon {
+  color: #D4AF37;
+}
+
+.upload-doc-icon {
+  color: #D4AF37;
+  margin-bottom: 1rem;
+}
+
+.upload-content h3,
+.upload-content h4 {
+  margin: 0;
+  color: #2C3E50;
+  font-size: 1.2rem;
+}
+
+.upload-content h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.upload-content p {
+  margin: 0;
+  color: #666;
+}
+
+.upload-button {
+  background: none;
+  border: none;
+  color: #D4AF37;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.upload-content small {
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.file-types {
+  display: flex;
+  gap: 0.75rem;
+  margin: 1rem 0 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.file-type {
+  background: rgba(212, 175, 55, 0.1);
+  color: #B8941F;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.archivo-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+/* ==========================================
+   PREVISUALIZACIONES MEJORADAS
+   ========================================== */
+.fotos-preview h4 {
+  margin: 0 0 1rem;
+  color: #2C3E50;
+}
+
+.fotos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.foto-item {
+  position: relative;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.foto-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.foto-thumbnail {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.foto-info {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  background: white;
+}
+
+.foto-nombre {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #2C3E50;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foto-tamaño {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.foto-remove {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(231, 76, 60, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.foto-remove:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
+
+/* ==========================================
+   FOTO TIPS
+   ========================================== */
+.foto-tips {
+  background: #F0F8FF;
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid #3498DB;
+}
+
+.foto-tips h4 {
+  margin: 0 0 0.5rem;
+  color: #2C3E50;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tip-icon {
+  color: #3498DB;
+  flex-shrink: 0;
+}
+
+.foto-tips ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.foto-tips li {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+/* ==========================================
+   SECCIÓN DE DOCUMENTOS MEJORADA
+   ========================================== */
+.documento-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #E0E0E0;
+}
+
+.documento-section h3 {
+  margin: 0 0 0.5rem;
+  color: #2C3E50;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.2rem;
+}
+
+.section-icon {
+  color: #D4AF37;
+  flex-shrink: 0;
+}
+
+.section-description {
+  margin: 0 0 1.5rem;
+  color: #666;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.documento-selected {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.documento-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  border: 2px solid #E0E0E0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.documento-item:hover {
+  border-color: #D4AF37;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+}
+
+.documento-icon {
+  background: linear-gradient(135deg, #D4AF37 0%, #F4D03F 100%);
+  color: white;
+  padding: 0.75rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.documento-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.documento-info {
+  flex: 1;
+}
+
+.documento-nombre {
+  font-weight: 600;
+  color: #2C3E50;
+  font-size: 1rem;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.documento-tamaño {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.documento-tipo {
+  font-size: 0.8rem;
+  color: #D4AF37;
+  font-weight: 500;
+}
+
+.documento-detalles {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.documento-remove {
+  background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.documento-remove:hover {
+  background: linear-gradient(135deg, #C0392B 0%, #A93226 100%);
+  transform: scale(1.05);
+}
+
+/* ==========================================
+   EJEMPLOS DE DOCUMENTOS
+   ========================================== */
+.documentos-ejemplos {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #F0F8FF;
+  border-radius: 8px;
+  border-left: 4px solid #3498DB;
+}
+
+.documentos-ejemplos h5 {
+  margin: 0 0 1rem;
+  color: #2C3E50;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.documentos-ejemplos h5 svg {
+  color: #3498DB;
+  flex-shrink: 0;
+}
+
+.ejemplos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.ejemplo-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #E0E0E0;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.ejemplo-item:hover {
+  border-color: #3498DB;
+  background: #EBF8FF;
+  transform: translateY(-1px);
+}
+
+.ejemplo-icon {
+  color: #3498DB;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.ejemplo-item:hover .ejemplo-icon {
+  color: #2980B9;
+  transform: scale(1.1);
+}
+
+.ejemplo-item span:last-child {
+  color: #2C3E50;
+  font-weight: 500;
+}
+
+/* ==========================================
+   NOTIFICACIONES DE ARCHIVOS
+   ========================================== */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  max-width: 400px;
+  min-width: 300px;
+  z-index: 9999;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+}
+
+.notification.error-archivo {
+  background: linear-gradient(135deg, #fee, #fecaca);
+  border-left: 4px solid #ef4444;
+  color: #dc2626;
+}
+
+.notification.success-archivo {
+  background: linear-gradient(135deg, #f0f9fe, #bfdbfe);
+  border-left: 4px solid #22c55e;
+  color: #16a34a;
+}
+
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+}
+
+.notification .error-icon {
+  color: #dc2626;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notification .success-icon {
+  color: #16a34a;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notification-text {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.notification-text strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.notification-text p {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-line;
+  opacity: 0.9;
+}
+
+.notification-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
+}
+
+.notification-close:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================================
+   PLAN DE PAGOS
+   ========================================== */
+.prestamo-config {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.plan-pagos {
+  background: #F8F9FA;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border-left: 4px solid #D4AF37;
+}
+
+.plan-pagos h3 {
+  margin: 0 0 1rem;
+  color: #2C3E50;
+}
+
+.resumen-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.resumen-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #E0E0E0;
+}
+
+.resumen-item:last-child {
+  border-bottom: none;
+}
+
+.resumen-item.total {
+  background: rgba(212, 175, 55, 0.1);
+  padding: 1rem;
+  margin: 0.5rem -1.5rem -1.5rem;
+  border-bottom: none;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.resumen-label {
+  color: #666;
+}
+
+.resumen-valor {
+  font-weight: 600;
+  color: #2C3E50;
+}
+
+.resumen-item.total .resumen-valor {
+  color: #D4AF37;
+  font-size: 1.2rem;
+}
+
+.cuotas-detalle h4 {
+  margin: 0 0 1rem;
+  color: #2C3E50;
+  font-size: 1rem;
+}
+
+.cuotas-lista {
+  display: grid;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.cuota-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  align-items: center;
+}
+
+.cuota-numero {
+  width: 24px;
+  height: 24px;
+  background: #D4AF37;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cuota-fecha {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.cuota-monto {
+  font-weight: 600;
+  color: #2C3E50;
+}
+
+/* ==========================================
+   CONFIRMACIÓN
+   ========================================== */
+.confirmacion-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.resumen-seccion {
+  background: #F8F9FA;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.resumen-seccion h3 {
+  background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
+  color: white;
+  padding: 1rem 1.5rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.resumen-contenido {
+  padding: 1.5rem;
+}
+
+.resumen-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #E0E0E0;
+}
+
+.resumen-row:last-child {
+  border-bottom: none;
+}
+
+.resumen-row .label {
+  font-weight: 500;
+  color: #666;
+  flex: 1;
+}
+
+.resumen-row .value {
+  color: #2C3E50;
+  font-weight: 500;
+  text-align: right;
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.resumen-row .value.highlight {
+  color: #D4AF37;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+/* ==========================================
+   TÉRMINOS Y CONDICIONES
+   ========================================== */
+.terminos-seccion {
+  background: #F0F8FF;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.terminos-seccion h3 {
+  background: #3498DB;
+  color: white;
+  padding: 1rem 1.5rem;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.terminos-contenido {
+  padding: 1.5rem;
+}
+
+.terminos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.termino-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #2C3E50;
+  font-size: 0.9rem;
+}
+
+.termino-item svg {
+  color: #27AE60;
+  flex-shrink: 0;
+}
+
+.aceptacion-terminos {
+  padding-top: 1rem;
+  border-top: 1px solid #E0E0E0;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: #2C3E50;
+}
+
+.checkbox-option input[type="checkbox"] {
+  display: none;
+}
+
+.checkbox-custom {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #3498DB;
+  border-radius: 4px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.checkbox-option input[type="checkbox"]:checked + .checkbox-custom {
+  background: #3498DB;
+}
+
+.checkbox-option input[type="checkbox"]:checked + .checkbox-custom::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+/* ==========================================
+   NAVEGACIÓN
+   ========================================== */
+.form-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #E0E0E0;
+  background: #F8F9FA;
+}
+
+.btn-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+}
+
+.btn-nav:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-nav.primary {
+  background: #D4AF37;
+  color: white;
+}
+
+.btn-nav.primary:hover:not(:disabled) {
+  background: #B8941F;
+  transform: translateY(-1px);
+}
+
+.btn-nav.secondary {
+  background: #E0E0E0;
+  color: #2C3E50;
+}
+
+.btn-nav.secondary:hover:not(:disabled) {
+  background: #D0D0D0;
+}
+
+/* ==========================================
+   ANIMACIONES
+   ========================================== */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.bounce-in {
+  animation: bounceIn 0.5s ease-out;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
     opacity: 0;
-    pointer-events: none;
   }
-
-  .upload-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
+}
 
-  .upload-icon {
-    color: #D4AF37;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
   }
-
-  .upload-content h3 {
-    margin: 0;
-    color: #2C3E50;
-    font-size: 1.2rem;
-  }
-
-  .upload-content p {
-    margin: 0;
-    color: #666;
-  }
-
-  .upload-button {
-    background: none;
-    border: none;
-    color: #D4AF37;
-    font-weight: 600;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
-  .upload-content small {
-    color: #888;
-    font-size: 0.8rem;
-  }
-
-  /* Fotos preview */
-  .fotos-preview h4 {
-    margin: 0 0 1rem;
-    color: #2C3E50;
-  }
-
-  .fotos-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-  }
-
-  .foto-item {
-    position: relative;
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  }
-
-  .foto-thumbnail {
-    width: 100%;
-    height: 120px;
-    object-fit: cover;
-  }
-
-  .foto-info {
-    padding: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .foto-nombre {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: #2C3E50;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .foto-tamaño {
-    font-size: 0.7rem;
-    color: #888;
-  }
-
-  .foto-remove {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: rgba(231, 76, 60, 0.9);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.3s ease;
-  }
-
-  .foto-remove:hover {
-    background: #E74C3C;
-  }
-
-  /* Foto tips */
-  .foto-tips {
-    background: #F0F8FF;
-    padding: 1rem;
-    border-radius: 8px;
-    border-left: 4px solid #3498DB;
-  }
-
-  .foto-tips h4 {
-    margin: 0 0 0.5rem;
-    color: #2C3E50;
-    font-size: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .tip-icon {
-    color: #3498DB;
-    flex-shrink: 0;
-  }
-
-  .foto-tips ul {
-    margin: 0;
-    padding-left: 1.5rem;
-  }
-
-  .foto-tips li {
-    color: #666;
-    font-size: 0.9rem;
-    margin-bottom: 0.25rem;
-  }
-
-  /* Documento section MEJORADA */
-  .documento-section {
-    margin-top: 2rem;
-    padding-top: 2rem;
-    border-top: 1px solid #E0E0E0;
-  }
-
-  .documento-section h3 {
-    margin: 0 0 0.5rem;
-    color: #2C3E50;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 1.2rem;
-  }
-
-  .section-icon {
-    color: #D4AF37;
-    flex-shrink: 0;
-  }
-
-  .section-description {
-    margin: 0 0 1.5rem;
-    color: #666;
-    font-size: 0.95rem;
-    line-height: 1.4;
-  }
-
-  .upload-area.documento-upload {
-    padding: 2rem;
-    background: linear-gradient(135deg, #FFF9E6 0%, #FFFBF0 100%);
-    border: 2px dashed #D4AF37;
-    transition: all 0.3s ease;
-  }
-
-  .upload-area.documento-upload:hover {
-    border-color: #B8941F;
-    background: linear-gradient(135deg, #FFF6D6 0%, #FFF9E6 100%);
-    transform: translateY(-1px);
-  }
-
-  .upload-doc-icon {
-    color: #D4AF37;
-    margin-bottom: 1rem;
-  }
-
-  .upload-content h4 {
-    margin: 0 0 0.5rem;
-    color: #2C3E50;
-    font-size: 1.1rem;
-  }
-
-  .file-types {
-    display: flex;
-    gap: 0.75rem;
-    margin: 1rem 0 0.5rem;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .file-type {
-    background: rgba(212, 175, 55, 0.1);
-    color: #B8941F;
-    padding: 0.25rem 0.5rem;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 500;
-    border: 1px solid rgba(212, 175, 55, 0.3);
-  }
-
-  .documento-selected {
-    margin-top: 1.5rem;
-  }
-
-  .documento-item {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.5rem;
-    background: white;
-    border-radius: 8px;
-    border: 2px solid #E0E0E0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-  }
-
-  .documento-item:hover {
-    border-color: #D4AF37;
-    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
-  }
-
-  .documento-icon {
-    background: linear-gradient(135deg, #D4AF37 0%, #F4D03F 100%);
-    color: white;
-    padding: 0.75rem;
-    border-radius: 8px;
-    flex-shrink: 0;
-  }
-
-  .documento-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1;
-  }
-
-  .documento-nombre {
-    font-weight: 600;
-    color: #2C3E50;
-    font-size: 1rem;
-  }
-
-  .documento-tamaño {
-    font-size: 0.85rem;
-    color: #666;
-  }
-
-  .documento-tipo {
-    font-size: 0.8rem;
-    color: #D4AF37;
-    font-weight: 500;
-  }
-
-  .documento-remove {
-    background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    flex-shrink: 0;
-  }
-
-  .documento-remove:hover {
-    background: linear-gradient(135deg, #C0392B 0%, #A93226 100%);
+  50% {
     transform: scale(1.05);
   }
-
-  /* Ejemplos de documentos */
-  .documentos-ejemplos {
-    margin-top: 2rem;
-    padding: 1.5rem;
-    background: #F0F8FF;
-    border-radius: 8px;
-    border-left: 4px solid #3498DB;
+  70% {
+    transform: scale(0.9);
   }
-
-  .documentos-ejemplos h5 {
-    margin: 0 0 1rem;
-    color: #2C3E50;
-    font-size: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
+}
 
-  .documentos-ejemplos h5 svg {
-    color: #3498DB;
-    flex-shrink: 0;
-  }
-
-  .ejemplos-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 0.75rem;
-  }
-
-  .ejemplo-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    background: white;
-    border-radius: 6px;
-    border: 1px solid #E0E0E0;
-    transition: all 0.3s ease;
-    font-size: 0.9rem;
-  }
-
-  .ejemplo-item:hover {
-    border-color: #3498DB;
-    background: #EBF8FF;
-    transform: translateY(-1px);
-  }
-
-  .ejemplo-icon {
-    color: #3498DB;
-    flex-shrink: 0;
-    transition: all 0.3s ease;
-  }
-
-  .ejemplo-item:hover .ejemplo-icon {
-    color: #2980B9;
-    transform: scale(1.1);
-  }
-
-  .ejemplo-item span:last-child {
-    color: #2C3E50;
-    font-weight: 500;
-  }
-
-  /* Plan de pagos */
-  .prestamo-config {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-  }
-
-  .plan-pagos {
-    background: #F8F9FA;
-    padding: 1.5rem;
-    border-radius: 12px;
-    border-left: 4px solid #D4AF37;
-  }
-
-  .plan-pagos h3 {
-    margin: 0 0 1rem;
-    color: #2C3E50;
-  }
-
-  .resumen-grid {
-    display: grid;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .resumen-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #E0E0E0;
-  }
-
-  .resumen-item:last-child {
-    border-bottom: none;
-  }
-
-  .resumen-item.total {
-    background: rgba(212, 175, 55, 0.1);
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
+@media (max-width: 768px) {
+  .formulario-contenido {
     padding: 1rem;
-    margin: 0.5rem -1.5rem -1.5rem;
-    border-bottom: none;
-    font-size: 1.1rem;
-    font-weight: 600;
   }
-
-  .resumen-label {
-    color: #666;
-  }
-
-  .resumen-valor {
-    font-weight: 600;
-    color: #2C3E50;
-  }
-
-  .resumen-item.total .resumen-valor {
-    color: #D4AF37;
-    font-size: 1.2rem;
-  }
-
-  .cuotas-detalle h4 {
-    margin: 0 0 1rem;
-    color: #2C3E50;
-    font-size: 1rem;
-  }
-
-  .cuotas-lista {
-    display: grid;
-    gap: 0.5rem;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .cuota-item {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 1rem;
-    padding: 0.75rem;
-    background: white;
-    border-radius: 6px;
-    align-items: center;
-  }
-
-  .cuota-numero {
-    width: 24px;
-    height: 24px;
-    background: #D4AF37;
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
+  
+  .progress-steps {
+    flex-wrap: wrap;
+    gap: 1rem 0.5rem;
     justify-content: center;
-    font-size: 0.8rem;
-    font-weight: 600;
   }
-
-  .cuota-fecha {
-    color: #666;
-    font-size: 0.9rem;
+  
+  .step-indicator {
+    flex: none;
+    min-width: 120px;
   }
-
-  .cuota-monto {
-    font-weight: 600;
-    color: #2C3E50;
+  
+  .form-row {
+    grid-template-columns: 1fr;
   }
-
-  /* Confirmación */
-  .confirmacion-resumen {
-    display: flex;
+  
+  .radio-group.horizontal {
     flex-direction: column;
-    gap: 2rem;
   }
-
-  .resumen-seccion {
-    background: #F8F9FA;
-    border-radius: 12px;
-    overflow: hidden;
+  
+  .fotos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
   }
-
-  .resumen-seccion h3 {
-    background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
-    color: white;
-    padding: 1rem 1.5rem;
-    margin: 0;
-    display: flex;
-    align-items: center;
+  
+  .foto-thumbnail {
+    height: 80px;
+  }
+  
+  .cuota-item {
+    grid-template-columns: 1fr;
+    text-align: center;
     gap: 0.5rem;
-    font-size: 1.1rem;
   }
-
-  .resumen-contenido {
-    padding: 1.5rem;
-  }
-
+  
   .resumen-row {
-    display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: start;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid #E0E0E0;
-  }
-
-  .resumen-row:last-child {
-    border-bottom: none;
-  }
-
-  .resumen-row .label {
-    font-weight: 500;
-    color: #666;
-    flex: 1;
-  }
-
-  .resumen-row .value {
-    color: #2C3E50;
-    font-weight: 500;
-    text-align: right;
-    flex: 2;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
     gap: 0.25rem;
   }
-
-  .resumen-row .value.highlight {
-    color: #D4AF37;
-    font-weight: 600;
-    font-size: 1.1rem;
+  
+  .resumen-row .value {
+    text-align: left;
+    justify-content: flex-start;
   }
-
-  /* Términos y condiciones */
-  .terminos-seccion {
-    background: #F0F8FF;
-    border-radius: 12px;
-    overflow: hidden;
-  }
-
-  .terminos-seccion h3 {
-    background: #3498DB;
-    color: white;
-    padding: 1rem 1.5rem;
-    margin: 0;
-    font-size: 1.1rem;
-  }
-
-  .terminos-contenido {
-    padding: 1.5rem;
-  }
-
-  .terminos-lista {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .termino-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    color: #2C3E50;
-    font-size: 0.9rem;
-  }
-
-  .termino-item svg {
-    color: #27AE60;
-    flex-shrink: 0;
-  }
-
-  .aceptacion-terminos {
-    padding-top: 1rem;
-    border-top: 1px solid #E0E0E0;
-  }
-
-  .checkbox-option {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    cursor: pointer;
-    font-weight: 500;
-    color: #2C3E50;
-  }
-
-  .checkbox-option input[type="checkbox"] {
-    display: none;
-  }
-
-  .checkbox-custom {
-    width: 20px;
-    height: 20px;
-    border: 2px solid #3498DB;
-    border-radius: 4px;
-    position: relative;
-    transition: all 0.3s ease;
-  }
-
-  .checkbox-option input[type="checkbox"]:checked + .checkbox-custom {
-    background: #3498DB;
-  }
-
-  .checkbox-option input[type="checkbox"]:checked + .checkbox-custom::after {
-    content: '✓';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: 0.8rem;
-    font-weight: bold;
-  }
-
-  /* Navegación */
+  
   .form-navigation {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem 2rem;
-    border-top: 1px solid #E0E0E0;
-    background: #F8F9FA;
+    flex-direction: column;
+    gap: 1rem;
   }
-
+  
   .btn-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    border: none;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 1rem;
+    width: 100%;
+    justify-content: center;
   }
 
-  .btn-nav:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .notification {
+    left: 16px;
+    right: 16px;
+    top: 16px;
+    max-width: none;
+    min-width: 0;
   }
+}
 
-  .btn-nav.primary {
-    background: #D4AF37;
-    color: white;
+@media (max-width: 640px) {
+  .fotos-grid {
+    grid-template-columns: 1fr 1fr;
   }
+  
+  .foto-thumbnail {
+    height: 60px;
+  }
+}
 
-  .btn-nav.primary:hover:not(:disabled) {
-    background: #B8941F;
-    transform: translateY(-1px);
+@media (max-width: 480px) {
+  .fotos-grid {
+    grid-template-columns: 1fr;
   }
-
-  .btn-nav.secondary {
-    background: #E0E0E0;
-    color: #2C3E50;
-  }
-
-  .btn-nav.secondary:hover:not(:disabled) {
-    background: #D0D0D0;
-  }
-
-  /* Spinning animation */
-  .spinning {
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  /* Responsive */
-  @media (max-width: 768px) {
-    .formulario-contenido {
-      padding: 1rem;
-    }
-    
-    .progress-steps {
-      flex-wrap: wrap;
-      gap: 1rem 0.5rem;
-      justify-content: center;
-    }
-    
-    .step-indicator {
-      flex: none;
-      min-width: 120px;
-    }
-    
-    .form-row {
-      grid-template-columns: 1fr;
-    }
-    
-    .radio-group.horizontal {
-      flex-direction: column;
-    }
-    
-    .fotos-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-    
-    .cuota-item {
-      grid-template-columns: 1fr;
-      text-align: center;
-      gap: 0.5rem;
-    }
-    
-    .resumen-row {
-      flex-direction: column;
-      align-items: start;
-      gap: 0.25rem;
-    }
-    
-    .resumen-row .value {
-      text-align: left;
-      justify-content: flex-start;
-    }
-    
-    .form-navigation {
-      flex-direction: column;
-      gap: 1rem;
-    }
-    
-    .btn-nav {
-      width: 100%;
-      justify-content: center;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .fotos-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-  </style>
+}
+</style>
