@@ -140,7 +140,7 @@ model Usuario {
   comentarios       ComentarioProducto[]
   sesiones          SesionUsuario[]
   parametrosModificados ParametrosSistema[]
-
+ logsActividad     LogActividad[]
   @@map("usuario")
 }
 
@@ -467,4 +467,24 @@ model SesionUsuario {
   usuario      Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@map("sesion_usuario")
+}
+
+
+
+model LogActividad {
+  id          Int      @id @default(autoincrement()) @map("id_log")
+  usuarioId   Int?     @map("id_usuario")
+  accion      String   @db.VarChar(100)
+  entidad     String   @db.VarChar(100)
+  entidadId   String?  @map("entidad_id") @db.VarChar(100)
+  detalles    Json?    // Para almacenar información adicional como JSON
+  ipAddress   String   @map("ip_address") @db.VarChar(45)
+  userAgent   String?  @map("user_agent")
+  fechaHora   DateTime @default(now()) @map("fecha_hora")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relación opcional con Usuario
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@map("log_actividad")
 }

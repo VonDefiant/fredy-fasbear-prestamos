@@ -1,14 +1,11 @@
-// ===============================================
-// Archivo: BACKEND/src/routes/solicitudes.routes.js
-// Rutas para la gestión de solicitudes de empéño - CORREGIDO
-// ===============================================
+
 
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs/promises';
 
-// SOLO importar el servicio y validador, NO el middleware principal
+
 import { 
   validateFileTypes, 
   uploadService 
@@ -581,6 +578,143 @@ router.get('/:solicitudId/archivos', catchAsync(async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error obteniendo archivos adjuntos',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+    });
+  }
+}));
+
+// 🆕 GET /api/solicitudes/:solicitudId/archivo/:archivoId
+// ⭐ NUEVA RUTA PARA DESCARGA DE ARCHIVOS - RESUELVE EL ERROR 404
+router.get('/:solicitudId/archivo/:archivoId', catchAsync(async (req, res) => {
+  const { solicitudId, archivoId } = req.params;
+  const userId = req.user.id;
+
+  console.log(`Descargando archivo ${archivoId} de solicitud ${solicitudId}`);
+
+  try {
+    // Verificar que la solicitud pertenece al usuario
+    const solicitud = await prisma.solicitudPrestamo.findFirst({
+      where: { 
+        id: parseInt(solicitudId),
+        usuarioId: userId 
+      }
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({
+        success: false,
+        message: 'Solicitud no encontrada'
+      });
+    }
+
+    // Obtener el documento específico
+    const documento = await prisma.documento.findFirst({
+      where: {
+        id: parseInt(archivoId),
+        idRelacionado: parseInt(solicitudId),
+        tipoRelacion: 'Solicitud'
+      }
+    });
+
+    if (!documento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Archivo no encontrado'
+      });
+    }
+
+    // Construir la ruta del archivo - Manejar diferentes formatos de ruta
+    let rutaCompleta;
+    if (documento.rutaArchivo.startsWith('/uploads/')) {
+      // Si la ruta ya incluye /uploads/, remover el / inicial
+      rutaCompleta = path.join(process.cwd(), documento.rutaArchivo.substring(1));
+    } else if (documento.rutaArchivo.startsWith('uploads/')) {
+      // Si la ruta ya incluye uploads/ sin barra inicial
+      rutaCompleta = path.join(process.cwd(), documento.rutaArchivo);
+    } else {
+      // Si es solo el nombre del archivo, construir la ruta completa
+      rutaCompleta = path.join(process.cwd(), 'uploads', documento.rutaArchivo);
+    }
+    
+    console.log('Ruta del archivo calculada:', rutaCompleta);
+    
+    // Verificar que el archivo existe
+    try {
+      await fs.access(rutaCompleta);
+    } catch (error) {
+      console.error('Archivo no encontrado en el sistema:', rutaCompleta);
+      console.error('Error de acceso:', error.message);
+      
+      // Intentar rutas alternativas
+      const rutasAlternativas = [
+        path.join(process.cwd(), 'uploads', 'solicitudes', 'fotos', path.basename(documento.rutaArchivo)),
+        path.join(process.cwd(), 'uploads', 'solicitudes', 'documentos', path.basename(documento.rutaArchivo)),
+        path.join(process.cwd(), 'uploads', path.basename(documento.rutaArchivo))
+      ];
+      
+      let archivoEncontrado = false;
+      for (const rutaAlt of rutasAlternativas) {
+        try {
+          await fs.access(rutaAlt);
+          rutaCompleta = rutaAlt;
+          archivoEncontrado = true;
+          console.log('Archivo encontrado en ruta alternativa:', rutaCompleta);
+          break;
+        } catch (e) {
+          // Continuar con la siguiente ruta
+        }
+      }
+      
+      if (!archivoEncontrado) {
+        return res.status(404).json({
+          success: false,
+          message: 'Archivo no encontrado en el servidor',
+          debug: process.env.NODE_ENV === 'development' ? {
+            rutaOriginal: documento.rutaArchivo,
+            rutaCalculada: rutaCompleta,
+            rutasIntentadas: rutasAlternativas
+          } : undefined
+        });
+      }
+    }
+
+    // Configurar headers para descarga/visualización
+    const estaImagen = documento.tipoMime && documento.tipoMime.startsWith('image/');
+    
+    if (estaImagen) {
+      // Para imágenes, permitir visualización inline
+      res.setHeader('Content-Disposition', `inline; filename="${documento.nombreArchivo}"`);
+      res.setHeader('Content-Type', documento.tipoMime);
+    } else {
+      // Para documentos, forzar descarga
+      res.setHeader('Content-Disposition', `attachment; filename="${documento.nombreArchivo}"`);
+      res.setHeader('Content-Type', documento.tipoMime || 'application/octet-stream');
+    }
+
+    // Headers adicionales para cache y seguridad
+    res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache por 1 hora
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    
+    // Enviar el archivo
+    res.sendFile(rutaCompleta, (err) => {
+      if (err) {
+        console.error('Error enviando archivo:', err);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            message: 'Error enviando el archivo'
+          });
+        }
+      } else {
+        console.log(`✅ Archivo enviado exitosamente: ${documento.nombreArchivo}`);
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error descargando archivo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
     });
   }

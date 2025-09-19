@@ -1,7 +1,4 @@
-// ===============================================
-// Archivo: BACKEND/src/middleware/requestLogger.js
-// Middleware para logging personalizado de requests
-// ===============================================
+
 
 import { PrismaClient } from '@prisma/client';
 
@@ -151,7 +148,7 @@ export const requestLogger = async (req, res, next) => {
       try {
         await logToDatabase(req, res, requestInfo, responseInfo, duration);
       } catch (error) {
-        console.error('Error logging to database:', error);
+        console.error('Error guardando log en base de datos:', error);
         // No fallar el request por errores de logging
       }
     }
@@ -194,10 +191,10 @@ const shouldLogToDatabase = (req, res) => {
   return isImportantPath && (isModifyAction || isError);
 };
 
-// Función para guardar el log en la base de datos
+
 const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
   try {
-    const userId = req.user?.userId || null;
+    const userId = req.user?.id || req.user?.userId || null;
     const accion = determinarTipoAccion(req.method, req.path);
     const entidad = determinarEntidad(req.path);
     const entidadId = extraerEntidadId(req.path);
@@ -222,23 +219,60 @@ const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
       }
     };
     
-    // Guardar en la base de datos
-    await prisma.logActividad.create({
-      data: {
-        usuarioId,
+
+    try {
+      // Verificar si el modelo logActividad existe
+      const tableExists = await prisma.$queryRaw`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'log_actividad'
+        );
+      `;
+      
+      if (tableExists[0]?.exists) {
+        // El modelo existe, intentar guardar
+        await prisma.logActividad.create({
+          data: {
+            usuarioId,
+            accion,
+            entidad,
+            entidadId,
+            detalles,
+            ipAddress: requestInfo.ip,
+            userAgent: requestInfo.userAgent,
+            fechaHora: new Date()
+          }
+        });
+        
+        console.log('📝 Log guardado en BD exitosamente');
+      } else {
+        // El modelo no existe, solo log en consola
+        console.log('📝 LOG (BD no disponible):', {
+          userId,
+          accion,
+          entidad,
+          entidadId,
+          ip: requestInfo.ip,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (dbError) {
+      // Error de base de datos, continuar sin fallar
+      console.log('📝 LOG (Error BD):', {
+        userId,
         accion,
         entidad,
         entidadId,
-        detalles,
-        ipAddress: requestInfo.ip,
-        userAgent: requestInfo.userAgent,
-        fechaHora: new Date()
-      }
-    });
+        ip: requestInfo.ip,
+        timestamp: new Date().toISOString(),
+        error: dbError.message
+      });
+    }
     
   } catch (error) {
-    console.error('Error guardando log en base de datos:', error);
-    // No relanzar el error para no afectar el request principal
+    console.error('Error en logToDatabase:', error);
+    // CRÍTICO: No relanzar el error para no afectar el request principal
   }
 };
 
@@ -253,15 +287,12 @@ export const logError = (error, req, additionalInfo = {}) => {
     method: req.method,
     ip: getClientIP(req),
     userAgent: getUserAgent(req),
-    userId: req.user?.userId || null,
+    userId: req.user?.id || req.user?.userId || null,
     timestamp: new Date().toISOString(),
     ...additionalInfo
   };
   
-  console.error('🚨 ERROR LOG:', JSON.stringify(errorInfo, null, 2));
-  
-  // En producción, aquí podrías enviar a un servicio de logging externo
-  // como Sentry, LogRocket, etc.
+
   if (process.env.NODE_ENV === 'production') {
     // Ejemplo: Sentry.captureException(error, { extra: errorInfo });
   }
@@ -274,29 +305,39 @@ export const logSecurityEvent = async (eventType, req, details = {}) => {
     ip: getClientIP(req),
     userAgent: getUserAgent(req),
     url: req.originalUrl,
-    userId: req.user?.userId || null,
+    userId: req.user?.id || req.user?.userId || null,
     timestamp: new Date().toISOString(),
     details
   };
   
-  console.warn('🔒 SECURITY EVENT:', JSON.stringify(securityInfo, null, 2));
-  
-  // Guardar eventos de seguridad importantes en la base de datos
+
+  // Intentar guardar eventos de seguridad importantes en la base de datos
   try {
-    await prisma.logActividad.create({
-      data: {
-        usuarioId: req.user?.userId || null,
-        accion: 'SECURITY_EVENT',
-        entidad: 'security',
-        entidadId: eventType,
-        detalles: securityInfo,
-        ipAddress: getClientIP(req),
-        userAgent: getUserAgent(req),
-        fechaHora: new Date()
-      }
-    });
+    const tableExists = await prisma.$queryRaw`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'log_actividad'
+      );
+    `;
+    
+    if (tableExists[0]?.exists) {
+      await prisma.logActividad.create({
+        data: {
+          usuarioId: req.user?.id || req.user?.userId || null,
+          accion: 'SECURITY_EVENT',
+          entidad: 'security',
+          entidadId: eventType,
+          detalles: securityInfo,
+          ipAddress: getClientIP(req),
+          userAgent: getUserAgent(req),
+          fechaHora: new Date()
+        }
+      });
+    }
   } catch (error) {
     console.error('Error logging security event:', error);
+
   }
 };
 
