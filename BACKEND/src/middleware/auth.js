@@ -113,7 +113,7 @@ export const optionalAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
-    // En auth opcional, no fallar si hay error con el token
+
     next();
   }
 };

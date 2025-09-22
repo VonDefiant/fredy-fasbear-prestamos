@@ -234,7 +234,7 @@ const handleCuentaClick = () => {
 const handleTiendaClick = () => {
   closeMobileMenu()
   
-  // La tienda puede ser accesible sin login, pero mejorar experiencia si está logueado
+
   if (isLoggedIn.value) {
     navigateTo('/tienda?logged=true')
   } else {

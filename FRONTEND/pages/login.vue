@@ -456,7 +456,73 @@ const clearMessages = () => {
   registerMessage.value = { text: '', type: '' }
 }
 
-// ===== FUNCIONES CONECTADAS AL BACKEND REAL =====
+// ===== NUEVA FUNCIÓN DE REDIRECCIÓN POR ROLES =====
+const redirectAfterLogin = (userData) => {
+  console.log('[LOGIN] Datos completos del usuario:', JSON.stringify(userData, null, 2))
+  console.log('[LOGIN] Tipo de usuario específico:', userData.tipoUsuario)
+  console.log('[LOGIN] Tipo de tipo de usuario:', typeof userData.tipoUsuario)
+  
+  // Verificar si hay una URL de destino guardada (para cuando el usuario intentó acceder a una página protegida)
+  const redirectUrl = process.client ? sessionStorage.getItem('redirect_after_login') : null
+  
+  if (redirectUrl) {
+    // Limpiar la URL guardada
+    sessionStorage.removeItem('redirect_after_login')
+    
+    // Verificar si la URL guardada coincide con el rol del usuario
+    const isAdminRoute = redirectUrl.startsWith('/admin')
+    const isEvaluatorRoute = redirectUrl.startsWith('/evaluator')
+    const isCollectorRoute = redirectUrl.startsWith('/collector')
+    const isAdminUser = userData.tipoUsuario === 'Administrador'
+    const isEvaluatorUser = userData.tipoUsuario === 'Evaluador'
+    const isCollectorUser = userData.tipoUsuario === 'Cobrador'
+    
+    // Verificar si el rol coincide con la ruta solicitada
+    const roleRouteMatch = (
+      (isAdminRoute && isAdminUser) ||
+      (isEvaluatorRoute && isEvaluatorUser) ||
+      (isCollectorRoute && isCollectorUser) ||
+      (!isAdminRoute && !isEvaluatorRoute && !isCollectorRoute && userData.tipoUsuario === 'Cliente')
+    )
+    
+    if (!roleRouteMatch) {
+      // Rol no coincide con la ruta solicitada, redirigir según rol
+      let targetRoute = '/dashboard'
+      if (isAdminUser) targetRoute = '/admin'
+      else if (isEvaluatorUser) targetRoute = '/evaluator'
+      else if (isCollectorUser) targetRoute = '/collector'
+      
+      console.log('[LOGIN] Rol no coincide con ruta solicitada, redirigiendo a:', targetRoute)
+      return navigateTo(targetRoute)
+    }
+    
+    // Rol coincide, redirigir a la URL original solicitada
+    console.log('[LOGIN] Redirigiendo a URL guardada:', redirectUrl)
+    return navigateTo(redirectUrl)
+  }
+  
+  // No hay URL guardada, redirigir según rol del usuario
+  console.log('[LOGIN] Evaluando rol para redirección...')
+  
+  if (userData.tipoUsuario === 'Administrador') {
+    console.log('[LOGIN] ✅ Usuario es Administrador, redirigiendo a /admin')
+    return navigateTo('/admin')
+  } else if (userData.tipoUsuario === 'Cliente') {
+    console.log('[LOGIN] ✅ Usuario es Cliente, redirigiendo a /dashboard')
+    return navigateTo('/dashboard')
+  } else if (userData.tipoUsuario === 'Evaluador') {
+    console.log('[LOGIN] ✅ Usuario es Evaluador, redirigiendo a /evaluator')
+    return navigateTo('/evaluator')
+  } else if (userData.tipoUsuario === 'Cobrador') {
+    console.log('[LOGIN] ✅ Usuario es Cobrador, redirigiendo a /collector')
+    return navigateTo('/collector')
+  } else {
+    console.log('[LOGIN] ⚠️ Rol no reconocido:', userData.tipoUsuario, 'redirigiendo al dashboard por defecto')
+    return navigateTo('/dashboard')
+  }
+}
+
+// ===== FUNCIÓN HANDLELOGIN MEJORADA CON REDIRECCIÓN POR ROLES =====
 const handleLogin = async () => {
   clearMessages()
   loginLoading.value = true
@@ -488,17 +554,40 @@ const handleLogin = async () => {
     if (response.success && response.data.token) {
       // Usar el composable de auth para guardar los datos
       const { login } = useAuth()
-login(response.data.user, response.data.token, loginForm.value.remember)
+      await login(response.data.user, response.data.token, loginForm.value.remember)
+      
+      // Mensaje de éxito con personalización por rol
+      let roleName = 'Usuario'
+      let roleIcon = '👤'
+      
+      switch(response.data.user.tipoUsuario) {
+        case 'Administrador':
+          roleName = 'Administrador'
+          roleIcon = '👑'
+          break
+        case 'Evaluador':
+          roleName = 'Evaluador'
+          roleIcon = '🔍'
+          break
+        case 'Cobrador':
+          roleName = 'Cobrador'
+          roleIcon = '💰'
+          break
+        case 'Cliente':
+          roleName = 'Cliente'
+          roleIcon = '👤'
+          break
+      }
       
       loginMessage.value = {
-        text: 'Inicio de sesión exitoso. Redirigiendo...',
+        text: `${roleIcon} ¡Bienvenido ${response.data.user.nombre}! Accediendo como ${roleName}...`,
         type: 'success'
       }
 
-      // Redirigir al dashboard después de 1 segundo
+      // Usar la nueva función de redirección por roles
       setTimeout(() => {
-        navigateTo('/dashboard')
-      }, 1000)
+        redirectAfterLogin(response.data.user)
+      }, 1500)
     } else {
       throw new Error(response.message || 'Error en la respuesta del servidor')
     }
@@ -634,6 +723,20 @@ watch([() => loginForm.value.email, () => loginForm.value.password], () => {
 watch([() => registerForm.value.email, () => registerForm.value.password], () => {
   if (registerMessage.value.text) {
     clearMessages()
+  }
+})
+
+// ===== INICIALIZACIÓN CON VERIFICACIÓN DE MENSAJES =====
+onMounted(() => {
+  // Verificar si hay un mensaje de autenticación guardado (cuando se requiere login)
+  const { getAuthMessage } = useAuth()
+  const savedMessage = getAuthMessage()
+  
+  if (savedMessage) {
+    loginMessage.value = {
+      text: savedMessage,
+      type: 'info'
+    }
   }
 })
 </script>
