@@ -145,7 +145,6 @@
           <p>
             Tu solicitud <strong>{{ solicitud.numero }}</strong> ha sido aprobada.
             Ahora puedes revisar la oferta y proceder con la aceptación del préstamo.
-            Te contactaremos pronto para coordinar la entrega del artículo y la firma del contrato.
           </p>
           <p v-if="solicitud.observaciones">
             <strong>Observaciones:</strong> {{ solicitud.observaciones }}
@@ -166,6 +165,20 @@
           </svg>
           Información General
         </button>
+
+        <!-- NUEVA PESTAÑA: Detalles Financieros -->
+        <button 
+          @click="pestanaActiva = 'financiero'"
+          :class="['btn-pestana', { active: pestanaActiva === 'financiero' }]"
+          v-if="tieneInformacionFinanciera"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+            <path d="M17 5H9.5C7.01 5 5 7.01 5 9.5S7.01 14 9.5 14H14.5C16.99 14 19 16.01 19 18.5S16.99 23 14.5 23H6" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Detalles Financieros
+          <span v-if="solicitud.prestamo?.montoSolicitado" class="contador-badge">Q{{ formatCurrency(solicitud.prestamo.montoSolicitado) }}</span>
+        </button>
         
         <button 
           @click="pestanaActiva = 'archivos'"
@@ -181,6 +194,7 @@
 
       <!-- Contenido de pestañas -->
       <div class="pestanas-contenido">
+        
         <!-- Pestaña: Información General -->
         <div v-if="pestanaActiva === 'informacion'" class="detalle-content">
           
@@ -252,7 +266,7 @@
             </div>
           </div>
 
-          <!-- Artículos Incluidos -->
+          <!-- Artículos Incluidos - MEJORADO -->
           <div class="articulos-section">
             <div class="section-header">
               <h2>
@@ -272,12 +286,14 @@
               <div v-for="articulo in solicitud.articulos" :key="articulo.id_articulo" class="articulo-card">
                 <div class="articulo-header">
                   <div class="articulo-tipo">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-                      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
-                      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    {{ articulo.tipo_articulo?.nombre || 'Artículo' }}
+                    <div class="tipo-icono">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
+                        <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                    </div>
+                    <span>{{ articulo.tipo_articulo?.nombre || 'Artículo' }}</span>
                   </div>
                   <div class="articulo-estado" :class="`estado-${articulo.estado_fisico?.toLowerCase()}`">
                     {{ formatearEstadoFisico(articulo.estado_fisico) }}
@@ -285,34 +301,89 @@
                 </div>
 
                 <div class="articulo-content">
-                  <h4 class="articulo-titulo">{{ articulo.descripcion || 'Sin descripción' }}</h4>
+                  <!-- Descripción principal -->
+                  <div class="articulo-descripcion">
+                    <h4>{{ articulo.descripcion || 'Sin descripción' }}</h4>
+                  </div>
 
-                  <div class="articulo-details">
-                    <div class="detail-row" v-if="articulo.marca">
-                      <span class="detail-label">Marca:</span>
-                      <span class="detail-value">{{ articulo.marca }}</span>
+                  <!-- Valoración estimada del cliente - NUEVO -->
+                  <div v-if="articulo.valor_estimado_cliente" class="valoracion-cliente">
+                    <div class="valoracion-header">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+                        <path d="M17 5H9.5C7.01 5 5 7.01 5 9.5S7.01 14 9.5 14H14.5C16.99 14 19 16.01 19 18.5S16.99 23 14.5 23H6" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                      <span>Valoración Estimada del Cliente</span>
                     </div>
-                    <div class="detail-row" v-if="articulo.modelo">
-                      <span class="detail-label">Modelo:</span>
-                      <span class="detail-value">{{ articulo.modelo }}</span>
-                    </div>
-                    <div class="detail-row" v-if="articulo.serie">
-                      <span class="detail-label">Serie:</span>
-                      <span class="detail-value">{{ articulo.serie }}</span>
-                    </div>
-                    <div class="detail-row" v-if="articulo.color">
-                      <span class="detail-label">Color:</span>
-                      <span class="detail-value">{{ articulo.color }}</span>
-                    </div>
-                    <div class="detail-row" v-if="articulo.valor_estimado_cliente">
-                      <span class="detail-label">Valor Estimado:</span>
-                      <span class="detail-value currency">{{ formatCurrency(articulo.valor_estimado_cliente) }}</span>
+                    <div class="valoracion-monto">{{ formatCurrency(articulo.valor_estimado_cliente) }}</div>
+                  </div>
+
+                  <!-- Detalles del artículo - AMPLIADO -->
+                  <div class="articulo-detalles">
+                    <div class="detalles-grid">
+                      <div class="detalle-item" v-if="articulo.marca">
+                        <span class="detalle-label">Marca:</span>
+                        <span class="detalle-valor">{{ articulo.marca }}</span>
+                      </div>
+                      <div class="detalle-item" v-if="articulo.modelo">
+                        <span class="detalle-label">Modelo:</span>
+                        <span class="detalle-valor">{{ articulo.modelo }}</span>
+                      </div>
+                      <div class="detalle-item" v-if="articulo.serie">
+                        <span class="detalle-label">Serie:</span>
+                        <span class="detalle-valor">{{ articulo.serie }}</span>
+                      </div>
+                      <div class="detalle-item" v-if="articulo.color">
+                        <span class="detalle-label">Color:</span>
+                        <div class="color-info">
+                          <span class="color-muestra" :style="{ backgroundColor: getColorHex(articulo.color) }"></span>
+                          <span class="detalle-valor">{{ articulo.color }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div class="articulo-specs" v-if="articulo.especificaciones_tecnicas">
-                    <h5>Especificaciones Técnicas:</h5>
-                    <p>{{ articulo.especificaciones_tecnicas }}</p>
+                  <!-- Especificaciones técnicas - MEJORADO -->
+                  <div v-if="articulo.especificaciones_tecnicas" class="especificaciones-section">
+                    <div class="specs-header">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
+                        <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                      <span>Especificaciones Técnicas</span>
+                    </div>
+                    <div class="specs-content">
+                      <pre>{{ articulo.especificaciones_tecnicas }}</pre>
+                    </div>
+                  </div>
+
+                  <!-- Información de avalúo si existe -->
+                  <div v-if="articulo.avaluo" class="avaluo-section">
+                    <div class="avaluo-header">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 11H15M9 15H15M17 21L20 18L17 15M3 19V5C3 3.89 3.89 3 5 3H19C20.11 3 21 3.89 21 5V12.5" stroke="currentColor" stroke-width="2" fill="none"/>
+                      </svg>
+                      <span>Evaluación Profesional</span>
+                    </div>
+                    <div class="avaluo-grid">
+                      <div class="avaluo-item">
+                        <span class="avaluo-label">Valor Comercial:</span>
+                        <span class="avaluo-valor comercial">{{ formatCurrency(articulo.avaluo.valorComercial) }}</span>
+                      </div>
+                      <div class="avaluo-item">
+                        <span class="avaluo-label">Porcentaje Aplicado:</span>
+                        <span class="avaluo-valor porcentaje">{{ articulo.avaluo.porcentajeAplicado }}%</span>
+                      </div>
+                      <div class="avaluo-item">
+                        <span class="avaluo-label">Monto Máximo de Préstamo:</span>
+                        <span class="avaluo-valor prestamo">{{ formatCurrency(articulo.avaluo.montoPrestamo) }}</span>
+                      </div>
+                      <div v-if="articulo.avaluo.observaciones" class="avaluo-observaciones">
+                        <span class="avaluo-label">Observaciones del Evaluador:</span>
+                        <p class="avaluo-obs-text">{{ articulo.avaluo.observaciones }}</p>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Media (Fotos y Documentos) -->
@@ -482,13 +553,178 @@
           </div>
         </div>
 
+        <!-- NUEVA PESTAÑA: Detalles Financieros -->
+        <div v-if="pestanaActiva === 'financiero'" class="detalle-content">
+          
+          <!-- Resumen Financiero -->
+          <div class="financiero-section">
+            <div class="section-header">
+              <h2>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+                  <path d="M17 5H9.5C7.01 5 5 7.01 5 9.5S7.01 14 9.5 14H14.5C16.99 14 19 16.01 19 18.5S16.99 23 14.5 23H6" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                Resumen Financiero
+              </h2>
+            </div>
+
+            <div class="financiero-resumen">
+              <!-- Montos principales -->
+              <div class="montos-principales">
+                <div class="monto-card principal" v-if="solicitud.prestamo?.montoSolicitado">
+                  <div class="monto-icono">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" stroke-width="2"/>
+                      <path d="M17 5H9.5C7.01 5 5 7.01 5 9.5S7.01 14 9.5 14H14.5C16.99 14 19 16.01 19 18.5S16.99 23 14.5 23H6" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="monto-info">
+                    <span class="monto-label">Monto Solicitado</span>
+                    <span class="monto-valor">{{ formatCurrency(solicitud.prestamo.montoSolicitado) }}</span>
+                  </div>
+                </div>
+
+                <div class="monto-card" v-if="solicitud.prestamo?.tasaInteres">
+                  <div class="monto-icono">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                      <path d="M8 14S9.5 16 12 16S16 14 16 14" stroke="currentColor" stroke-width="2"/>
+                      <line x1="9" y1="9" x2="9.01" y2="9" stroke="currentColor" stroke-width="2"/>
+                      <line x1="15" y1="9" x2="15.01" y2="9" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="monto-info">
+                    <span class="monto-label">Tasa de Interés</span>
+                    <span class="monto-valor">{{ solicitud.prestamo.tasaInteres }}% mensual</span>
+                  </div>
+                </div>
+
+                <div class="monto-card destacada" v-if="solicitud.prestamo?.totalAPagar">
+                  <div class="monto-icono">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <path d="M16 4H18C19.1 4 20 4.9 20 6V18C20 19.1 19.1 20 18 20H6C4.9 20 4 19.1 4 18V6C4 4.9 4.9 4 6 4H8" stroke="currentColor" stroke-width="2"/>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" stroke="currentColor" stroke-width="2"/>
+                      <path d="M9 14L11 16L15 12" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="monto-info">
+                    <span class="monto-label">Total a Pagar</span>
+                    <span class="monto-valor">{{ formatCurrency(solicitud.prestamo.totalAPagar) }}</span>
+                  </div>
+                </div>
+
+                <div class="monto-card" v-if="solicitud.prestamo?.modalidadPago">
+                  <div class="monto-icono">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                      <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
+                      <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="monto-info">
+                    <span class="monto-label">Modalidad de Pago</span>
+                    <span class="monto-valor">{{ formatModalidadPago(solicitud.prestamo.modalidadPago) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Desglose si es en cuotas -->
+              <div v-if="solicitud.prestamo?.modalidadPago !== 'contado' && planPagosCalculado.length > 0" class="plan-pagos-section">
+                <div class="plan-header">
+                  <h3>Plan de Pagos</h3>
+                  <div class="plan-resumen">
+                    <span class="numero-pagos">{{ planPagosCalculado.length }} pagos</span>
+                    <span class="monto-por-pago">{{ formatCurrency(montoPorPago) }} cada {{ frequenciaPago }}</span>
+                  </div>
+                </div>
+
+                <div class="tabla-pagos">
+                  <div class="tabla-header">
+                    <div class="col-cuota">Cuota</div>
+                    <div class="col-fecha">Fecha</div>
+                    <div class="col-capital">Capital</div>
+                    <div class="col-interes">Interés</div>
+                    <div class="col-total">Total</div>
+                    <div class="col-saldo">Saldo</div>
+                  </div>
+                  
+                  <div 
+                    v-for="pago in planPagosCalculado" 
+                    :key="pago.numero"
+                    class="tabla-row"
+                    :class="{ 'row-final': pago.numero === planPagosCalculado.length }"
+                  >
+                    <div class="col-cuota">
+                      <span class="cuota-numero">{{ pago.numero }}</span>
+                    </div>
+                    <div class="col-fecha">
+                      <span class="fecha-corta">{{ formatDateShort(pago.fecha) }}</span>
+                    </div>
+                    <div class="col-capital">
+                      <span class="monto capital">{{ formatCurrency(pago.capital) }}</span>
+                    </div>
+                    <div class="col-interes">
+                      <span class="monto interes">{{ formatCurrency(pago.interes) }}</span>
+                    </div>
+                    <div class="col-total">
+                      <span class="monto total">{{ formatCurrency(pago.totalCuota) }}</span>
+                    </div>
+                    <div class="col-saldo">
+                      <span class="monto saldo" :class="{ 'saldo-cero': pago.saldoPendiente === 0 }">
+                        {{ formatCurrency(pago.saldoPendiente) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Totales del plan -->
+                <div class="plan-totales">
+                  <div class="total-item">
+                    <span class="total-label">Total Capital:</span>
+                    <span class="total-valor">{{ formatCurrency(solicitud.prestamo?.montoSolicitado) }}</span>
+                  </div>
+                  <div class="total-item">
+                    <span class="total-label">Total Intereses:</span>
+                    <span class="total-valor">{{ formatCurrency(totalIntereses) }}</span>
+                  </div>
+                  <div class="total-item destacado">
+                    <span class="total-label">Total a Pagar:</span>
+                    <span class="total-valor">{{ formatCurrency(solicitud.prestamo?.totalAPagar) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Información adicional -->
+              <div class="info-adicional" v-if="solicitud.prestamo?.plazoMeses">
+                <div class="info-item">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+                    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
+                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Plazo: {{ solicitud.prestamo.plazoMeses }} {{ solicitud.prestamo.plazoMeses === 1 ? 'mes' : 'meses' }}</span>
+                </div>
+                
+                <div class="info-item" v-if="fechaVencimientoCalculada">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  <span>Vencimiento: {{ formatDateLong(fechaVencimientoCalculada) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Pestaña: Archivos Adjuntos -->
-          <div v-if="pestanaActiva === 'archivos'" class="archivos-pestana">
-            <ArchivosAdjuntos 
-              :archivos="archivos"
-              :loading="loadingArchivos"
-            /> 
-             <div v-if="!loadingArchivos && archivos.length === 0" class="archivos-estado-vacio">
+        <div v-if="pestanaActiva === 'archivos'" class="archivos-pestana">
+          <ArchivosAdjuntos 
+            :archivos="archivos"
+            :loading="loadingArchivos"
+          /> 
+          <div v-if="!loadingArchivos && archivos.length === 0" class="archivos-estado-vacio">
             <div class="estado-vacio-content">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" class="icono-vacio">
                 <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="#9CA3AF" stroke-width="2"/>
@@ -504,11 +740,11 @@
                 </svg>
                 Refrescar archivos
               </button>
+            </div>
           </div>
         </div>
-                </div>
-          </div>
-        </div>
+      </div>
+    </div>
 
     <!-- MODAL DE CONFIRMACIÓN DE CANCELACIÓN -->
     <div class="modal-overlay" v-if="mostrarConfirmacionCancelacion" @click="cerrarConfirmacionCancelacion">
@@ -670,7 +906,6 @@
         </button>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -690,7 +925,7 @@ const { api } = useApi()
 const { 
   obtenerDetalleSolicitud, 
   cancelarSolicitud,
-  obtenerArchivosAdjuntos  // NUEVA: función para obtener archivos
+  obtenerArchivosAdjuntos
 } = useSolicitudes()
 const config = useRuntimeConfig()
 
@@ -709,12 +944,12 @@ const solicitud = ref(null)
 const loadingAction = ref(false)
 const loadingCancelacion = ref(false)
 
-// NUEVO: Estado para archivos adjuntos
+// Estado para archivos adjuntos
 const archivos = ref([])
 const loadingArchivos = ref(false)
 
 // Estado para pestañas
-const pestanaActiva = ref('informacion') // 'informacion' o 'archivos'
+const pestanaActiva = ref('informacion') // 'informacion', 'financiero' o 'archivos'
 
 // Modal de confirmación
 const mostrarConfirmacionCancelacion = ref(false)
@@ -733,12 +968,83 @@ const notification = ref({
   message: ''
 })
 
-// ===== COMPUTED =====
+// ===== COMPUTED PROPERTIES =====
 const solicitudId = computed(() => {
   return parseInt(route.params.id)
 })
 
-// ===== NUEVA FUNCIÓN PARA CARGAR ARCHIVOS =====
+// NUEVO: Verificar si tiene información financiera
+const tieneInformacionFinanciera = computed(() => {
+  return solicitud.value && solicitud.value.prestamo && (
+    solicitud.value.prestamo.montoSolicitado || 
+    solicitud.value.prestamo.tasaInteres || 
+    solicitud.value.prestamo.modalidadPago || 
+    solicitud.value.prestamo.plazoMeses
+  )
+})
+
+// NUEVO: Calcular plan de pagos
+const planPagosCalculado = computed(() => {
+  if (!solicitud.value || 
+      !solicitud.value.prestamo || 
+      !solicitud.value.prestamo.planPagos ||
+      !Array.isArray(solicitud.value.prestamo.planPagos)) {
+    return []
+  }
+
+  // Usar el plan de pagos que viene del backend
+  return solicitud.value.prestamo.planPagos.map(pago => ({
+    numero: pago.numeroPago,
+    fecha: new Date(pago.fechaPago),
+    capital: pago.capital,
+    interes: pago.interes,
+    totalCuota: pago.montoPago,
+    saldoPendiente: pago.saldoPendiente,
+    comision: pago.comision || 0
+  }))
+})
+
+// NUEVO: Monto por pago
+const montoPorPago = computed(() => {
+  if (solicitud.value?.prestamo?.resumenFinanciero?.montoPorPago) {
+    return solicitud.value.prestamo.resumenFinanciero.montoPorPago
+  }
+  return 0
+})
+
+// NUEVO: Frecuencia de pago
+const frequenciaPago = computed(() => {
+  if (!solicitud.value?.prestamo?.modalidadPago) return ''
+  
+  const frecuencias = {
+    'mensual': 'mes',
+    'quincenal': '15 días',
+    'semanal': 'semana',
+    'contado': 'pago único'
+  }
+  
+  return frecuencias[solicitud.value.prestamo.modalidadPago] || ''
+})
+
+// NUEVO: Total de intereses
+const totalIntereses = computed(() => {
+  if (solicitud.value?.prestamo?.resumenFinanciero?.interesTotal) {
+    return solicitud.value.prestamo.resumenFinanciero.interesTotal
+  }
+  return 0
+})
+
+// NUEVO: Fecha de vencimiento calculada
+const fechaVencimientoCalculada = computed(() => {
+  if (!solicitud.value?.fechaSolicitud || !solicitud.value?.prestamo?.plazoMeses) return null
+  
+  const fechaInicio = new Date(solicitud.value.fechaSolicitud)
+  fechaInicio.setMonth(fechaInicio.getMonth() + parseInt(solicitud.value.prestamo.plazoMeses))
+  
+  return fechaInicio
+})
+
+// ===== FUNCIONES DE CARGA DE ARCHIVOS =====
 const cargarArchivosAdjuntos = async () => {
   try {
     loadingArchivos.value = true
@@ -752,10 +1058,7 @@ const cargarArchivosAdjuntos = async () => {
     const response = await obtenerArchivosAdjuntos(solicitudId.value)
     
     if (response.success && response.data) {
-      // El backend devuelve archivos agrupados por tipo
       const { archivos: archivosPorTipo } = response.data
-      
-      // Convertir los archivos agrupados en un array plano para el componente
       const todosLosArchivos = []
       
       // Agregar fotos
@@ -815,11 +1118,6 @@ const cargarArchivosAdjuntos = async () => {
         otros: archivosPorTipo.otros?.length || 0
       })
       
-      // Si no hay archivos, mostrar información útil
-      if (todosLosArchivos.length === 0) {
-        console.log('ℹ️ No se encontraron archivos adjuntos para esta solicitud')
-      }
-      
     } else {
       console.warn('⚠️ No se encontraron archivos:', response.message)
       archivos.value = []
@@ -827,27 +1125,24 @@ const cargarArchivosAdjuntos = async () => {
     
   } catch (err) {
     console.error('❌ Error cargando archivos adjuntos:', err)
-    // No mostramos error al usuario porque no tener archivos no es crítico
     archivos.value = []
   } finally {
     loadingArchivos.value = false
   }
 }
 
-// ===== NUEVA FUNCIÓN PARA REFRESCAR ARCHIVOS =====
 const refrescarArchivos = async () => {
   console.log('🔄 Refrescando archivos adjuntos...')
   await cargarArchivosAdjuntos()
 }
 
-// ===== MÉTODOS DE UTILIDAD =====
+// ===== MÉTODOS DE UTILIDAD Y FORMATEO =====
 const formatCurrency = (amount) => {
+  if (!amount && amount !== 0) return '0.00'
   return new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: 'GTQ',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amount || 0)
+  }).format(amount)
 }
 
 const formatDate = (dateString) => {
@@ -868,6 +1163,15 @@ const formatDateLong = (dateString) => {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
+  })
+}
+
+// NUEVO: Formato de fecha corta para tabla
+const formatDateShort = (dateString) => {
+  if (!dateString) return 'Sin fecha'
+  return new Date(dateString).toLocaleDateString('es-GT', {
+    month: 'short',
+    day: 'numeric'
   })
 }
 
@@ -899,6 +1203,53 @@ const formatearEstadoFisico = (estado) => {
   return estados[estado] || estado || 'No especificado'
 }
 
+// NUEVO: Formatear modalidad de pago
+const formatModalidadPago = (modalidad) => {
+  const modalidades = {
+    'contado': 'Pago al Contado',
+    'mensual': 'Pagos Mensuales',
+    'quincenal': 'Pagos Quincenales',
+    'semanal': 'Pagos Semanales'
+  }
+  return modalidades[modalidad] || modalidad
+}
+
+// NUEVO: Obtener color hexadecimal para muestras de color
+const getColorHex = (colorName) => {
+  if (!colorName) return '#CCCCCC'
+  
+  const colores = {
+    // Colores básicos
+    'rojo': '#FF0000',
+    'azul': '#0000FF',
+    'verde': '#008000',
+    'amarillo': '#FFFF00',
+    'negro': '#000000',
+    'blanco': '#FFFFFF',
+    'gris': '#808080',
+    'rosa': '#FFC0CB',
+    'morado': '#800080',
+    'naranja': '#FFA500',
+    
+    // Metales
+    'plata': '#C0C0C0',
+    'oro': '#FFD700',
+    'bronce': '#CD7F32',
+    
+    // Tonos específicos
+    'azul marino': '#000080',
+    'verde oscuro': '#006400',
+    'rojo oscuro': '#8B0000',
+    'gris oscuro': '#2F2F2F',
+    'gris claro': '#D3D3D3',
+    'beige': '#F5F5DC',
+    'café': '#A0522D',
+    'marrón': '#A0522D'
+  }
+  
+  return colores[colorName.toLowerCase()] || '#CCCCCC'
+}
+
 const obtenerTipoDocumento = (tipoMime) => {
   const tipos = {
     'application/pdf': 'PDF',
@@ -907,7 +1258,9 @@ const obtenerTipoDocumento = (tipoMime) => {
     'text/plain': 'Texto',
     'image/jpeg': 'Imagen',
     'image/jpg': 'Imagen',
-    'image/png': 'Imagen'
+    'image/png': 'Imagen',
+    'image/gif': 'Imagen',
+    'image/webp': 'Imagen'
   }
   return tipos[tipoMime] || 'Documento'
 }
@@ -915,12 +1268,10 @@ const obtenerTipoDocumento = (tipoMime) => {
 const construirUrlArchivo = (rutaArchivo) => {
   if (!rutaArchivo) return '/images/placeholder.jpg'
   
-  // Si ya es una URL completa, devolverla tal como está
   if (rutaArchivo.startsWith('http')) {
     return rutaArchivo
   }
   
-  // Construir URL con la base del API
   const baseUrl = config.public.apiBase.replace('/api', '')
   return `${baseUrl}${rutaArchivo}`
 }
@@ -1011,6 +1362,7 @@ const cargarDetalle = async () => {
     
     if (response.success && response.data) {
       solicitud.value = response.data
+      
       console.log('✅ Detalle cargado:', solicitud.value)
       
       // Actualizar meta tags dinámicamente
@@ -1018,7 +1370,7 @@ const cargarDetalle = async () => {
         title: `${solicitud.value.numero} - Detalle de Solicitud`,
       })
       
-      // NUEVA: Cargar archivos adjuntos después de cargar el detalle
+      // Cargar archivos adjuntos después de cargar el detalle
       await cargarArchivosAdjuntos()
       
     } else {
@@ -1048,7 +1400,6 @@ const aceptarOferta = async () => {
     loadingAction.value = true
     console.log('✅ Redirigiendo para aceptar oferta:', solicitudId.value)
     
-    // Redirigir a una página específica de aceptación de oferta
     navigateTo(`/empeno/solicitudes/${solicitudId.value}/aceptar`)
     
   } catch (error) {
@@ -1096,10 +1447,7 @@ const ejecutarCancelacion = async () => {
         'success'
       )
       
-      // Cerrar modal
       cerrarConfirmacionCancelacion()
-      
-      // Recargar detalle
       await cargarDetalle()
       
       console.log('✅ Solicitud cancelada exitosamente')
@@ -1136,6 +1484,14 @@ watch(() => route.params.id, (newId, oldId) => {
   }
 })
 
+// NUEVO: Watcher para cambiar pestaña automáticamente si tiene información financiera
+watch(() => tieneInformacionFinanciera.value, (tieneInfo) => {
+  if (tieneInfo && pestanaActiva.value === 'informacion') {
+    // Opcionalmente cambiar a pestaña financiera automáticamente
+    // pestanaActiva.value = 'financiero'
+  }
+})
+
 // ===== LIFECYCLE =====
 onMounted(async () => {
   console.log('🚀 Iniciando página de detalle de solicitud...')
@@ -1146,7 +1502,8 @@ onMounted(async () => {
 // ===== EXPOSICIÓN DE FUNCIONES =====
 defineExpose({
   refrescarArchivos,
-  cargarArchivosAdjuntos
+  cargarArchivosAdjuntos,
+  cargarDetalle
 })
 </script>
 
@@ -1165,6 +1522,11 @@ defineExpose({
   --color-rojo-granate: #8B0000;
   --color-marron-chocolate: #3E2723;
   --color-verde-bosque: #1B4332;
+
+  /* Utilidades */
+  --border-radius: 12px;
+  --shadow-card: 0 15px 35px rgba(26, 26, 26, 0.2);
+  --transition: all 0.3s ease;
 }
 
 /* ===== ESTILOS BASE ===== */
@@ -1230,7 +1592,7 @@ defineExpose({
 .detalle-header {
   background: var(--color-blanco-perla);
   border-radius: 20px;
-  box-shadow: 0 15px 35px rgba(26, 26, 26, 0.2);
+  box-shadow: var(--shadow-card);
   margin-bottom: 2rem;
   overflow: hidden;
 }
@@ -1252,7 +1614,7 @@ defineExpose({
   font-size: 0.875rem;
   cursor: pointer;
   border-radius: 8px;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .btn-back:hover {
@@ -1392,7 +1754,7 @@ defineExpose({
   font-size: 1rem;
   color: var(--color-gris-acero);
   background: var(--color-blanco-perla);
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .step.active .step-number {
@@ -1447,7 +1809,7 @@ defineExpose({
   gap: 1rem;
   padding: 1.5rem;
   margin-bottom: 2rem;
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   border-left: 4px solid;
 }
 
@@ -1527,26 +1889,31 @@ defineExpose({
   align-items: center;
   gap: 0.5rem;
   padding: 1rem 1.5rem;
-  background: transparent;
+  background: white;
   border: none;
   border-bottom: 3px solid transparent;
-  color: var(--color-gris-acero);
+  color: var(--color-negro-carbon);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition);
   border-radius: 8px 8px 0 0;
   position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-pestana:hover {
-  background: rgba(212, 175, 55, 0.1);
-  color: var(--color-dorado-vintage);
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: var(--color-negro-carbon);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .btn-pestana.active {
-  color: var(--color-dorado-vintage);
+  color: white;
+  background: var(--color-dorado-vintage);
   border-bottom-color: var(--color-dorado-vintage);
-  background: rgba(212, 175, 55, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(212, 175, 55, 0.3);
 }
 
 .contador-badge {
@@ -1582,10 +1949,11 @@ defineExpose({
 /* ===== SECCIONES ===== */
 .info-section,
 .articulos-section,
-.actions-section {
+.actions-section,
+.financiero-section {
   background: var(--color-blanco-perla);
   border-radius: 20px;
-  box-shadow: 0 15px 35px rgba(26, 26, 26, 0.2);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -1629,9 +1997,9 @@ defineExpose({
   gap: 1rem;
   padding: 1.5rem;
   background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   border: 1px solid #e5e7eb;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .info-card:hover {
@@ -1643,7 +2011,7 @@ defineExpose({
 .info-icon {
   padding: 1rem;
   background: var(--color-dorado-vintage);
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   color: var(--color-blanco-perla);
   flex-shrink: 0;
 }
@@ -1666,19 +2034,19 @@ defineExpose({
   color: var(--color-negro-carbon);
 }
 
-/* ===== ARTÍCULOS ===== */
+/* ===== ARTÍCULOS MEJORADOS ===== */
 .articulos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
   gap: 1.5rem;
   padding: 2rem;
 }
 
 .articulo-card {
   border: 2px solid #e5e7eb;
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: var(--transition);
   background: var(--color-blanco-perla);
 }
 
@@ -1704,6 +2072,17 @@ defineExpose({
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-dorado-vintage);
+}
+
+.tipo-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-dorado-vintage);
+  border-radius: 6px;
+  color: white;
 }
 
 .articulo-estado {
@@ -1737,62 +2116,517 @@ defineExpose({
   padding: 1.5rem;
 }
 
-.articulo-titulo {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-negro-carbon);
-  margin-bottom: 1rem;
-}
-
-.articulo-details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+.articulo-descripcion {
   margin-bottom: 1.5rem;
 }
 
-.detail-row {
+.articulo-descripcion h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-negro-carbon);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* NUEVO: Valoración del cliente */
+.valoracion-cliente {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 2px solid var(--color-dorado-vintage);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.valoracion-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-marron-chocolate);
+  margin-bottom: 0.5rem;
+}
+
+.valoracion-header svg {
+  color: var(--color-dorado-vintage);
+}
+
+.valoracion-monto {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-dorado-vintage);
+}
+
+/* NUEVO: Detalles del artículo mejorados */
+.articulo-detalles {
+  margin-bottom: 1.5rem;
+}
+
+.detalles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.detalle-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.875rem;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 6px;
 }
 
-.detail-label {
+.detalle-label {
   color: var(--color-gris-acero);
   font-weight: 500;
 }
 
-.detail-value {
+.detalle-valor {
   color: var(--color-negro-carbon);
   font-weight: 600;
 }
 
-.detail-value.currency {
-  color: var(--color-dorado-vintage);
-  font-weight: 700;
+/* NUEVO: Información de color */
+.color-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.articulo-specs {
-  padding: 1rem;
-  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
-  border-radius: 8px;
+.color-muestra {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+/* NUEVO: Especificaciones técnicas mejoradas */
+.especificaciones-section {
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   border: 1px solid #e5e7eb;
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.specs-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-negro-carbon);
+  padding: 1rem;
+  background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+  border-bottom: 1px solid #d1d5db;
+}
+
+.specs-header svg {
+  color: var(--color-dorado-vintage);
+}
+
+.specs-content {
+  padding: 1rem;
+}
+
+.specs-content pre {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-gris-acero);
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* NUEVO: Información de avalúo mejorada */
+.avaluo-section {
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border: 1px solid #0ea5e9;
+  border-radius: var(--border-radius);
+  overflow: hidden;
   margin-bottom: 1.5rem;
 }
 
-.articulo-specs h5 {
+.avaluo-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--color-negro-carbon);
-  margin: 0 0 0.5rem 0;
+  color: var(--color-azul-marino);
+  padding: 1rem;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: white;
 }
 
-.articulo-specs p {
+.avaluo-header svg {
+  color: white;
+}
+
+.avaluo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.avaluo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0f2fe;
+}
+
+.avaluo-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-gris-acero);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.avaluo-valor {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.avaluo-valor.comercial {
+  color: var(--color-azul-marino);
+}
+
+.avaluo-valor.porcentaje {
+  color: var(--color-verde-bosque);
+}
+
+.avaluo-valor.prestamo {
+  color: var(--color-dorado-vintage);
+  font-size: 1.125rem;
+}
+
+.avaluo-observaciones {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+}
+
+.avaluo-obs-text {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-style: italic;
+  color: var(--color-gris-acero);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-left: 3px solid var(--color-azul-marino);
+  margin: 0;
+}
+
+/* ===== NUEVA SECCIÓN FINANCIERA ===== */
+.financiero-section {
+  background: var(--color-blanco-perla);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.financiero-resumen {
+  padding: 2rem;
+}
+
+/* Montos principales */
+.montos-principales {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.monto-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, white, #f8fafc);
+  border-radius: var(--border-radius);
+  border: 2px solid transparent;
+  transition: var(--transition);
+}
+
+.monto-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(26, 26, 26, 0.15);
+}
+
+.monto-card.principal {
+  border-color: var(--color-dorado-vintage);
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.monto-card.destacada {
+  border-color: var(--color-verde-bosque);
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+}
+
+.monto-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--border-radius);
+  color: white;
+  flex-shrink: 0;
+}
+
+.monto-card.principal .monto-icono {
+  background: var(--color-dorado-vintage);
+}
+
+.monto-card.destacada .monto-icono {
+  background: var(--color-verde-bosque);
+}
+
+.monto-card:not(.principal):not(.destacada) .monto-icono {
+  background: var(--color-azul-marino);
+}
+
+.monto-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.monto-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-gris-acero);
+}
+
+.monto-valor {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-negro-carbon);
+}
+
+.monto-card.principal .monto-valor {
+  color: var(--color-dorado-vintage);
+  font-size: 1.5rem;
+}
+
+.monto-card.destacada .monto-valor {
+  color: var(--color-verde-bosque);
+  font-size: 1.5rem;
+}
+
+/* Plan de pagos */
+.plan-pagos-section {
+  background: white;
+  border-radius: var(--border-radius);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  margin-top: 2rem;
+}
+
+.plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--color-azul-marino), var(--color-gris-acero));
+  color: white;
+}
+
+.plan-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.plan-resumen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: right;
+}
+
+.numero-pagos {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.monto-por-pago {
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+/* Tabla de pagos */
+.tabla-pagos {
+  overflow-x: auto;
+}
+
+.tabla-header,
+.tabla-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 1fr 1fr 1fr 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 600px;
+}
+
+.tabla-header {
+  background: var(--color-dorado-vintage);
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 1rem;
+}
+
+.tabla-row {
+  padding: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.875rem;
+  transition: var(--transition);
+}
+
+.tabla-row:hover {
+  background: #f8fafc;
+}
+
+.tabla-row.row-final {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  font-weight: 600;
+}
+
+.tabla-row:last-child {
+  border-bottom: none;
+}
+
+.col-cuota,
+.col-fecha,
+.col-capital,
+.col-interes,
+.col-total,
+.col-saldo {
+  text-align: center;
+  padding: 0.25rem;
+}
+
+.cuota-numero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-dorado-vintage);
+  color: white;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.fecha-corta {
+  font-weight: 500;
+  color: var(--color-gris-acero);
+}
+
+.monto {
+  font-weight: 600;
+}
+
+.monto.capital {
+  color: var(--color-azul-marino);
+}
+
+.monto.interes {
+  color: var(--color-rojo-granate);
+}
+
+.monto.total {
+  color: var(--color-negro-carbon);
+}
+
+.monto.saldo {
+  color: var(--color-gris-acero);
+}
+
+.monto.saldo.saldo-cero {
+  color: var(--color-verde-bosque);
+  font-weight: 700;
+}
+
+/* Totales del plan */
+.plan-totales {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+}
+
+.total-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.total-item.destacado {
+  border-color: var(--color-verde-bosque);
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+}
+
+.total-label {
+  font-weight: 500;
+  color: var(--color-gris-acero);
+  font-size: 0.875rem;
+}
+
+.total-valor {
+  font-weight: 700;
+  color: var(--color-negro-carbon);
+}
+
+.total-item.destacado .total-label {
+  color: var(--color-verde-bosque);
+}
+
+.total-item.destacado .total-valor {
+  color: var(--color-verde-bosque);
+  font-size: 1.125rem;
+}
+
+/* Información adicional */
+.info-adicional {
+  display: flex;
+  gap: 2rem;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-radius: var(--border-radius);
+  border: 1px solid #e5e7eb;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.875rem;
   color: var(--color-gris-acero);
-  margin: 0;
-  line-height: 1.5;
+}
+
+.info-item svg {
+  color: var(--color-dorado-vintage);
 }
 
 /* ===== MEDIA (FOTOS Y DOCUMENTOS) ===== */
@@ -1822,7 +2656,7 @@ defineExpose({
   color: var(--color-dorado-vintage);
 }
 
-/* ===== GALERÍA DE FOTOS ===== */
+/* Galería de fotos */
 .fotos-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -1835,7 +2669,7 @@ defineExpose({
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition);
   border: 2px solid transparent;
 }
 
@@ -1848,7 +2682,7 @@ defineExpose({
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .foto-overlay {
@@ -1870,7 +2704,7 @@ defineExpose({
   opacity: 1;
 }
 
-/* ===== LISTA DE DOCUMENTOS ===== */
+/* Lista de documentos */
 .documentos-list {
   display: flex;
   flex-direction: column;
@@ -1886,7 +2720,7 @@ defineExpose({
   border-radius: 8px;
   border: 1px solid #e5e7eb;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .documento-item:hover {
@@ -1950,6 +2784,66 @@ defineExpose({
   opacity: 0.5;
 }
 
+.archivos-estado-vacio {
+  padding: 3rem 2rem;
+  text-align: center;
+  background: white;
+  border-radius: var(--border-radius);
+  margin: 1rem;
+}
+
+.estado-vacio-content {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.icono-vacio {
+  margin: 0 auto 1.5rem;
+  opacity: 0.6;
+}
+
+.estado-vacio-content h4 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.estado-vacio-content p {
+  color: #6B7280;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #F3F4F6;
+  border: 1px solid #D1D5DB;
+  border-radius: 8px;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-refresh:hover {
+  background: #E5E7EB;
+  border-color: #9CA3AF;
+  transform: translateY(-1px);
+}
+
+.btn-refresh svg {
+  transition: transform 0.2s ease;
+}
+
+.btn-refresh:hover svg {
+  transform: rotate(180deg);
+}
+
 /* ===== ACCIONES ===== */
 .actions-grid {
   display: grid;
@@ -1964,10 +2858,10 @@ defineExpose({
   gap: 1rem;
   padding: 1.5rem;
   border: 2px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   background: var(--color-blanco-perla);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition);
   text-align: left;
 }
 
@@ -2019,7 +2913,7 @@ defineExpose({
 
 .action-icon {
   padding: 1rem;
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   flex-shrink: 0;
 }
 
@@ -2108,7 +3002,7 @@ defineExpose({
   cursor: pointer;
   padding: 0.5rem;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: var(--transition);
 }
 
 .modal-close:hover {
@@ -2216,7 +3110,7 @@ defineExpose({
   cursor: pointer;
   padding: 0.5rem;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  transition: var(--transition);
 }
 
 .viewer-close:hover {
@@ -2264,7 +3158,7 @@ defineExpose({
   justify-content: center;
   cursor: pointer;
   color: var(--color-negro-carbon);
-  transition: all 0.3s ease;
+  transition: var(--transition);
 }
 
 .viewer-nav:hover:not(:disabled) {
@@ -2306,7 +3200,7 @@ defineExpose({
   border-radius: 6px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition);
   flex-shrink: 0;
 }
 
@@ -2338,7 +3232,7 @@ defineExpose({
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition);
   text-decoration: none;
 }
 
@@ -2394,7 +3288,7 @@ defineExpose({
   gap: 1rem;
   max-width: 400px;
   padding: 1rem 1.5rem;
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   box-shadow: 0 25px 50px rgba(26, 26, 26, 0.25);
   backdrop-filter: blur(10px);
   animation: slideIn 0.3s ease;
@@ -2503,7 +3397,8 @@ defineExpose({
     font-size: 0.875rem;
   }
   
-  .info-grid {
+  .info-grid,
+  .montos-principales {
     grid-template-columns: 1fr;
     padding: 1rem;
   }
@@ -2513,7 +3408,11 @@ defineExpose({
     padding: 1rem;
   }
   
-  .articulo-details {
+  .detalles-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .avaluo-grid {
     grid-template-columns: 1fr;
   }
   
@@ -2524,6 +3423,28 @@ defineExpose({
   .actions-grid {
     grid-template-columns: 1fr;
     padding: 1rem;
+  }
+  
+  /* Tabla de pagos responsive */
+  .tabla-header,
+  .tabla-row {
+    grid-template-columns: 60px 1fr 1fr 1fr;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .col-capital,
+  .col-interes {
+    display: none;
+  }
+  
+  .plan-totales {
+    grid-template-columns: 1fr;
+  }
+  
+  .info-adicional {
+    flex-direction: column;
+    gap: 1rem;
   }
   
   .modal-overlay {
@@ -2620,64 +3541,28 @@ defineExpose({
   .fotos-grid {
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
   }
-  .archivos-estado-vacio {
-  padding: 3rem 2rem;
-  text-align: center;
-  background: white;
-  border-radius: 12px;
-  margin: 1rem;
-}
-
-.estado-vacio-content {
-  max-width: 400px;
-  margin: 0 auto;
-}
-
-.icono-vacio {
-  margin: 0 auto 1.5rem;
-  opacity: 0.6;
-}
-
-.estado-vacio-content h4 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 0.5rem;
-}
-
-.estado-vacio-content p {
-  color: #6B7280;
-  margin-bottom: 2rem;
-  line-height: 1.5;
-}
-
-.btn-refresh {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: #F3F4F6;
-  border: 1px solid #D1D5DB;
-  border-radius: 8px;
-  color: #374151;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-refresh:hover {
-  background: #E5E7EB;
-  border-color: #9CA3AF;
-  transform: translateY(-1px);
-}
-
-.btn-refresh svg {
-  transition: transform 0.2s ease;
-}
-
-.btn-refresh:hover svg {
-  transform: rotate(180deg);
-}
+  
+  .tabla-header,
+  .tabla-row {
+    grid-template-columns: 50px 1fr 80px;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .col-fecha,
+  .col-capital,
+  .col-interes,
+  .col-saldo {
+    display: none;
+  }
+  
+  .monto-card {
+    padding: 1rem;
+  }
+  
+  .monto-icono {
+    width: 48px;
+    height: 48px;
+  }
 }
 </style>
