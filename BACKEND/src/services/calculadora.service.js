@@ -1,4 +1,4 @@
-// ===============================================
+
 // Archivo: BACKEND/src/services/calculadora.service.js
 // Servicio para cálculos de préstamos - Completamente dinámico desde BD
 // ===============================================
