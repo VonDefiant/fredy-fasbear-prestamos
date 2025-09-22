@@ -754,7 +754,7 @@ const cargarDatos = async () => {
   try {
     loadingData.value = true
     error.value = null
-    W
+    
     
     // Cargar solicitudes y préstamos en paralelo
     await Promise.all([

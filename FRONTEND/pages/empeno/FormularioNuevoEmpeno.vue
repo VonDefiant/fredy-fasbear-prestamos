@@ -43,7 +43,7 @@
             <!-- Loading state MEJORADO -->
             <div v-if="cargandoTipos" class="loading-tipos">
               <div class="spinner"></div>
-              <span>Cargando tipos de artículos W...</span>
+              <span>Cargando tipos de artículos...</span>
             </div>
             
             <!-- Select con tipos dinámicos MEJORADO -->
@@ -891,16 +891,13 @@ const mostrarExitoArchivo = (mensaje, duracion = 3000) => {
   setTimeout(() => notification.remove(), duracion)
 }
 
-// ==========================================
-// FUNCIÓN PRINCIPAL: CARGAR TIPOS DESDE API - MEJORADA
-// ==========================================
 const cargarTiposArticulos = async () => {
   cargandoTipos.value = true
   errorCargandoTipos.value = false
   mensajeError.value = ''
   
   try {
-W
+
     // OBTENER TOKEN DE AUTENTICACIÓN
     const { getToken } = useAuth()
     const token = getToken()
@@ -956,7 +953,9 @@ W
     console.error('Error cargando tipos de artículos:', error)
     errorCargandoTipos.value = true
     mensajeError.value = error.message || 'Error desconocido'
-
+    
+    // FALLBACK: Tipos de ejemplo para desarrollo/demo
+    console.log('Cargando tipos de fallback...')
     tiposArticulos.value = [
       {
         id: 'fallback_1',
@@ -1045,7 +1044,9 @@ const obtenerIconoSvg = (nombre) => {
   return iconos.default
 }
 
-
+// ==========================================
+// COMPUTED PROPERTIES
+// ==========================================
 const tiposAgrupados = computed(() => {
   const grupos = {}
   tiposArticulos.value.forEach(tipo => {
