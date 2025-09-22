@@ -8,12 +8,13 @@ export const useAuth = () => {
   const checkAuth = () => {
     if (process.client) {
       // Verificar si hay un token guardado
-      const token = localStorage.getItem('auth_token')
-      const userData = localStorage.getItem('user_data')
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
+      const userData = localStorage.getItem('user_data') || sessionStorage.getItem('user_data')
       
       if (token && userData) {
         try {
           user.value = JSON.parse(userData)
+          console.log('[AUTH] Usuario restaurado desde storage:', user.value)
           return true
         } catch (error) {
           console.error('Error parsing user data:', error)
@@ -36,7 +37,8 @@ export const useAuth = () => {
       storage.setItem('auth_token', token)
       storage.setItem('user_data', JSON.stringify(userData))
       
-      console.log('Usuario logueado:', userData)
+      console.log('[AUTH] Usuario logueado:', userData)
+      console.log('[AUTH] Tipo de usuario detectado:', userData.tipoUsuario)
     }
   }
 
@@ -51,7 +53,7 @@ export const useAuth = () => {
       sessionStorage.removeItem('auth_token')
       sessionStorage.removeItem('user_data')
       
-      console.log('Usuario deslogueado')
+      console.log('[AUTH] Usuario deslogueado')
     }
   }
 
@@ -65,12 +67,30 @@ export const useAuth = () => {
 
   // Verificar si el usuario es cliente
   const isClient = computed(() => {
-    return user.value && user.value.tipo_usuario === 'Cliente'
+    const result = user.value && user.value.tipoUsuario === 'Cliente'
+    console.log('[AUTH] isClient computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
+    return result
   })
 
   // Verificar si el usuario es administrador
   const isAdmin = computed(() => {
-    return user.value && user.value.tipo_usuario === 'Administrador'
+    const result = user.value && user.value.tipoUsuario === 'Administrador'
+    console.log('[AUTH] isAdmin computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
+    return result
+  })
+
+  // Verificar si el usuario es evaluador
+  const isEvaluator = computed(() => {
+    const result = user.value && user.value.tipoUsuario === 'Evaluador'
+    console.log('[AUTH] isEvaluator computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
+    return result
+  })
+
+  // Verificar si el usuario es cobrador
+  const isCollector = computed(() => {
+    const result = user.value && user.value.tipoUsuario === 'Cobrador'
+    console.log('[AUTH] isCollector computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
+    return result
   })
 
   // Redirigir a login si no está autenticado
@@ -120,6 +140,8 @@ export const useAuth = () => {
     isLoggedIn,
     isClient,
     isAdmin,
+    isEvaluator,
+    isCollector,
     
     // Métodos
     login,
