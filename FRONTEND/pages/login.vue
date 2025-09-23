@@ -401,7 +401,11 @@ useHead({
   ]
 })
 
-// Reactive state
+// ===== COMPOSABLES =====
+const { login, getAuthMessage, getDebugInfo } = useAuth()
+const { api } = useApi()
+
+// ===== ESTADO REACTIVO =====
 const activeTab = ref('login')
 const loginLoading = ref(false)
 const registerLoading = ref(false)
@@ -409,11 +413,11 @@ const showLoginPassword = ref(false)
 const showRegisterPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-// Messages
+// Mensajes
 const loginMessage = ref({ text: '', type: '' })
 const registerMessage = ref({ text: '', type: '' })
 
-// Forms
+// Formularios
 const loginForm = ref({
   email: '',
   password: '',
@@ -432,7 +436,7 @@ const registerForm = ref({
   acceptTerms: false
 })
 
-// Computed
+// ===== COMPUTED PROPERTIES =====
 const isRegisterFormValid = computed(() => {
   return registerForm.value.nombre.trim() &&
          registerForm.value.apellido.trim() &&
@@ -445,7 +449,7 @@ const isRegisterFormValid = computed(() => {
          registerForm.value.acceptTerms
 })
 
-// Methods
+// ===== MÉTODOS AUXILIARES =====
 const setActiveTab = (tab) => {
   activeTab.value = tab
   clearMessages()
@@ -456,16 +460,20 @@ const clearMessages = () => {
   registerMessage.value = { text: '', type: '' }
 }
 
-// ===== NUEVA FUNCIÓN DE REDIRECCIÓN POR ROLES =====
+// ===== FUNCIÓN DE REDIRECCIÓN POR ROLES =====
 const redirectAfterLogin = (userData) => {
-  console.log('[LOGIN] Datos completos del usuario:', JSON.stringify(userData, null, 2))
-  console.log('[LOGIN] Tipo de usuario específico:', userData.tipoUsuario)
-  console.log('[LOGIN] Tipo de tipo de usuario:', typeof userData.tipoUsuario)
+  console.log('[LOGIN] 🎯 Iniciando redirección para usuario:', {
+    nombre: userData.nombre,
+    email: userData.email,
+    tipoUsuario: userData.tipoUsuario
+  })
   
-  // Verificar si hay una URL de destino guardada (para cuando el usuario intentó acceder a una página protegida)
+  // Verificar si hay una URL de destino guardada
   const redirectUrl = process.client ? sessionStorage.getItem('redirect_after_login') : null
   
   if (redirectUrl) {
+    console.log('[LOGIN] 📍 URL de destino guardada encontrada:', redirectUrl)
+    
     // Limpiar la URL guardada
     sessionStorage.removeItem('redirect_after_login')
     
@@ -492,37 +500,42 @@ const redirectAfterLogin = (userData) => {
       else if (isEvaluatorUser) targetRoute = '/evaluator'
       else if (isCollectorUser) targetRoute = '/collector'
       
-      console.log('[LOGIN] Rol no coincide con ruta solicitada, redirigiendo a:', targetRoute)
+      console.log('[LOGIN] ⚠️ Rol no coincide con ruta solicitada, redirigiendo a:', targetRoute)
       return navigateTo(targetRoute)
     }
     
     // Rol coincide, redirigir a la URL original solicitada
-    console.log('[LOGIN] Redirigiendo a URL guardada:', redirectUrl)
+    console.log('[LOGIN] ✅ Redirigiendo a URL guardada:', redirectUrl)
     return navigateTo(redirectUrl)
   }
   
   // No hay URL guardada, redirigir según rol del usuario
-  console.log('[LOGIN] Evaluando rol para redirección...')
+  console.log('[LOGIN] 🔄 Evaluando rol para redirección...')
   
-  if (userData.tipoUsuario === 'Administrador') {
-    console.log('[LOGIN] ✅ Usuario es Administrador, redirigiendo a /admin')
-    return navigateTo('/admin')
-  } else if (userData.tipoUsuario === 'Cliente') {
-    console.log('[LOGIN] ✅ Usuario es Cliente, redirigiendo a /dashboard')
-    return navigateTo('/dashboard')
-  } else if (userData.tipoUsuario === 'Evaluador') {
-    console.log('[LOGIN] ✅ Usuario es Evaluador, redirigiendo a /evaluator')
-    return navigateTo('/evaluator')
-  } else if (userData.tipoUsuario === 'Cobrador') {
-    console.log('[LOGIN] ✅ Usuario es Cobrador, redirigiendo a /collector')
-    return navigateTo('/collector')
-  } else {
-    console.log('[LOGIN] ⚠️ Rol no reconocido:', userData.tipoUsuario, 'redirigiendo al dashboard por defecto')
-    return navigateTo('/dashboard')
+  switch (userData.tipoUsuario) {
+    case 'Administrador':
+      console.log('[LOGIN] 👑 Usuario es Administrador, redirigiendo a /admin')
+      return navigateTo('/admin')
+      
+    case 'Cliente':
+      console.log('[LOGIN] 👤 Usuario es Cliente, redirigiendo a /dashboard')
+      return navigateTo('/dashboard')
+      
+    case 'Evaluador':
+      console.log('[LOGIN] 🔍 Usuario es Evaluador, redirigiendo a /evaluator')
+      return navigateTo('/evaluator')
+      
+    case 'Cobrador':
+      console.log('[LOGIN] 💰 Usuario es Cobrador, redirigiendo a /collector')
+      return navigateTo('/collector')
+      
+    default:
+      console.log('[LOGIN] ⚠️ Rol no reconocido:', userData.tipoUsuario, 'redirigiendo al dashboard por defecto')
+      return navigateTo('/dashboard')
   }
 }
 
-// ===== FUNCIÓN HANDLELOGIN MEJORADA CON REDIRECCIÓN POR ROLES =====
+// ===== FUNCIÓN DE LOGIN CORREGIDA =====
 const handleLogin = async () => {
   clearMessages()
   loginLoading.value = true
@@ -533,13 +546,12 @@ const handleLogin = async () => {
       throw new Error('Por favor completa todos los campos')
     }
 
-    console.log('🔐 Intentando login con backend real...', {
+    console.log('[LOGIN] 🔐 Iniciando proceso de login...', {
       email: loginForm.value.email,
       remember: loginForm.value.remember
     })
 
-    // Llamada real a tu API
-    const { api } = useApi()
+    // Llamada a la API
     const response = await api('/auth/login', {
       method: 'POST',
       body: {
@@ -549,57 +561,71 @@ const handleLogin = async () => {
       }
     })
     
-    console.log('✅ Respuesta del backend:', response)
+    console.log('[LOGIN] 📨 Respuesta del backend:', {
+      success: response.success,
+      hasToken: !!response.data?.token,
+      hasUser: !!response.data?.user,
+      userType: response.data?.user?.tipoUsuario
+    })
 
-    if (response.success && response.data.token) {
-      // Usar el composable de auth para guardar los datos
-      const { login } = useAuth()
-      await login(response.data.user, response.data.token, loginForm.value.remember)
+    if (response.success && response.data?.token && response.data?.user) {
+      console.log('[LOGIN] 💾 Guardando datos de autenticación...')
+      
+      login(response.data.user, response.data.token, loginForm.value.remember)
+      
+      // Verificar que se guardó correctamente después de un pequeño delay
+      setTimeout(() => {
+        const debugInfo = getDebugInfo()
+        console.log('[LOGIN] 🔍 Estado después del login:', debugInfo)
+        
+        if (!debugInfo.isLoggedIn) {
+          console.error('[LOGIN] ❌ ERROR: Los datos no se guardaron correctamente')
+          loginMessage.value = {
+            text: 'Error guardando datos de sesión. Intenta de nuevo.',
+            type: 'error'
+          }
+          return
+        }
+      }, 100)
       
       // Mensaje de éxito con personalización por rol
-      let roleName = 'Usuario'
-      let roleIcon = '👤'
-      
-      switch(response.data.user.tipoUsuario) {
-        case 'Administrador':
-          roleName = 'Administrador'
-          roleIcon = '👑'
-          break
-        case 'Evaluador':
-          roleName = 'Evaluador'
-          roleIcon = '🔍'
-          break
-        case 'Cobrador':
-          roleName = 'Cobrador'
-          roleIcon = '💰'
-          break
-        case 'Cliente':
-          roleName = 'Cliente'
-          roleIcon = '👤'
-          break
+      const roleConfig = {
+        'Administrador': { name: 'Administrador', icon: '👑' },
+        'Evaluador': { name: 'Evaluador', icon: '🔍' },
+        'Cobrador': { name: 'Cobrador', icon: '💰' },
+        'Cliente': { name: 'Cliente', icon: '👤' }
       }
       
+      const userRole = roleConfig[response.data.user.tipoUsuario] || { name: 'Usuario', icon: '👤' }
+      
       loginMessage.value = {
-        text: `${roleIcon} ¡Bienvenido ${response.data.user.nombre}! Accediendo como ${roleName}...`,
+        text: `${userRole.icon} ¡Bienvenido ${response.data.user.nombre}! Accediendo como ${userRole.name}...`,
         type: 'success'
       }
 
-      // Usar la nueva función de redirección por roles
+      // Redirección con delay para mostrar el mensaje
       setTimeout(() => {
         redirectAfterLogin(response.data.user)
       }, 1500)
+      
     } else {
-      throw new Error(response.message || 'Error en la respuesta del servidor')
+      // Error en la respuesta
+      const errorMsg = response.message || 'Error en la respuesta del servidor'
+      console.error('[LOGIN] ❌ Error en respuesta:', errorMsg)
+      throw new Error(errorMsg)
     }
 
   } catch (error) {
-    console.error('❌ Error en login:', error)
+    console.error('[LOGIN] ❌ Error en login:', error)
     
     // Manejar diferentes tipos de errores
     let errorMessage = 'Error al iniciar sesión. Verifica tus credenciales.'
     
+    // Errores específicos del backend
     if (error.data?.message) {
       errorMessage = error.data.message
+    } else if (error.message?.includes('fetch')) {
+      errorMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.'
     } else if (error.message) {
       errorMessage = error.message
     }
@@ -613,6 +639,7 @@ const handleLogin = async () => {
   }
 }
 
+// ===== FUNCIÓN DE REGISTRO =====
 const handleRegister = async () => {
   clearMessages()
   registerLoading.value = true
@@ -635,18 +662,13 @@ const handleRegister = async () => {
       throw new Error('Debes aceptar los términos y condiciones')
     }
 
-    console.log('👤 Creando cuenta con backend real...', {
+    console.log('[REGISTER] 👤 Creando cuenta...', {
       nombre: registerForm.value.nombre,
       apellido: registerForm.value.apellido,
-      email: registerForm.value.email,
-      telefono: registerForm.value.telefono,
-      cedula: registerForm.value.cedula,
-      direccion: registerForm.value.direccion,
-      tipoUsuario: 'Cliente'
+      email: registerForm.value.email
     })
 
-    // Llamada real a tu API
-    const { api } = useApi()
+    // Llamada a la API
     const response = await api('/auth/register', {
       method: 'POST',
       body: {
@@ -661,11 +683,11 @@ const handleRegister = async () => {
       }
     })
     
-    console.log('✅ Usuario registrado:', response)
+    console.log('[REGISTER] ✅ Usuario registrado:', response.success)
 
     if (response.success) {
       registerMessage.value = {
-        text: 'Cuenta creada exitosamente. Puedes iniciar sesión ahora.',
+        text: '¡Cuenta creada exitosamente! Puedes iniciar sesión ahora.',
         type: 'success'
       }
       
@@ -693,13 +715,15 @@ const handleRegister = async () => {
     }
 
   } catch (error) {
-    console.error('❌ Error en registro:', error)
+    console.error('[REGISTER] ❌ Error en registro:', error)
     
     // Manejar diferentes tipos de errores
     let errorMessage = 'Error al crear la cuenta. Inténtalo de nuevo.'
     
     if (error.data?.message) {
       errorMessage = error.data.message
+    } else if (error.message?.includes('fetch')) {
+      errorMessage = 'Error de conexión. Verifica tu internet e intenta de nuevo.'
     } else if (error.message) {
       errorMessage = error.message
     }
@@ -713,6 +737,7 @@ const handleRegister = async () => {
   }
 }
 
+// ===== WATCHERS =====
 // Limpiar mensajes cuando el usuario empiece a escribir
 watch([() => loginForm.value.email, () => loginForm.value.password], () => {
   if (loginMessage.value.text) {
@@ -726,10 +751,9 @@ watch([() => registerForm.value.email, () => registerForm.value.password], () =>
   }
 })
 
-// ===== INICIALIZACIÓN CON VERIFICACIÓN DE MENSAJES =====
+// ===== INICIALIZACIÓN =====
 onMounted(() => {
-  // Verificar si hay un mensaje de autenticación guardado (cuando se requiere login)
-  const { getAuthMessage } = useAuth()
+  // Verificar si hay un mensaje de autenticación guardado
   const savedMessage = getAuthMessage()
   
   if (savedMessage) {
@@ -737,6 +761,11 @@ onMounted(() => {
       text: savedMessage,
       type: 'info'
     }
+  }
+  
+  // Debug inicial
+  if (process.client) {
+    console.log('[LOGIN] 🔧 Estado inicial de autenticación:', getDebugInfo())
   }
 })
 </script>

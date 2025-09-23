@@ -1,4 +1,4 @@
-// FRONTEND/composables/useApi.js
+// FRONTEND/composables/useApi.js 
 export const useApi = () => {
   const config = useRuntimeConfig()
   const baseURL = config.public.apiBase || 'http://localhost:3001/api'
@@ -11,27 +11,60 @@ export const useApi = () => {
     onRequest({ request, options }) {
       // Agregar token automáticamente si existe
       if (process.client) {
-        const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token')
-        if (token) {
-          options.headers = {
-            ...options.headers,
-            Authorization: `Bearer ${token}`
+        try {
+          const { getToken } = useAuth()
+          const token = getToken()
+          
+          if (token) {
+            options.headers = {
+              ...options.headers,
+              Authorization: `Bearer ${token}`
+            }
+            console.log(`[API] ✅ Token agregado a petición: ${request}`)
+          } else {
+            console.log(`[API] ⚠️ No hay token para: ${request}`)
           }
+        } catch (error) {
+          console.error('[API] Error obteniendo token:', error)
         }
       }
     },
-    onResponseError({ response }) {
+    onResponse({ request, response }) {
+      const status = response.status
+      const statusIcon = status >= 200 && status < 300 ? '✅' : status >= 400 ? '❌' : '⚠️'
+      console.log(`[API] ${statusIcon} ${status} - ${request}`)
+    },
+    onResponseError({ request, response }) {
+      console.error(`[API] ❌ Error ${response.status} - ${request}:`, response._data)
+      
       // Manejar errores de autenticación
       if (response.status === 401) {
-        // Token expirado o inválido
+        console.log('[API] 🚨 Token expirado/inválido, cerrando sesión...')
+        
         if (process.client) {
-          const { logout } = useAuth()
-          logout()
-          navigateTo('/login')
+          try {
+            const { logout } = useAuth()
+            logout()
+            
+            // Redirigir al login después de un pequeño delay
+            setTimeout(() => {
+              navigateTo('/login')
+            }, 100)
+          } catch (error) {
+            console.error('[API] Error durante logout automático:', error)
+            // Fallback: redirigir directamente
+            window.location.href = '/login'
+          }
         }
       }
     }
   })
 
-  return { api }
+  return { 
+    api,
+    // Función auxiliar para compatibilidad
+    $api: (url, options = {}) => {
+      return api(url, options)
+    }
+  }
 }

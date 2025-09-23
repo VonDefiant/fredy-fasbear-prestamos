@@ -6,6 +6,7 @@ import authRoutes from './auth.routes.js';
 import prestamosRoutes from './prestamos.routes.js';  
 import solicitudesRoutes from './solicitudes.routes.js';  
 import adminRoutes from './admin.routes.js';
+import personalRoutes from './personal.routes.js';
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.use('/auth', authRoutes);
 router.use('/prestamos', prestamosRoutes);     
 router.use('/solicitudes', solicitudesRoutes); 
 router.use('/admin', adminRoutes);
+router.use('/personal', personalRoutes);
 
 // Futuras rutas (placeholders)
 // router.use('/productos', productosRoutes);
@@ -47,7 +49,8 @@ router.get('/health', (req, res) => {
       database: 'connected',
       storage: 'available',
       auth: 'active',
-      admin: 'active'  
+      admin: 'active',
+      personal: 'active'
     }
   });
 });
@@ -168,7 +171,9 @@ router.use((req, res) => {
       '/api/auth/*',
       '/api/homepage/*', 
       '/api/prestamos/*',
-      '/api/solicitudes/*',
+      '/api/solicitudes/*',,
+      '/api/personal/*',
+      '/api/admin/*',
       '/api/health',
       '/api/info'
     ]
