@@ -2,9 +2,9 @@ import express from 'express';
 import authController from '../controllers/auth.controller.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import rateLimit from 'express-rate-limit';
-import { PrismaClient } from '@prisma/client';  // AGREGAR ESTA LÍNEA
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();  // AGREGAR ESTA LÍNEA
+const prisma = new PrismaClient();
 const router = express.Router();
 
 // Rate limiting para login/register
@@ -19,29 +19,23 @@ const authLimiter = rateLimit({
   legacyHeaders: false
 });
 
-
 router.use((req, res, next) => {
   console.log(`🔐 Auth API: ${req.method} ${req.path}`);
   next();
 });
 
 router.post('/register', authLimiter, authController.register);
-
 router.post('/login', authLimiter, authController.login);
-
 router.post('/logout', authController.logout);
-
-
 router.get('/me', authenticateToken, authController.getProfile);
-
 router.put('/profile', authenticateToken, authController.updateProfile);
-
-
 router.post('/change-password', authenticateToken, authController.changePassword);
 
 
 router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    console.log('[AUTH] Obteniendo lista de usuarios...');
+    
     const users = await prisma.usuario.findMany({
       select: {
         id: true,
@@ -51,23 +45,29 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
         tipoUsuario: true,
         estado: true,
         fechaRegistro: true,
-        ultimoAcceso: true
+        // eliminada ultimoAcceso ya que no existe en el schema
+        cedula: true,
+        telefono: true
       },
       orderBy: { fechaRegistro: 'desc' }
     });
+
+    console.log(`[AUTH] ${users.length} usuarios encontrados`);
 
     res.status(200).json({
       success: true,
       data: { users }
     });
+    
   } catch (error) {
+    console.error('[ERROR] Error obteniendo usuarios:', error);
     res.status(500).json({
       success: false,
-      message: 'Error obteniendo usuarios'
+      message: 'Error obteniendo usuarios',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
-
 
 router.use((error, req, res, next) => {
   console.error('❌ Error en rutas de auth:', error);

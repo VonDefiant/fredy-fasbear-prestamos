@@ -1,13 +1,11 @@
-// ===============================================
-// Archivo: BACKEND/src/routes/index.js (ACTUALIZADO)
-// Registro principal de todas las rutas de la API
-// ===============================================
+
 
 import express from 'express';
 import homepageRoutes from './homepage.routes.js';
 import authRoutes from './auth.routes.js';
-import prestamosRoutes from './prestamos.routes.js';  // NUEVO
-import solicitudesRoutes from './solicitudes.routes.js';  // NUEVO
+import prestamosRoutes from './prestamos.routes.js';  
+import solicitudesRoutes from './solicitudes.routes.js';  
+import adminRoutes from './admin.routes.js';
 
 const router = express.Router();
 
@@ -26,13 +24,13 @@ router.use('/homepage', homepageRoutes);
 router.use('/auth', authRoutes);
 
 // Rutas protegidas (requieren autenticación)
-router.use('/prestamos', prestamosRoutes);     // NUEVO
-router.use('/solicitudes', solicitudesRoutes); // NUEVO
+router.use('/prestamos', prestamosRoutes);     
+router.use('/solicitudes', solicitudesRoutes); 
+router.use('/admin', adminRoutes);
 
 // Futuras rutas (placeholders)
 // router.use('/productos', productosRoutes);
 // router.use('/tienda', tiendaRoutes);
-// router.use('/admin', adminRoutes);
 // router.use('/reportes', reportesRoutes);
 // router.use('/notificaciones', notificacionesRoutes);
 
@@ -46,9 +44,10 @@ router.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0',
     services: {
-      database: 'connected', // Aquí puedes agregar check real de DB
+      database: 'connected',
       storage: 'available',
-      auth: 'active'
+      auth: 'active',
+      admin: 'active'  
     }
   });
 });
