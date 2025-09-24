@@ -1,6 +1,14 @@
 <template>
   <div class="admin-personal-page">
     <div class="admin-container">
+      <!-- Botón de regreso -->
+      <div class="navigation-header">
+        <button @click="regresarAlPanel" class="btn-back">
+          <IconBack />
+          Volver al Panel
+        </button>
+      </div>
+
       <div class="admin-header">
         <div class="header-content">
           <div class="header-info">
@@ -25,7 +33,7 @@
               <input 
                 v-model="filtros.busqueda"
                 type="text" 
-                placeholder="Buscar por nombre, email o cédula..."
+                placeholder="Buscar por nombre, email o DPI..."
                 @input="filtrarPersonal"
               >
             </div>
@@ -62,6 +70,7 @@
       </div>
 
       <div v-else class="personal-content">
+        <!-- Estadísticas con colores exactos de la app -->
         <div class="estadisticas-grid">
           <div class="stat-card administradores">
             <div class="stat-icon">
@@ -108,28 +117,31 @@
               <button 
                 @click="vistaActual = 'tabla'" 
                 :class="['btn-vista', { active: vistaActual === 'tabla' }]"
+                title="Vista de tabla"
               >
                 <IconTabla />
               </button>
               <button 
                 @click="vistaActual = 'tarjetas'" 
                 :class="['btn-vista', { active: vistaActual === 'tarjetas' }]"
+                title="Vista de tarjetas"
               >
                 <IconTarjetas />
               </button>
             </div>
           </div>
 
+          <!-- Vista de tabla -->
           <div v-if="vistaActual === 'tabla'" class="tabla-wrapper">
             <table class="personal-tabla">
               <thead>
                 <tr>
-                  <th>Empleado</th>
-                  <th>Contacto</th>
-                  <th>Tipo</th>
-                  <th>Estado</th>
-                  <th>Registro</th>
-                  <th>Acciones</th>
+                  <th>EMPLEADO</th>
+                  <th>CONTACTO</th>
+                  <th>TIPO</th>
+                  <th>ESTADO</th>
+                  <th>REGISTRO</th>
+                  <th>ACCIONES</th>
                 </tr>
               </thead>
               <tbody>
@@ -168,13 +180,13 @@
                   </td>
                   <td>
                     <div class="acciones-grupo">
-                      <button @click="editarEmpleado(empleado)" class="btn-accion editar">
+                      <button @click="editarEmpleado(empleado)" class="btn-accion editar" title="Editar empleado">
                         <IconEditar />
                       </button>
-                      <button @click="cambiarEstadoEmpleado(empleado)" class="btn-accion estado">
+                      <button @click="cambiarEstadoEmpleado(empleado)" class="btn-accion estado" title="Cambiar estado">
                         <IconCambiarEstado />
                       </button>
-                      <button @click="verDetalleEmpleado(empleado)" class="btn-accion ver">
+                      <button @click="verDetalleEmpleado(empleado)" class="btn-accion ver" title="Ver detalles">
                         <IconVer />
                       </button>
                     </div>
@@ -184,6 +196,7 @@
             </table>
           </div>
 
+          <!-- Vista de tarjetas -->
           <div v-else class="tarjetas-grid">
             <div v-for="empleado in personalFiltrado" :key="empleado.id" class="empleado-card">
               <div class="card-header">
@@ -220,11 +233,9 @@
               </div>
               <div class="card-actions">
                 <button @click="editarEmpleado(empleado)" class="btn btn-secondary">
-                  <IconEditar />
                   Editar
                 </button>
                 <button @click="verDetalleEmpleado(empleado)" class="btn btn-primary">
-                  <IconVer />
                   Ver Detalles
                 </button>
               </div>
@@ -234,7 +245,7 @@
       </div>
     </div>
 
-    <!-- Modal Crear/Editar Empleado -->
+    <!-- Modales -->
     <div v-if="modalEmpleado.visible" class="modal-overlay" @click="cerrarModal">
       <div class="modal-container" @click.stop>
         <div class="modal-header">
@@ -268,7 +279,7 @@
               >
             </div>
             <div class="form-group">
-              <label>Cédula *</label>
+              <label>DPI *</label>
               <input 
                 v-model="modalEmpleado.datos.cedula" 
                 type="text" 
@@ -323,6 +334,7 @@
                 type="password" 
                 required 
                 :disabled="modalEmpleado.guardando"
+                minlength="8"
               >
             </div>
             <div class="form-group">
@@ -351,7 +363,7 @@
       </div>
     </div>
 
-    <!-- Modal Detalle Empleado -->
+    <!-- Modal Detalle -->
     <div v-if="modalDetalle.visible" class="modal-overlay" @click="cerrarModalDetalle">
       <div class="modal-container" @click.stop>
         <div class="modal-header">
@@ -380,7 +392,7 @@
           
           <div class="detalle-grid">
             <div class="detalle-item">
-              <label>Cédula:</label>
+              <label>DPI:</label>
               <span>{{ modalDetalle.empleado.cedula }}</span>
             </div>
             <div class="detalle-item">
@@ -424,10 +436,9 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-const config = useRuntimeConfig()
 
 // Composables
-const { $api } = useNuxtApp()
+const { api } = useApi()
 
 // Estado reactivo
 const loading = ref(false)
@@ -506,20 +517,21 @@ const personalFiltrado = computed(() => {
 })
 
 // Métodos
+const regresarAlPanel = () => {
+  navigateTo('/admin')
+}
+
 const cargarPersonal = async () => {
   try {
     loading.value = true
     error.value = null
     
-    const response = await $api('/auth/users', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
+    const response = await api('/personal', {
+      method: 'GET'
     })
 
     if (response.success) {
-      personal.value = response.data.users || []
+      personal.value = response.data.personal || []
     } else {
       throw new Error(response.message)
     }
@@ -573,16 +585,15 @@ const guardarEmpleado = async () => {
     modalEmpleado.guardando = true
     
     const endpoint = modalEmpleado.editando 
-      ? `/auth/users/${modalEmpleado.datos.id}`
-      : '/auth/register'
+      ? `/personal/${modalEmpleado.datos.id}`
+      : '/personal'
     
     const method = modalEmpleado.editando ? 'PUT' : 'POST'
     
-    const response = await $api(endpoint, {
+    const response = await api(endpoint, {
       method,
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(modalEmpleado.datos)
     })
@@ -608,14 +619,12 @@ const cambiarEstadoEmpleado = async (empleado) => {
   try {
     const nuevoEstado = empleado.estado === 'Activo' ? 'Inactivo' : 'Activo'
     
-    const response = await $api(`/auth/users/${empleado.id}`, {
+    const response = await api(`/personal/${empleado.id}/estado`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        ...empleado,
         estado: nuevoEstado
       })
     })
@@ -672,7 +681,15 @@ onMounted(() => {
   cargarPersonal()
 })
 
-// Componentes de iconos
+// Componentes de iconos (todos los iconos aquí...)
+const IconBack = {
+  template: `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M19 12H5m7-7l-7 7 7 7"/>
+    </svg>
+  `
+}
+
 const IconPersonal = {
   template: `
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -859,39 +876,49 @@ const IconExito = {
 </script>
 
 <style scoped>
-/* Variables CSS con paleta corporativa */
-:root {
-  --color-negro-carbon: #1A1A1A;
-  --color-blanco-perla: #F5F5F5;
-  --color-gris-acero: #4A4A4A;
-  --color-azul-marino: #2C3E50;
-  --color-dorado-vintage: #D4AF37;
-  --color-dorado-claro: #F4D03F;
-  --color-rojo-granate: #8B0000;
-  --color-marron-chocolate: #3E2723;
-  --color-verde-bosque: #1B4332;
-  --border-radius: 12px;
-  --shadow-card: 0 15px 35px rgba(26, 26, 26, 0.2);
-  --transition: all 0.3s ease;
-}
-
+/* Paleta de colores EXACTA extraída de login.vue y dashboard.vue */
 .admin-personal-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--color-azul-marino) 0%, var(--color-gris-acero) 50%, var(--color-negro-carbon) 100%);
+  background: linear-gradient(135deg, #2C3E50 0%, #4A4A4A 50%, #1A1A1A 100%);
   padding: 2rem 0;
 }
 
 .admin-container {
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 2rem;
 }
 
-/* Header */
+/* Botón de regreso con estilo exacto de logout */
+.navigation-header {
+  margin-bottom: 2rem;
+}
+
+.btn-back {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  color: #D4AF37;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.btn-back:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: #D4AF37;
+}
+
+/* Header con estilo de dashboard */
 .admin-header {
-  background: var(--color-blanco-perla);
-  border-radius: 20px;
-  box-shadow: var(--shadow-card);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
   overflow: hidden;
 }
@@ -901,7 +928,7 @@ const IconExito = {
   justify-content: space-between;
   align-items: center;
   padding: 2rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e9ecef;
 }
 
 .header-info h1 {
@@ -909,25 +936,20 @@ const IconExito = {
   align-items: center;
   gap: 0.75rem;
   margin: 0 0 0.5rem 0;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-negro-carbon);
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #2C3E50;
 }
 
 .header-info p {
   margin: 0;
-  color: var(--color-gris-acero);
-  font-size: 1.1rem;
-}
-
-.header-actions {
-  display: flex;
-  gap: 1rem;
+  color: #6c757d;
+  font-size: 0.95rem;
 }
 
 .filtros-container {
   padding: 1.5rem 2rem;
-  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
+  background: #f8f9fa;
 }
 
 .filtros-group {
@@ -948,7 +970,7 @@ const IconExito = {
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--color-gris-acero);
+  color: #6c757d;
 }
 
 .search-box input {
@@ -957,12 +979,14 @@ const IconExito = {
   border: 2px solid #e9ecef;
   border-radius: 10px;
   font-size: 0.95rem;
-  transition: var(--transition);
+  transition: all 0.3s ease;
+  background: #fafbfc;
 }
 
 .search-box input:focus {
   outline: none;
-  border-color: var(--color-dorado-vintage);
+  border-color: #D4AF37;
+  background: white;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
@@ -973,12 +997,12 @@ const IconExito = {
   background: white;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: var(--transition);
+  transition: all 0.3s ease;
 }
 
 .filter-select:focus {
   outline: none;
-  border-color: var(--color-dorado-vintage);
+  border-color: #D4AF37;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
@@ -989,86 +1013,70 @@ const IconExito = {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
+  min-height: 40vh;
   text-align: center;
   padding: 2rem;
-  color: var(--color-blanco-perla);
+  color: white;
 }
 
-.loading-spinner,
-.error-container svg {
-  margin-bottom: 1.5rem;
-  color: var(--color-dorado-vintage);
+.loading-spinner {
+  margin-bottom: 1rem;
+  color: #D4AF37;
 }
 
-/* Estadísticas */
+/* Estadísticas exactas como dashboard */
 .estadisticas-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1.5rem;
-  margin-bottom: 2rem;
+  margin-bottom: 3rem;
 }
 
 .stat-card {
-  background: linear-gradient(135deg, var(--color-blanco-perla), white);
-  border-radius: var(--border-radius);
+  background: white;
   padding: 1.5rem;
-  box-shadow: var(--shadow-card);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   gap: 1rem;
-  transition: var(--transition);
+  transition: transform 0.3s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(26, 26, 26, 0.3);
+  transform: translateY(-2px);
 }
 
 .stat-icon {
   width: 60px;
   height: 60px;
-  border-radius: 15px;
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
 }
 
-.administradores .stat-icon {
-  background: linear-gradient(135deg, var(--color-dorado-vintage), var(--color-dorado-claro));
-}
-
-.evaluadores .stat-icon {
-  background: linear-gradient(135deg, var(--color-azul-marino), #3498db);
-}
-
-.cobradores .stat-icon {
-  background: linear-gradient(135deg, var(--color-verde-bosque), #27ae60);
-}
-
-.activos .stat-icon {
-  background: linear-gradient(135deg, var(--color-rojo-granate), #e74c3c);
-}
-
 .stat-info h3 {
-  margin: 0 0 0.25rem 0;
   font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-negro-carbon);
+  font-weight: bold;
+  color: #2C3E50;
+  margin: 0;
 }
 
 .stat-info p {
+  font-size: 0.9rem;
+  color: #6c757d;
   margin: 0;
-  color: var(--color-gris-acero);
   font-weight: 500;
 }
 
 /* Contenido principal */
 .personal-content {
-  background: var(--color-blanco-perla);
-  border-radius: 20px;
-  box-shadow: var(--shadow-card);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 
@@ -1080,42 +1088,45 @@ const IconExito = {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .tabla-header h2 {
   margin: 0;
   font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--color-negro-carbon);
+  color: #2C3E50;
 }
 
 .vista-controles {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 0.25rem;
 }
 
 .btn-vista {
   padding: 0.5rem;
-  border: 2px solid #e9ecef;
-  background: white;
-  border-radius: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
   cursor: pointer;
-  transition: var(--transition);
+  transition: all 0.3s ease;
+  color: #6c757d;
 }
 
 .btn-vista.active,
 .btn-vista:hover {
-  border-color: var(--color-dorado-vintage);
-  background: var(--color-dorado-vintage);
-  color: white;
+  background: white;
+  color: #D4AF37;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* Tabla */
 .tabla-wrapper {
   overflow-x: auto;
-  border-radius: var(--border-radius);
-  box-shadow: 0 8px 25px rgba(26, 26, 26, 0.1);
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
 }
 
 .personal-tabla {
@@ -1125,19 +1136,18 @@ const IconExito = {
 }
 
 .personal-tabla th {
-  background: linear-gradient(135deg, var(--color-negro-carbon), var(--color-gris-acero));
+  background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
   color: white;
   padding: 1rem;
   text-align: left;
   font-weight: 600;
-  font-size: 0.875rem;
-  text-transform: uppercase;
+  font-size: 0.8rem;
   letter-spacing: 0.5px;
 }
 
 .personal-tabla td {
   padding: 1rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f3f4;
   vertical-align: middle;
 }
 
@@ -1154,81 +1164,84 @@ const IconExito = {
 .empleado-avatar {
   width: 40px;
   height: 40px;
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-dorado-vintage), var(--color-dorado-claro));
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-weight: 600;
-  font-size: 0.875rem;
+  font-weight: bold;
+  font-size: 0.9rem;
 }
 
 .empleado-datos strong {
   display: block;
-  color: var(--color-negro-carbon);
+  color: #2C3E50;
   font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .empleado-datos small {
-  color: var(--color-gris-acero);
+  color: #6c757d;
   font-size: 0.8rem;
 }
 
 .contacto-info div {
   margin-bottom: 0.25rem;
+  font-size: 0.85rem;
 }
 
 .contacto-info div:first-child {
   font-weight: 500;
-  color: var(--color-negro-carbon);
+  color: #2C3E50;
 }
 
 .contacto-info div:last-child {
-  color: var(--color-gris-acero);
-  font-size: 0.875rem;
+  color: #6c757d;
 }
 
+/* Badges */
 .badge-tipo,
 .badge-estado {
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .badge-tipo.administrador {
-  background: rgba(212, 175, 55, 0.2);
-  color: var(--color-dorado-vintage);
+  background: rgba(212, 175, 55, 0.15);
+  color: #D4AF37;
 }
 
 .badge-tipo.evaluador {
-  background: rgba(44, 62, 80, 0.2);
-  color: var(--color-azul-marino);
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498DB;
 }
 
 .badge-tipo.cobrador {
-  background: rgba(27, 67, 50, 0.2);
-  color: var(--color-verde-bosque);
+  background: rgba(39, 174, 96, 0.15);
+  color: #27AE60;
 }
 
 .badge-estado.activo {
-  background: rgba(27, 67, 50, 0.2);
-  color: var(--color-verde-bosque);
+  background: rgba(39, 174, 96, 0.15);
+  color: #27AE60;
 }
 
 .badge-estado.inactivo {
-  background: rgba(139, 0, 0, 0.2);
-  color: var(--color-rojo-granate);
+  background: rgba(231, 76, 60, 0.15);
+  color: #E74C3C;
 }
 
 .fecha-info {
-  color: var(--color-gris-acero);
-  font-size: 0.875rem;
+  color: #6c757d;
+  font-size: 0.8rem;
 }
 
+/* Botones de acciones CORREGIDOS Y VISIBLES */
 .acciones-grupo {
   display: flex;
   gap: 0.5rem;
@@ -1243,37 +1256,41 @@ const IconExito = {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition);
+  transition: all 0.3s ease;
+  position: relative;
 }
 
 .btn-accion.editar {
   background: rgba(212, 175, 55, 0.1);
-  color: var(--color-dorado-vintage);
+  color: #D4AF37;
 }
 
 .btn-accion.editar:hover {
-  background: var(--color-dorado-vintage);
+  background: #D4AF37;
   color: white;
+  transform: scale(1.1);
 }
 
 .btn-accion.estado {
-  background: rgba(44, 62, 80, 0.1);
-  color: var(--color-azul-marino);
+  background: rgba(52, 152, 219, 0.1);
+  color: #3498DB;
 }
 
 .btn-accion.estado:hover {
-  background: var(--color-azul-marino);
+  background: #3498DB;
   color: white;
+  transform: scale(1.1);
 }
 
 .btn-accion.ver {
-  background: rgba(27, 67, 50, 0.1);
-  color: var(--color-verde-bosque);
+  background: rgba(39, 174, 96, 0.1);
+  color: #27AE60;
 }
 
 .btn-accion.ver:hover {
-  background: var(--color-verde-bosque);
+  background: #27AE60;
   color: white;
+  transform: scale(1.1);
 }
 
 /* Vista de tarjetas */
@@ -1285,20 +1302,19 @@ const IconExito = {
 
 .empleado-card {
   background: white;
-  border-radius: var(--border-radius);
-  box-shadow: 0 8px 25px rgba(26, 26, 26, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  transition: var(--transition);
+  transition: transform 0.3s ease;
 }
 
 .empleado-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(26, 26, 26, 0.3);
+  transform: translateY(-2px);
 }
 
 .card-header {
   padding: 1.5rem;
-  background: linear-gradient(135deg, var(--color-negro-carbon), var(--color-gris-acero));
+  background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
   color: white;
   display: flex;
   justify-content: space-between;
@@ -1306,16 +1322,16 @@ const IconExito = {
 }
 
 .empleado-avatar-large {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-dorado-vintage), var(--color-dorado-claro));
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-weight: 700;
-  font-size: 1.25rem;
+  font-weight: bold;
+  font-size: 1.1rem;
 }
 
 .card-body {
@@ -1325,22 +1341,21 @@ const IconExito = {
 .card-body h3 {
   margin: 0 0 0.25rem 0;
   font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--color-negro-carbon);
+  color: #2C3E50;
 }
 
 .empleado-cedula {
   margin: 0 0 1rem 0;
-  color: var(--color-gris-acero);
-  font-size: 0.875rem;
+  color: #6c757d;
+  font-size: 0.8rem;
 }
 
 .empleado-tipo {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .contacto-card {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .contacto-item {
@@ -1348,61 +1363,61 @@ const IconExito = {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
-  color: var(--color-gris-acero);
-  font-size: 0.875rem;
+  color: #6c757d;
+  font-size: 0.8rem;
 }
 
 .contacto-item svg {
-  color: var(--color-dorado-vintage);
+  color: #D4AF37;
 }
 
 .fecha-registro {
-  color: var(--color-gris-acero);
-  font-size: 0.8rem;
+  color: #6c757d;
+  font-size: 0.75rem;
 }
 
 .card-actions {
   padding: 1rem 1.5rem;
-  background: #f8fafc;
+  background: #f8f9fa;
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
-/* Botones */
+/* Botones principales como en login y dashboard */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 1.25rem;
   border: none;
   border-radius: 10px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: var(--transition);
+  transition: all 0.3s ease;
   text-decoration: none;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-dorado-vintage), var(--color-dorado-claro));
-  color: var(--color-negro-carbon);
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
+  color: #1A1A1A;
   box-shadow: 0 8px 25px rgba(212, 175, 55, 0.4);
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 12px 35px rgba(212, 175, 55, 0.6);
 }
 
 .btn-secondary {
-  background: rgba(74, 74, 74, 0.1);
-  color: var(--color-gris-acero);
-  border: 2px solid rgba(74, 74, 74, 0.2);
+  background: #f8f9fa;
+  color: #6c757d;
+  border: 1px solid #e9ecef;
 }
 
 .btn-secondary:hover {
-  background: var(--color-gris-acero);
-  color: white;
+  background: #e9ecef;
+  color: #2C3E50;
 }
 
 .btn:disabled {
@@ -1411,14 +1426,14 @@ const IconExito = {
   transform: none !important;
 }
 
-/* Modales */
+/* Modales con estilo de login */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(26, 26, 26, 0.8);
+  background: rgba(44, 62, 80, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1428,8 +1443,8 @@ const IconExito = {
 
 .modal-container {
   background: white;
-  border-radius: 20px;
-  box-shadow: var(--shadow-card);
+  border-radius: 25px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
   max-width: 600px;
   width: 100%;
   max-height: 90vh;
@@ -1437,8 +1452,9 @@ const IconExito = {
 }
 
 .modal-header {
-  padding: 2rem 2rem 1rem 2rem;
-  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #2C3E50, #1A1A1A);
+  color: white;
+  padding: 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1446,9 +1462,8 @@ const IconExito = {
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  color: var(--color-negro-carbon);
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -1458,18 +1473,18 @@ const IconExito = {
   width: 40px;
   height: 40px;
   border: none;
-  background: rgba(139, 0, 0, 0.1);
-  color: var(--color-rojo-granate);
+  background: rgba(231, 76, 60, 0.2);
+  color: #ff6b6b;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition);
+  transition: all 0.3s ease;
 }
 
 .btn-cerrar:hover {
-  background: var(--color-rojo-granate);
+  background: rgba(231, 76, 60, 0.3);
   color: white;
 }
 
@@ -1495,9 +1510,9 @@ const IconExito = {
 
 .form-group label {
   margin-bottom: 0.5rem;
-  color: var(--color-negro-carbon);
+  color: #2C3E50;
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
 }
 
 .form-group input,
@@ -1505,16 +1520,18 @@ const IconExito = {
 .form-group textarea {
   padding: 0.75rem;
   border: 2px solid #e9ecef;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.95rem;
-  transition: var(--transition);
+  transition: all 0.3s ease;
+  background: #fafbfc;
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: var(--color-dorado-vintage);
+  border-color: #D4AF37;
+  background: white;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
@@ -1543,20 +1560,20 @@ const IconExito = {
   gap: 1.5rem;
   margin-bottom: 2rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, var(--color-blanco-perla), #f8fafc);
-  border-radius: var(--border-radius);
+  background: #f8f9fa;
+  border-radius: 12px;
 }
 
 .perfil-avatar {
   width: 80px;
   height: 80px;
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-dorado-vintage), var(--color-dorado-claro));
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-weight: 700;
+  font-weight: bold;
   font-size: 1.5rem;
 }
 
@@ -1564,12 +1581,12 @@ const IconExito = {
   margin: 0 0 0.5rem 0;
   font-size: 1.5rem;
   font-weight: 600;
-  color: var(--color-negro-carbon);
+  color: #2C3E50;
 }
 
 .perfil-info p {
   margin: 0 0 0.75rem 0;
-  color: var(--color-gris-acero);
+  color: #6c757d;
   font-weight: 500;
 }
 
@@ -1591,12 +1608,12 @@ const IconExito = {
 
 .detalle-item label {
   font-weight: 600;
-  color: var(--color-negro-carbon);
-  font-size: 0.875rem;
+  color: #2C3E50;
+  font-size: 0.9rem;
 }
 
 .detalle-item span {
-  color: var(--color-gris-acero);
+  color: #6c757d;
   padding: 0.5rem 0;
 }
 
@@ -1607,19 +1624,19 @@ const IconExito = {
   right: 2rem;
   padding: 1rem 1.5rem;
   border-radius: 10px;
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   z-index: 1001;
   transform: translateX(100%);
   animation: slideIn 0.3s ease forwards;
 }
 
 .notificacion.exito {
-  background: linear-gradient(135deg, var(--color-verde-bosque), #27ae60);
+  background: #27AE60;
   color: white;
 }
 
 .notificacion.error {
-  background: linear-gradient(135deg, var(--color-rojo-granate), #e74c3c);
+  background: #E74C3C;
   color: white;
 }
 
@@ -1637,12 +1654,8 @@ const IconExito = {
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .animate-spin {
@@ -1671,7 +1684,7 @@ const IconExito = {
   }
   
   .estadisticas-grid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: 1fr;
   }
   
   .tabla-header {

@@ -18,5 +18,5 @@ useHead({
 })
 
 // Importar el componente
-import AdministracionPersonal from '~/components/admin/AdministracionPersonal.vue'
+import AdministracionPersonal from '~/pages/admin/AdministracionPersonal.vue'
 </script>

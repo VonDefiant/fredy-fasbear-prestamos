@@ -323,7 +323,7 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Verificar que email y cédula no existan
+    // Verificar que email y DPI no existan
     const existeUsuario = await prisma.usuario.findFirst({
       where: {
         OR: [
@@ -338,7 +338,7 @@ router.post('/', async (req, res) => {
         success: false,
         message: existeUsuario.email === email 
           ? 'Ya existe un usuario con este email'
-          : 'Ya existe un usuario con esta cédula'
+          : 'Ya existe un usuario con esta DPI'
       });
     }
 
@@ -390,7 +390,7 @@ router.post('/', async (req, res) => {
     if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
-        message: 'Ya existe un usuario con este email o cédula'
+        message: 'Ya existe un usuario con este email o DPI'
       });
     }
 
@@ -447,7 +447,7 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Verificar unicidad de email y cédula (excluyendo el registro actual)
+    // Verificar unicidad de email y DPI (excluyendo el registro actual)
     if (email || cedula) {
       const conflictUsuario = await prisma.usuario.findFirst({
         where: {
@@ -466,7 +466,7 @@ router.put('/:id', async (req, res) => {
       if (conflictUsuario) {
         return res.status(400).json({
           success: false,
-          message: 'Ya existe otro usuario con este email o cédula'
+          message: 'Ya existe otro usuario con este email o DPI'
         });
       }
     }
@@ -514,7 +514,7 @@ router.put('/:id', async (req, res) => {
     if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
-        message: 'Ya existe un usuario con este email o cédula'
+        message: 'Ya existe un usuario con este email o DPI'
       });
     }
 

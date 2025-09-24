@@ -510,7 +510,7 @@ const getUserInitials = () => {
 const navigateToModule = (path) => {
   // Por ahora mostrar en consola, luego implementar las rutas específicas
   console.log(`Navegando a: ${path}`)
-  // navigateTo(path)
+  navigateTo(path)
 }
 
 const formatTimeAgo = (timestamp) => {
