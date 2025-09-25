@@ -588,11 +588,11 @@ const formCliente = ref({
   fechaNacimiento: ''
 })
 
-const { $api } = useNuxtApp()
+const { api } = useApi()
 
 const cargarEstadisticas = async () => {
   try {
-    const response = await $api('/api/clients/stats')
+    const response = await api('/clients/stats')
     if (response.success) {
       stats.value = response.data.stats
     }
@@ -614,7 +614,7 @@ const cargarClientes = async () => {
     params.append('page', filtros.value.page.toString())
     params.append('limit', filtros.value.limit.toString())
     
-    const response = await $api(`/api/clients?${params.toString()}`)
+    const response = await api(`/clients?${params.toString()}`)
     
     if (response.success) {
       clientes.value = response.data.clients
@@ -653,7 +653,7 @@ const crearCliente = async () => {
   try {
     guardandoCliente.value = true
     
-    const response = await $api('/api/clients', {
+    const response = await api('/clients', {
       method: 'POST',
       body: JSON.stringify(formCliente.value)
     })
@@ -677,7 +677,7 @@ const actualizarCliente = async () => {
   try {
     guardandoCliente.value = true
     
-    const response = await $api(`/api/clients/${formCliente.value.id}`, {
+    const response = await api(`/clients/${formCliente.value.id}`, {
       method: 'PUT',
       body: JSON.stringify({
         nombre: formCliente.value.nombre,
@@ -711,7 +711,7 @@ const toggleEstadoCliente = async (cliente) => {
     const confirmMessage = `¿Estás seguro que deseas ${nuevoEstado.toLowerCase()} este cliente?`
     
     if (confirm(confirmMessage)) {
-      const response = await $api(`/api/clients/${cliente.id}/toggle-status`, {
+      const response = await api(`/clients/${cliente.id}/toggle-status`, {
         method: 'PUT'
       })
       
@@ -730,7 +730,7 @@ const toggleEstadoCliente = async (cliente) => {
 
 const verCliente = async (cliente) => {
   try {
-    const response = await $api(`/api/clients/${cliente.id}`)
+    const response = await api(`/clients/${cliente.id}`)
     if (response.success) {
       clienteSeleccionado.value = response.data.cliente
       mostrarModalVer.value = true
