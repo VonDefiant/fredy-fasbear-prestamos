@@ -1,5 +1,3 @@
-
-
 import express from 'express';
 import homepageRoutes from './homepage.routes.js';
 import authRoutes from './auth.routes.js';
@@ -7,6 +5,7 @@ import prestamosRoutes from './prestamos.routes.js';
 import solicitudesRoutes from './solicitudes.routes.js';  
 import adminRoutes from './admin.routes.js';
 import personalRoutes from './personal.routes.js';
+import clientsRoutes from './clients.routes.js';
 
 const router = express.Router();
 
@@ -29,6 +28,7 @@ router.use('/prestamos', prestamosRoutes);
 router.use('/solicitudes', solicitudesRoutes); 
 router.use('/admin', adminRoutes);
 router.use('/personal', personalRoutes);
+router.use('/clients', clientsRoutes);  // Corregido: sin /api/ porque ya está en el contexto
 
 // Futuras rutas (placeholders)
 // router.use('/productos', productosRoutes);
@@ -77,6 +77,17 @@ router.get('/info', (req, res) => {
             'POST /api/auth/change-password'
           ]
         },
+        clients: {
+          base: '/api/clients',
+          endpoints: [
+            'GET /api/clients/stats',
+            'GET /api/clients',
+            'GET /api/clients/:id',
+            'POST /api/clients',
+            'PUT /api/clients/:id',
+            'PUT /api/clients/:id/toggle-status'
+          ]
+        }, // Agregada coma faltante
         homepage: {
           base: '/api/homepage',
           endpoints: [
@@ -87,7 +98,7 @@ router.get('/info', (req, res) => {
             'POST /api/homepage/newsletter'
           ]
         },
-        // Rutas protegidas - NUEVAS
+        // Rutas protegidas
         prestamos: {
           base: '/api/prestamos',
           endpoints: [
@@ -113,6 +124,25 @@ router.get('/info', (req, res) => {
             'POST /api/solicitudes/:solicitudId/aceptar-oferta',
             'GET /api/solicitudes/:solicitudId/fotos/:fotoId',
             'GET /api/solicitudes/:solicitudId/documento-tecnico'
+          ]
+        },
+        personal: {
+          base: '/api/personal',
+          endpoints: [
+            'GET /api/personal/stats',
+            'GET /api/personal',
+            'GET /api/personal/:id',
+            'POST /api/personal',
+            'PUT /api/personal/:id',
+            'PUT /api/personal/:id/toggle-status'
+          ]
+        },
+        admin: {
+          base: '/api/admin',
+          endpoints: [
+            'GET /api/admin/stats',
+            'GET /api/admin/recent-activity',
+            'PUT /api/admin/system-parameters/:id'
           ]
         },
         // Rutas de utilidad
@@ -171,9 +201,10 @@ router.use((req, res) => {
       '/api/auth/*',
       '/api/homepage/*', 
       '/api/prestamos/*',
-      '/api/solicitudes/*',,
+      '/api/solicitudes/*',  // Corregido: eliminada coma duplicada
       '/api/personal/*',
       '/api/admin/*',
+      '/api/clients/*',  // Agregado
       '/api/health',
       '/api/info'
     ]
