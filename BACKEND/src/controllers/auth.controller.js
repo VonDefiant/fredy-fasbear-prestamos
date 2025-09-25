@@ -73,7 +73,7 @@ const authController = {
           success: false,
           message: existingUser.email === email.toLowerCase() 
             ? 'Ya existe una cuenta con este email' 
-            : 'Ya existe una cuenta con esta cédula'
+            : 'Ya existe una cuenta con este DPI'
         });
       }
 

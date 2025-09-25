@@ -1,5 +1,21 @@
+<!-- =============================================== -->
+<!-- Archivo: FRONTEND/pages/admin/AdministracionClientes.vue -->
+<!-- Versión final corregida: Sin errores de sintaxis + mejor manejo -->
+<!-- =============================================== -->
+
 <template>
   <div class="admin-clientes">
+    <!-- Botón de regreso al panel de administración -->
+    <div class="navigation-header">
+      <NuxtLink to="/admin" class="btn-back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M19 12H5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="12,19 5,12 12,5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Volver al Panel de Administración
+      </NuxtLink>
+    </div>
+
     <div class="header-section">
       <div class="page-title">
         <div class="title-icon">
@@ -38,77 +54,75 @@
         </svg>
         <h3>Error al cargar clientes</h3>
         <p>{{ error }}</p>
-        <button @click="cargarClientes" class="btn-retry">Reintentar</button>
+        <div class="error-details" v-if="errorDetails">
+          <p><strong>Detalles del error:</strong></p>
+          <p class="error-technical">{{ errorDetails }}</p>
+        </div>
+        <div class="error-actions">
+          <button @click="cargarClientes" class="btn-retry">Reintentar</button>
+          <NuxtLink to="/admin" class="btn-back-error">Volver al Panel</NuxtLink>
+        </div>
       </div>
     </div>
 
     <div v-else>
-      <div class="stats-cards">
-        <div class="stat-card">
-          <div class="stat-icon clients">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" stroke-width="2"/>
-              <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-              <path d="M23 21V19C23 18.1645 22.7155 17.3541 22.2094 16.7071C21.7033 16.0601 20.9641 15.6148 20.1323 15.4386" stroke="currentColor" stroke-width="2"/>
-              <path d="M16 3.13C16.8604 3.35031 17.623 3.81378 18.1676 4.48086C18.7122 5.14794 19.0078 5.9703 19.0078 6.82C19.0078 7.6697 18.7122 8.49206 18.1676 9.15914C17.623 9.82622 16.8604 10.2897 16 10.51" stroke="currentColor" stroke-width="2"/>
-            </svg>
+      <div class="stats-section" v-if="stats">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" stroke-width="2"/>
+                <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                <path d="M23 21V19C23 18.1645 22.7155 17.3541 22.2094 16.7018C21.7033 16.0495 20.9969 15.5906 20.2 15.3943" stroke="currentColor" stroke-width="2"/>
+                <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <h3>{{ stats.totalClients || 0 }}</h3>
+              <p>Total Clientes</p>
+            </div>
           </div>
-          <div class="stat-content">
-            <h3>{{ stats?.totalClients || 0 }}</h3>
-            <p>Total Clientes</p>
-          </div>
-        </div>
 
-        <div class="stat-card">
-          <div class="stat-icon active">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M22 12H18L15 21L9 3L6 12H2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+          <div class="stat-card active">
+            <div class="stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="2"/>
+                <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <h3>{{ stats.activeClients || 0 }}</h3>
+              <p>Clientes Activos</p>
+            </div>
           </div>
-          <div class="stat-content">
-            <h3>{{ stats?.activeClients || 0 }}</h3>
-            <p>Clientes Activos</p>
-          </div>
-        </div>
 
-        <div class="stat-card">
-          <div class="stat-icon loans">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" stroke-width="2"/>
-              <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" stroke-width="2"/>
-            </svg>
-          </div>
-          <div class="stat-content">
-            <h3>{{ stats?.clientsWithLoans || 0 }}</h3>
-            <p>Con Préstamos</p>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon new">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M8 2V5M16 2V5M3.5 9.09H20.5M21 8.5V17C21 17.5304 20.7893 18.0391 20.4142 18.4142C20.0391 18.7893 19.5304 19 19 19H5C4.46957 19 3.96086 18.7893 3.58579 18.4142C3.21071 18.0391 3 17.5304 3 17V8.5C3 7.96957 3.21071 7.46086 3.58579 7.08579C3.96086 6.71071 4.46957 6.5 5 6.5H19C19.5304 6.5 20.0391 6.71071 20.4142 7.08579C20.7893 7.46086 21 7.96957 21 8.5Z" stroke="currentColor" stroke-width="2"/>
-            </svg>
-          </div>
-          <div class="stat-content">
-            <h3>{{ stats?.newThisMonth || 0 }}</h3>
-            <p>Nuevos Este Mes</p>
+          <div class="stat-card inactive">
+            <div class="stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+                <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </div>
+            <div class="stat-content">
+              <h3>{{ stats.inactiveClients || 0 }}</h3>
+              <p>Clientes Inactivos</p>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="filters-section">
         <div class="search-box">
-          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
-            <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2"/>
+            <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2"/>
           </svg>
           <input 
             v-model="filtros.busqueda" 
             @input="debouncedBuscar"
-            placeholder="Buscar por nombre, email, cédula..."
-            class="search-input"
+            type="text" 
+            placeholder="Buscar clientes por nombre, email o DPI..."
           />
         </div>
 
@@ -132,110 +146,117 @@
         </div>
       </div>
 
-      <div class="clientes-table">
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Contacto</th>
-                <th>Estado</th>
-                <th>Registro</th>
-                <th>Solicitudes</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="cliente in clientes" :key="cliente.id">
-                <td>
-                  <div class="client-info">
-                    <div class="client-avatar">
-                      {{ getInitials(cliente.nombre, cliente.apellido) }}
+      <div class="table-container">
+        <table class="clients-table">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+              <th>Estado</th>
+              <th>Fecha Registro</th>
+              <th>Solicitudes</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="cliente in clientes" :key="cliente.id" class="client-row">
+              <td>
+                <div class="client-info">
+                  <div class="client-avatar">
+                    {{ getInitials(cliente.nombre, cliente.apellido) }}
+                  </div>
+                  <div class="client-details">
+                    <div class="client-name">{{ cliente.nombre }} {{ cliente.apellido }}</div>
+                    <div class="client-cedula">C.I: {{ cliente.cedula }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="email">{{ cliente.email }}</span>
+              </td>
+              <td>
+                <span class="phone">{{ cliente.telefono }}</span>
+              </td>
+              <td>
+                <span :class="['status-badge', cliente.estado.toLowerCase()]">
+                  {{ cliente.estado }}
+                </span>
+              </td>
+              <td>
+                <span class="date">{{ formatDate(cliente.fechaRegistro) }}</span>
+              </td>
+              <td>
+                <span class="requests-count">
+                  {{ cliente._count?.solicitudes || 0 }}
+                </span>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <button 
+                    @click="verCliente(cliente)" 
+                    class="btn-action view"
+                    title="Ver detalles"
+                    :disabled="loadingClienteDetalle === cliente.id"
+                  >
+                    <div v-if="loadingClienteDetalle === cliente.id" class="loading-icon">
+                      <div class="mini-spinner"></div>
                     </div>
-                    <div>
-                      <div class="client-name">{{ cliente.nombre }} {{ cliente.apellido }}</div>
-                      <div class="client-id">ID: {{ cliente.cedula }}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div class="contact-info">
-                    <div>{{ cliente.email }}</div>
-                    <div class="phone">{{ cliente.telefono }}</div>
-                  </div>
-                </td>
-                <td>
-                  <span :class="['status-badge', cliente.estado.toLowerCase()]">
-                    {{ cliente.estado }}
-                  </span>
-                </td>
-                <td>{{ formatDate(cliente.fechaRegistro) }}</td>
-                <td>
-                  <span class="requests-count">
-                    {{ cliente._count?.solicitudes || 0 }}
-                  </span>
-                </td>
-                <td>
-                  <div class="action-buttons">
-                    <button 
-                      @click="verCliente(cliente)" 
-                      class="btn-action view"
-                      title="Ver detalles"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                    </button>
-                    <button 
-                      @click="editarCliente(cliente)" 
-                      class="btn-action edit"
-                      title="Editar"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" stroke-width="2"/>
-                        <path d="M18.5 2.50023C18.8978 2.1024 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.1024 21.5 2.50023C21.8978 2.89805 22.1215 3.43762 22.1215 4.00023C22.1215 4.56284 21.8978 5.1024 21.5 5.50023L12 15.0002L8 16.0002L9 12.0002L18.5 2.50023Z" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                    </button>
-                    <button 
-                      @click="toggleEstadoCliente(cliente)" 
-                      :class="['btn-action', cliente.estado === 'Activo' ? 'deactivate' : 'activate']"
-                      :title="cliente.estado === 'Activo' ? 'Desactivar' : 'Activar'"
-                    >
-                      <svg v-if="cliente.estado === 'Activo'" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M16 12V8C16 6.93913 15.5786 5.92172 14.8284 5.17157C14.0783 4.42143 13.0609 4 12 4C10.9391 4 9.92172 4.42143 9.17157 5.17157C8.42143 5.92172 8 6.93913 8 8V12" stroke="currentColor" stroke-width="2"/>
-                        <rect x="3" y="11" width="18" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                      <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <rect x="3" y="11" width="18" height="10" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                    <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" stroke-width="2"/>
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                  <button 
+                    @click="editarCliente(cliente)" 
+                    class="btn-action edit"
+                    title="Editar"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke="currentColor" stroke-width="2"/>
+                      <path d="M18.5 2.50023C18.8978 2.1024 19.4374 1.87868 20 1.87868C20.5626 1.87868 21.1022 2.1024 21.5 2.50023C21.8978 2.89805 22.1215 3.43762 22.1215 4.00023C22.1215 4.56284 21.8978 5.1024 21.5 5.50023L12 15.0002L8 16.0002L9 12.0002L18.5 2.50023Z" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                  <button 
+                    @click="toggleEstadoCliente(cliente)" 
+                    :class="['btn-action', cliente.estado === 'Activo' ? 'deactivate' : 'activate']"
+                    :title="cliente.estado === 'Activo' ? 'Desactivar' : 'Activar'"
+                  >
+                    <svg v-if="cliente.estado === 'Activo'" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                      <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+                      <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="2"/>
+                      <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
-        <div v-if="pagination" class="pagination-controls">
+        <!-- Paginación -->
+        <div v-if="pagination && pagination.pages > 1" class="pagination">
           <button 
             @click="cambiarPagina(pagination.page - 1)"
             :disabled="pagination.page <= 1"
-            class="btn-pagination"
+            class="pagination-btn"
           >
             Anterior
           </button>
-          
+
           <span class="pagination-info">
-            Página {{ pagination.page }} de {{ pagination.pages }} 
-            ({{ pagination.total }} clientes)
+            Página {{ pagination.page }} de {{ pagination.pages }}
+            ({{ pagination.total }} clientes total)
           </span>
-          
+
           <button 
             @click="cambiarPagina(pagination.page + 1)"
             :disabled="pagination.page >= pagination.pages"
-            class="btn-pagination"
+            class="pagination-btn"
           >
             Siguiente
           </button>
@@ -265,6 +286,7 @@
                 type="text" 
                 required
                 class="form-input"
+                maxlength="100"
               />
             </div>
             
@@ -275,6 +297,7 @@
                 type="text" 
                 required
                 class="form-input"
+                maxlength="100"
               />
             </div>
             
@@ -285,6 +308,7 @@
                 type="email" 
                 required
                 class="form-input"
+                maxlength="150"
               />
             </div>
             
@@ -295,17 +319,25 @@
                 type="tel" 
                 required
                 class="form-input"
+                maxlength="20"
               />
             </div>
             
             <div class="form-group">
-              <label>Cédula *</label>
+              <label>DPI * <span class="field-hint">(Máximo 13 dígitos)</span></label>
               <input 
                 v-model="formCliente.cedula" 
                 type="text" 
                 required
                 class="form-input"
+                @input="validarCedula"
+                @keypress="soloNumeros"
+                maxlength="13"
+                pattern="[0-9]{1,13}"
+                title="Solo se permiten números, máximo 13 dígitos"
+                placeholder="Ej: 1234567890123"
               />
+              <span v-if="cedulaError" class="field-error">{{ cedulaError }}</span>
             </div>
             
             <div class="form-group">
@@ -315,6 +347,7 @@
                 type="password" 
                 required
                 class="form-input"
+                minlength="6"
               />
             </div>
             
@@ -324,6 +357,7 @@
                 v-model="formCliente.fechaNacimiento" 
                 type="date" 
                 class="form-input"
+                :max="fechaMaximaNacimiento"
               />
             </div>
             
@@ -343,6 +377,7 @@
               required
               class="form-textarea"
               rows="3"
+              maxlength="500"
             ></textarea>
           </div>
           
@@ -350,7 +385,7 @@
             <button type="button" @click="cerrarModalCrear" class="btn-secondary">
               Cancelar
             </button>
-            <button type="submit" :disabled="guardandoCliente" class="btn-primary">
+            <button type="submit" :disabled="guardandoCliente || !!cedulaError" class="btn-primary">
               <span v-if="guardandoCliente">Guardando...</span>
               <span v-else>Crear Cliente</span>
             </button>
@@ -381,6 +416,7 @@
                 type="text" 
                 required
                 class="form-input"
+                maxlength="100"
               />
             </div>
             
@@ -391,6 +427,7 @@
                 type="text" 
                 required
                 class="form-input"
+                maxlength="100"
               />
             </div>
             
@@ -401,6 +438,7 @@
                 type="email" 
                 required
                 class="form-input"
+                maxlength="150"
               />
             </div>
             
@@ -411,17 +449,20 @@
                 type="tel" 
                 required
                 class="form-input"
+                maxlength="20"
               />
             </div>
             
             <div class="form-group">
-              <label>Cédula</label>
+              <label>DPI</label>
               <input 
                 v-model="formCliente.cedula" 
                 type="text" 
                 readonly
                 class="form-input readonly"
+                title="El DPI no puede ser modificado"
               />
+              <span class="field-info">El DPI no puede ser modificado</span>
             </div>
             
             <div class="form-group">
@@ -430,6 +471,7 @@
                 v-model="formCliente.fechaNacimiento" 
                 type="date" 
                 class="form-input"
+                :max="fechaMaximaNacimiento"
               />
             </div>
             
@@ -449,6 +491,7 @@
               required
               class="form-textarea"
               rows="3"
+              maxlength="500"
             ></textarea>
           </div>
           
@@ -487,7 +530,7 @@
                 <span>{{ clienteSeleccionado.nombre }} {{ clienteSeleccionado.apellido }}</span>
               </div>
               <div class="detail-item">
-                <label>Cédula</label>
+                <label>DPI</label>
                 <span>{{ clienteSeleccionado.cedula }}</span>
               </div>
               <div class="detail-item">
@@ -540,13 +583,77 @@
                     {{ solicitud.estado }}
                   </span>
                   <span class="monto">
-                    Q{{ formatNumber(solicitud.montoSolicitado) }}
+                    Q{{ formatNumber(solicitud.montoSolicitado || 0) }}
                   </span>
                 </div>
               </div>
             </div>
           </div>
+          <div v-else class="no-solicitudes">
+            <p>Este cliente no tiene solicitudes registradas.</p>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal de Error Específico para Detalles de Cliente -->
+    <div v-if="mostrarErrorDetalle" class="modal-overlay" @click="cerrarErrorDetalle">
+      <div class="modal-content error-modal" @click.stop>
+        <div class="modal-header error-header">
+          <h2>Error al Cargar Cliente</h2>
+          <button @click="cerrarErrorDetalle" class="btn-close">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
+              <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="error-modal-content">
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+            <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+            <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          
+          <h3>No se pudo cargar la información del cliente</h3>
+          <p>{{ errorDetalleMessage }}</p>
+          
+          <div class="error-suggestions">
+            <h4>Posibles causas:</h4>
+            <ul>
+              <li>El cliente podría haber sido eliminado recientemente</li>
+              <li>Problema temporal de conectividad con la base de datos</li>
+              <li>Error interno del servidor</li>
+            </ul>
+          </div>
+          
+          <div class="error-actions">
+            <button @click="reintentarCargarDetalle" class="btn-retry" :disabled="loadingClienteDetalle">
+              <span v-if="loadingClienteDetalle">Reintentando...</span>
+              <span v-else>Reintentar</span>
+            </button>
+            <button @click="cerrarErrorDetalle" class="btn-secondary">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notificación -->
+    <div v-if="notificacion.mostrar" :class="['notification', notificacion.tipo]">
+      <div class="notification-content">
+        <svg v-if="notificacion.tipo === 'success'" width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="2"/>
+          <polyline points="22,4 12,14.01 9,11.01" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+          <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span>{{ notificacion.mensaje }}</span>
       </div>
     </div>
   </div>
@@ -557,6 +664,7 @@ import { ref, onMounted, computed } from 'vue'
 
 const loading = ref(true)
 const error = ref(null)
+const errorDetails = ref(null)
 const stats = ref(null)
 const clientes = ref([])
 const pagination = ref(null)
@@ -566,6 +674,22 @@ const mostrarModalEditar = ref(false)
 const mostrarModalVer = ref(false)
 const clienteSeleccionado = ref(null)
 const guardandoCliente = ref(false)
+
+// Estados específicos para manejo de errores de detalle de cliente
+const loadingClienteDetalle = ref(null)
+const mostrarErrorDetalle = ref(false)
+const errorDetalleMessage = ref('')
+const clientePendienteDetalle = ref(null)
+
+// Validación de DPI
+const cedulaError = ref('')
+
+// Sistema de notificaciones
+const notificacion = ref({
+  mostrar: false,
+  mensaje: '',
+  tipo: 'success'
+})
 
 const filtros = ref({
   busqueda: '',
@@ -588,7 +712,57 @@ const formCliente = ref({
   fechaNacimiento: ''
 })
 
+// Fecha máxima para nacimiento (18 años atrás)
+const fechaMaximaNacimiento = computed(() => {
+  const fecha = new Date()
+  fecha.setFullYear(fecha.getFullYear() - 18)
+  return fecha.toISOString().split('T')[0]
+})
+
 const { api } = useApi()
+
+// Función para mostrar notificaciones
+const mostrarNotificacion = (mensaje, tipo = 'success') => {
+  notificacion.value = {
+    mostrar: true,
+    mensaje,
+    tipo
+  }
+  
+  setTimeout(() => {
+    notificacion.value.mostrar = false
+  }, 4000)
+}
+
+// Función para validar DPI
+const validarCedula = (event) => {
+  const valor = event.target.value
+  
+  // Limpiar caracteres no numéricos
+  const soloNumeros = valor.replace(/\D/g, '')
+  
+  // Actualizar el valor
+  formCliente.value.cedula = soloNumeros
+  
+  // Validar
+  if (soloNumeros.length === 0) {
+    cedulaError.value = ''
+  } else if (soloNumeros.length > 13) {
+    cedulaError.value = 'El DPI no puede tener más de 13 dígitos'
+  } else if (soloNumeros.length < 13) {
+    cedulaError.value = 'El DPI debe tener al menos 13 dígitos'
+  } else {
+    cedulaError.value = ''
+  }
+}
+
+// Función para permitir solo números
+const soloNumeros = (event) => {
+  const char = String.fromCharCode(event.which)
+  if (!/[0-9]/.test(char)) {
+    event.preventDefault()
+  }
+}
 
 const cargarEstadisticas = async () => {
   try {
@@ -605,6 +779,7 @@ const cargarClientes = async () => {
   try {
     loading.value = true
     error.value = null
+    errorDetails.value = null
     
     const params = new URLSearchParams()
     if (filtros.value.busqueda) params.append('busqueda', filtros.value.busqueda)
@@ -624,6 +799,8 @@ const cargarClientes = async () => {
     }
   } catch (err) {
     error.value = err.message || 'Error cargando clientes'
+    errorDetails.value = err.details || null
+    console.error('Error detallado:', err)
   } finally {
     loading.value = false
   }
@@ -650,6 +827,11 @@ const cambiarPagina = (nuevaPagina) => {
 }
 
 const crearCliente = async () => {
+  if (cedulaError.value) {
+    mostrarNotificacion('Corrige los errores en el formulario', 'error')
+    return
+  }
+
   try {
     guardandoCliente.value = true
     
@@ -728,16 +910,44 @@ const toggleEstadoCliente = async (cliente) => {
   }
 }
 
+// Función mejorada para cargar detalles de cliente
 const verCliente = async (cliente) => {
   try {
+    loadingClienteDetalle.value = cliente.id
+    clientePendienteDetalle.value = cliente
+    
     const response = await api(`/clients/${cliente.id}`)
+    
     if (response.success) {
       clienteSeleccionado.value = response.data.cliente
       mostrarModalVer.value = true
+    } else {
+      throw new Error(response.message || 'Error obteniendo detalle del cliente')
     }
   } catch (err) {
-    mostrarNotificacion('Error cargando detalles del cliente', 'error')
+    console.error('Error detallado:', err)
+    
+    // Mostrar modal de error específico
+    errorDetalleMessage.value = `No se pudo cargar la información del cliente "${cliente.nombre} ${cliente.apellido}". ${err.message || 'Error interno del servidor.'}`
+    mostrarErrorDetalle.value = true
+  } finally {
+    loadingClienteDetalle.value = null
   }
+}
+
+// Función para reintentar cargar detalles
+const reintentarCargarDetalle = async () => {
+  if (clientePendienteDetalle.value) {
+    cerrarErrorDetalle()
+    await verCliente(clientePendienteDetalle.value)
+  }
+}
+
+// Función para cerrar modal de error
+const cerrarErrorDetalle = () => {
+  mostrarErrorDetalle.value = false
+  errorDetalleMessage.value = ''
+  clientePendienteDetalle.value = null
 }
 
 const editarCliente = (cliente) => {
@@ -757,6 +967,7 @@ const editarCliente = (cliente) => {
 
 const cerrarModalCrear = () => {
   mostrarModalCrear.value = false
+  cedulaError.value = ''
   formCliente.value = {
     nombre: '',
     apellido: '',
@@ -794,46 +1005,83 @@ const getInitials = (nombre, apellido) => {
   return `${nombre?.[0] || ''}${apellido?.[0] || ''}`.toUpperCase()
 }
 
-const formatDate = (date) => {
-  if (!date) return ''
-  return new Date(date).toLocaleDateString('es-GT')
-}
-
-const formatNumber = (number) => {
-  if (!number) return '0.00'
-  return new Intl.NumberFormat('es-GT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(number)
-}
-
-const mostrarNotificacion = (mensaje, tipo = 'info') => {
-  if (tipo === 'success') {
-    console.log('✅', mensaje)
-  } else if (tipo === 'error') {
-    console.error('❌', mensaje)
+const formatDate = (fecha) => {
+  if (!fecha) return 'N/A'
+  try {
+    return new Date(fecha).toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  } catch {
+    return 'Fecha inválida'
   }
 }
 
-onMounted(() => {
-  cargarEstadisticas()
-  cargarClientes()
+const formatNumber = (numero) => {
+  if (!numero) return '0.00'
+  try {
+    return parseFloat(numero).toLocaleString('es-ES', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  } catch {
+    return '0.00'
+  }
+}
+
+// Cargar datos al montar el componente
+onMounted(async () => {
+  await cargarEstadisticas()
+  await cargarClientes()
 })
 </script>
 
 <style scoped>
+/* Estilos base */
 .admin-clientes {
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 2rem 0;
 }
 
+/* Botón de navegación de regreso */
+.navigation-header {
+  max-width: 1400px;
+  margin: 0 auto 1rem auto;
+  padding: 0 2rem;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #D4AF37;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.btn-back:hover {
+  background: rgba(212, 175, 55, 0.2);
+  border-color: #D4AF37;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+}
+
+/* Header section */
 .header-section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem 2rem 2rem;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  gap: 1rem;
+  align-items: flex-start;
 }
 
 .page-title {
@@ -844,54 +1092,68 @@ onMounted(() => {
 
 .title-icon {
   padding: 1rem;
-  background: rgba(212, 175, 55, 0.1);
-  border-radius: 12px;
-  color: #D4AF37;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
+  border-radius: 16px;
+  color: white;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
 }
 
 .page-title h1 {
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: bold;
-  margin: 0 0 0.25rem;
   color: #2C3E50;
+  margin: 0;
 }
 
 .page-title p {
-  margin: 0;
-  color: #4A4A4A;
+  color: #6c757d;
+  margin: 0.5rem 0 0 0;
+  font-size: 1rem;
 }
 
 .btn-primary {
-  background: #D4AF37;
+  background: linear-gradient(45deg, #D4AF37, #F4D03F);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
 }
 
 .btn-primary:hover {
-  background: #B8941F;
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
 }
 
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Estados de carga y error */
 .loading-state, .error-state {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
   display: flex;
-  align-items: center;
   justify-content: center;
-  min-height: 300px;
+  align-items: center;
+  min-height: 400px;
 }
 
-.loading-spinner {
+.loading-spinner, .error-content {
   text-align: center;
+  background: white;
+  padding: 3rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .spinner {
@@ -901,7 +1163,22 @@ onMounted(() => {
   border-top: 4px solid #D4AF37;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
+  margin: 0 auto 1rem auto;
+}
+
+.mini-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498DB;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @keyframes spin {
@@ -909,45 +1186,111 @@ onMounted(() => {
   100% { transform: rotate(360deg); }
 }
 
-.error-content {
-  text-align: center;
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-}
-
 .error-content svg {
   color: #e74c3c;
   margin-bottom: 1rem;
+}
+
+.error-content h3 {
+  color: #2C3E50;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+}
+
+.error-details {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #ffeaea;
+  border-left: 4px solid #e74c3c;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.error-technical {
+  font-family: monospace;
+  font-size: 0.9rem;
+  color: #c0392b;
+  word-break: break-word;
+}
+
+.error-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
 }
 
 .btn-retry {
   background: #D4AF37;
   color: white;
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 2rem;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 1rem;
+  transition: all 0.3s ease;
 }
 
-.stats-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
+.btn-retry:hover:not(:disabled) {
+  background: #B8941F;
+  transform: translateY(-2px);
+}
+
+.btn-retry:disabled {
+  background: #d3d3d3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-back-error {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.btn-back-error:hover {
+  background: #5a6268;
+  transform: translateY(-2px);
+}
+
+/* Contenedor principal */
+.admin-clientes > div:last-child {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* Estadísticas */
+.stats-section {
   margin-bottom: 2rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
 }
 
 .stat-card {
   background: white;
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   gap: 1rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
 .stat-icon {
@@ -956,30 +1299,26 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.stat-icon.clients {
+.stat-card .stat-icon {
   background: rgba(52, 152, 219, 0.1);
   color: #3498DB;
 }
 
-.stat-icon.active {
+.stat-card.active .stat-icon {
   background: rgba(39, 174, 96, 0.1);
   color: #27AE60;
 }
 
-.stat-icon.loans {
-  background: rgba(155, 89, 182, 0.1);
-  color: #9B59B6;
-}
-
-.stat-icon.new {
-  background: rgba(212, 175, 55, 0.1);
-  color: #D4AF37;
+.stat-card.inactive .stat-icon {
+  background: rgba(231, 76, 60, 0.1);
+  color: #E74C3C;
 }
 
 .stat-content h3 {
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: bold;
   margin: 0 0 0.25rem;
   color: #2C3E50;
@@ -991,82 +1330,112 @@ onMounted(() => {
   font-weight: 500;
 }
 
+/* Filtros */
 .filters-section {
   background: white;
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   display: flex;
   gap: 1rem;
-  flex-wrap: wrap;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .search-box {
   position: relative;
-  flex: 1;
+  flex: 2;
   min-width: 300px;
 }
 
-.search-icon {
+.search-box svg {
   position: absolute;
-  left: 1rem;
+  left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #4A4A4A;
+  color: #6c757d;
 }
 
-.search-input {
+.search-box input {
   width: 100%;
-  padding: 0.75rem 0.75rem 0.75rem 3rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
+  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: #fafbfc;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: #D4AF37;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
 .filter-controls {
   display: flex;
   gap: 1rem;
+  align-items: center;
   flex-wrap: wrap;
 }
 
 .filter-select {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
-  min-width: 150px;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  background: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.clientes-table {
+.filter-select:focus {
+  outline: none;
+  border-color: #D4AF37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+/* Tabla */
+.table-container {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
-.table-container {
-  overflow-x: auto;
-}
-
-.data-table {
+.clients-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.data-table th {
-  background: #f8f9fa;
+.clients-table thead {
+  background: linear-gradient(45deg, #2C3E50, #34495E);
+  color: white;
+}
+
+.clients-table th {
   padding: 1rem;
   text-align: left;
   font-weight: 600;
-  color: #2C3E50;
-  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.data-table td {
+.client-row {
+  border-bottom: 1px solid #e9ecef;
+  transition: background-color 0.3s ease;
+}
+
+.client-row:hover {
+  background-color: #f8f9fa;
+}
+
+.clients-table td {
   padding: 1rem;
-  border-bottom: 1px solid #f1f1f1;
+  vertical-align: middle;
 }
 
 .client-info {
@@ -1086,68 +1455,90 @@ onMounted(() => {
   color: white;
   font-weight: bold;
   font-size: 0.9rem;
+  flex-shrink: 0;
 }
 
 .client-name {
   font-weight: 600;
   color: #2C3E50;
+  font-size: 0.95rem;
 }
 
-.client-id {
-  font-size: 0.9rem;
-  color: #4A4A4A;
-}
-
-.contact-info div {
-  margin-bottom: 0.25rem;
-}
-
-.phone {
-  color: #4A4A4A;
-  font-size: 0.9rem;
+.client-cedula {
+  font-size: 0.8rem;
+  color: #6c757d;
 }
 
 .status-badge {
+  display: inline-block;
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .status-badge.activo {
   background: rgba(39, 174, 96, 0.1);
   color: #27AE60;
+  border: 1px solid rgba(39, 174, 96, 0.2);
 }
 
 .status-badge.inactivo {
   background: rgba(231, 76, 60, 0.1);
   color: #E74C3C;
+  border: 1px solid rgba(231, 76, 60, 0.2);
+}
+
+.status-badge.pendiente {
+  background: rgba(255, 193, 7, 0.1);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.status-badge.aprobada {
+  background: rgba(40, 167, 69, 0.1);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.status-badge.rechazada {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.2);
 }
 
 .requests-count {
-  background: rgba(52, 152, 219, 0.1);
-  color: #3498DB;
+  background: #D4AF37;
+  color: white;
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: bold;
 }
 
+/* Botones de acción */
 .action-buttons {
   display: flex;
   gap: 0.5rem;
 }
 
 .btn-action {
-  padding: 0.5rem;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-action.view {
@@ -1155,9 +1546,17 @@ onMounted(() => {
   color: #3498DB;
 }
 
+.btn-action.view:hover:not(:disabled) {
+  background: rgba(52, 152, 219, 0.2);
+}
+
 .btn-action.edit {
   background: rgba(212, 175, 55, 0.1);
   color: #D4AF37;
+}
+
+.btn-action.edit:hover {
+  background: rgba(212, 175, 55, 0.2);
 }
 
 .btn-action.activate {
@@ -1165,72 +1564,86 @@ onMounted(() => {
   color: #27AE60;
 }
 
+.btn-action.activate:hover {
+  background: rgba(39, 174, 96, 0.2);
+}
+
 .btn-action.deactivate {
   background: rgba(231, 76, 60, 0.1);
   color: #E74C3C;
 }
 
-.btn-action:hover {
-  transform: translateY(-2px);
-  opacity: 0.8;
+.btn-action.deactivate:hover {
+  background: rgba(231, 76, 60, 0.2);
 }
 
-.pagination-controls {
+/* Paginación */
+.pagination {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-top: 1px solid #eee;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
 }
 
-.btn-pagination {
+.pagination-btn {
+  background: #D4AF37;
+  color: white;
+  border: none;
   padding: 0.5rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: white;
+  border-radius: 8px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.btn-pagination:hover:not(:disabled) {
-  background: #f8f9fa;
+.pagination-btn:hover:not(:disabled) {
+  background: #B8941F;
+  transform: translateY(-1px);
 }
 
-.btn-pagination:disabled {
-  opacity: 0.5;
+.pagination-btn:disabled {
+  background: #d3d3d3;
   cursor: not-allowed;
 }
 
 .pagination-info {
-  color: #4A4A4A;
-  font-weight: 500;
+  color: #6c757d;
+  font-size: 0.9rem;
 }
 
+/* Modales */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 2rem;
 }
 
 .modal-content {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
   max-width: 600px;
-  width: 90%;
+  width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
 .modal-content.large {
   max-width: 800px;
+}
+
+.modal-content.error-modal {
+  max-width: 500px;
 }
 
 .modal-header {
@@ -1238,30 +1651,83 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #e9ecef;
+  background: linear-gradient(45deg, #2C3E50, #34495E);
+  color: white;
+  border-radius: 16px 16px 0 0;
+}
+
+.modal-header.error-header {
+  background: linear-gradient(45deg, #e74c3c, #c0392b);
 }
 
 .modal-header h2 {
   margin: 0;
-  color: #2C3E50;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .btn-close {
   background: none;
   border: none;
-  color: #4A4A4A;
+  color: white;
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 6px;
-  transition: all 0.3s ease;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
 }
 
 .btn-close:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.2);
 }
 
+/* Modal de Error Específico */
+.error-modal-content {
+  padding: 2rem;
+  text-align: center;
+}
+
+.error-modal-content svg {
+  color: #e74c3c;
+  margin-bottom: 1rem;
+}
+
+.error-modal-content h3 {
+  color: #2C3E50;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.error-suggestions {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1.5rem 0;
+  text-align: left;
+}
+
+.error-suggestions h4 {
+  color: #856404;
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.error-suggestions ul {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: #856404;
+}
+
+.error-suggestions li {
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Formularios */
 .client-form {
-  padding: 1.5rem;
+  padding: 2rem;
 }
 
 .form-grid {
@@ -1272,7 +1738,9 @@ onMounted(() => {
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .form-group.full-width {
@@ -1280,33 +1748,47 @@ onMounted(() => {
 }
 
 .form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-weight: 600;
   color: #2C3E50;
+  font-size: 0.9rem;
 }
 
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
+.field-hint {
+  color: #6c757d;
+  font-size: 0.8rem;
+  font-weight: normal;
+}
+
+.form-input, .form-select, .form-textarea {
   padding: 0.75rem;
-  border: 1px solid #ddd;
+  border: 2px solid #e9ecef;
   border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.3s ease;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  font-family: inherit;
 }
 
-.form-input:focus,
-.form-select:focus,
-.form-textarea:focus {
+.form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
   border-color: #D4AF37;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
 .form-input.readonly {
   background: #f8f9fa;
   color: #6c757d;
+  cursor: not-allowed;
+}
+
+.field-error {
+  color: #e74c3c;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.field-info {
+  color: #6c757d;
+  font-size: 0.8rem;
 }
 
 .form-actions {
@@ -1314,30 +1796,34 @@ onMounted(() => {
   gap: 1rem;
   justify-content: flex-end;
   padding-top: 1rem;
-  border-top: 1px solid #eee;
+  border-top: 1px solid #e9ecef;
+  margin-top: 2rem;
 }
 
 .btn-secondary {
+  background: #6c757d;
+  color: white;
+  border: none;
   padding: 0.75rem 1.5rem;
-  border: 1px solid #ddd;
   border-radius: 8px;
-  background: white;
-  color: #4A4A4A;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .btn-secondary:hover {
-  background: #f8f9fa;
+  background: #5a6268;
+  transform: translateY(-1px);
 }
 
+/* Detalles del cliente */
 .client-details {
-  padding: 1.5rem;
+  padding: 2rem;
 }
 
 .details-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 2rem;
   margin-bottom: 2rem;
 }
@@ -1347,49 +1833,57 @@ onMounted(() => {
   margin-bottom: 1rem;
   font-size: 1.1rem;
   font-weight: 600;
+  border-bottom: 2px solid #D4AF37;
+  padding-bottom: 0.5rem;
 }
 
 .detail-item {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
   margin-bottom: 1rem;
 }
 
 .detail-item label {
-  font-size: 0.9rem;
-  color: #4A4A4A;
-  margin-bottom: 0.25rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .detail-item span {
   color: #2C3E50;
-  font-weight: 500;
+  font-size: 0.95rem;
 }
 
+/* Solicitudes */
 .solicitudes-section {
-  border-top: 1px solid #eee;
-  padding-top: 1.5rem;
+  border-top: 1px solid #e9ecef;
+  padding-top: 2rem;
 }
 
 .solicitudes-section h3 {
   color: #2C3E50;
   margin-bottom: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 .solicitudes-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
 .solicitud-item {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
+  border-left: 4px solid #D4AF37;
 }
 
 .solicitud-info {
@@ -1401,11 +1895,12 @@ onMounted(() => {
 .solicitud-id {
   font-weight: 600;
   color: #2C3E50;
+  font-size: 0.9rem;
 }
 
 .solicitud-fecha {
-  font-size: 0.9rem;
-  color: #4A4A4A;
+  color: #6c757d;
+  font-size: 0.8rem;
 }
 
 .solicitud-details {
@@ -1415,46 +1910,106 @@ onMounted(() => {
 }
 
 .monto {
+  color: #2C3E50;
   font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.no-solicitudes {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  font-style: italic;
+  border-top: 1px solid #e9ecef;
+}
+
+/* Sistema de notificaciones */
+.notification {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  z-index: 1100;
+  overflow: hidden;
+  animation: slideIn 0.3s ease-out;
+  max-width: 400px;
+}
+
+.notification.success {
+  border-left: 4px solid #27AE60;
+}
+
+.notification.error {
+  border-left: 4px solid #E74C3C;
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+}
+
+.notification.success .notification-content svg {
   color: #27AE60;
 }
 
-.status-badge.pendiente {
-  background: rgba(243, 156, 18, 0.1);
-  color: #F39C12;
-}
-
-.status-badge.aprobada {
-  background: rgba(39, 174, 96, 0.1);
-  color: #27AE60;
-}
-
-.status-badge.rechazada {
-  background: rgba(231, 76, 60, 0.1);
+.notification.error .notification-content svg {
   color: #E74C3C;
 }
 
+.notification-content span {
+  color: #2C3E50;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .header-section {
     flex-direction: column;
+    gap: 1rem;
     align-items: stretch;
   }
   
   .filters-section {
     flex-direction: column;
+    align-items: stretch;
   }
   
   .search-box {
-    min-width: 100%;
+    min-width: auto;
   }
   
   .filter-controls {
-    justify-content: stretch;
+    flex-direction: column;
+    align-items: stretch;
   }
   
-  .filter-select {
-    flex: 1;
-    min-width: unset;
+  .clients-table {
+    font-size: 0.8rem;
+  }
+  
+  .clients-table th,
+  .clients-table td {
+    padding: 0.5rem;
+  }
+  
+  .modal-overlay {
+    padding: 1rem;
   }
   
   .form-grid {
@@ -1465,9 +2020,16 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
   
-  .modal-content {
-    width: 95%;
-    margin: 1rem;
+  .pagination {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .notification {
+    right: 1rem;
+    left: 1rem;
+    max-width: none;
   }
 }
 </style>
