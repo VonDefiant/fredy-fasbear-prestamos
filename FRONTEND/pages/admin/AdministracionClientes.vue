@@ -662,6 +662,10 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 
+definePageMeta({
+  middleware: 'admin'
+})
+
 const loading = ref(true)
 const error = ref(null)
 const errorDetails = ref(null)
@@ -720,6 +724,7 @@ const fechaMaximaNacimiento = computed(() => {
 })
 
 const { api } = useApi()
+const { user } = useAuth()
 
 // Función para mostrar notificaciones
 const mostrarNotificacion = (mensaje, tipo = 'success') => {
@@ -772,6 +777,19 @@ const cargarEstadisticas = async () => {
     }
   } catch (err) {
     console.error('Error cargando estadísticas:', err)
+    // Si hay error, reintentamos una vez después de un delay
+    if (err.status === 500) {
+      setTimeout(async () => {
+        try {
+          const retryResponse = await api('/clients/stats')
+          if (retryResponse.success) {
+            stats.value = retryResponse.data.stats
+          }
+        } catch (retryErr) {
+          console.error('Error en reintento:', retryErr)
+        }
+      }, 1000)
+    }
   }
 }
 
@@ -960,14 +978,14 @@ const editarCliente = (cliente) => {
     direccion: cliente.direccion,
     cedula: cliente.cedula,
     estado: cliente.estado,
-    fechaNacimiento: cliente.fechaNacimiento ? cliente.fechaNacimiento.split('T')[0] : ''
+    fechaNacimiento: cliente.fechaNacimiento ? cliente.fechaNacimiento.split('T')[0] : '',
+    password: '' // Nunca pre-llenamos contraseñas
   }
   mostrarModalEditar.value = true
 }
 
 const cerrarModalCrear = () => {
   mostrarModalCrear.value = false
-  cedulaError.value = ''
   formCliente.value = {
     nombre: '',
     apellido: '',
@@ -979,6 +997,7 @@ const cerrarModalCrear = () => {
     estado: 'Activo',
     fechaNacimiento: ''
   }
+  cedulaError.value = ''
 }
 
 const cerrarModalEditar = () => {
@@ -994,6 +1013,7 @@ const cerrarModalEditar = () => {
     estado: 'Activo',
     fechaNacimiento: ''
   }
+  cedulaError.value = ''
 }
 
 const cerrarModalVer = () => {
@@ -1030,10 +1050,18 @@ const formatNumber = (numero) => {
   }
 }
 
-// Cargar datos al montar el componente
+// Cargar datos al montar el componente - VERSIÓN SIMPLIFICADA
 onMounted(async () => {
-  await cargarEstadisticas()
-  await cargarClientes()
+  console.log('Montando AdministracionClientes...')
+  
+  // Esperar un poco para que la autenticación se estabilice
+  await nextTick()
+  
+  // Cargar datos con un pequeño delay para evitar problemas de timing
+  setTimeout(async () => {
+    await cargarEstadisticas()
+    await cargarClientes()
+  }, 100)
 })
 </script>
 

@@ -1,8 +1,3 @@
-<!-- =============================================== -->
-<!-- Archivo: FRONTEND/pages/admin/index.vue (ESTILO ORIGINAL RESTAURADO) -->
-<!-- Panel de administración con estilo original + backend conectado -->
-<!-- =============================================== -->
-
 <template>
   <div class="admin-panel">
     <!-- Header del Admin Panel -->
