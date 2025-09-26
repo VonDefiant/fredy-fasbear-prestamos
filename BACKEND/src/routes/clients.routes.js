@@ -14,10 +14,6 @@ router.use((req, res, next) => {
 router.use(authenticateToken);
 router.use(requireAdmin);
 
-/**
- * GET /api/clients/stats
- * Obtiene estadísticas de los clientes - FUNCIONANDO
- */
 router.get('/stats', async (req, res) => {
   try {
     const [
@@ -113,10 +109,6 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-/**
- * GET /api/clients
- * Obtiene lista de clientes con filtros y paginación - FUNCIONANDO
- */
 router.get('/', async (req, res) => {
   try {
     const { 
@@ -208,15 +200,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-/**
- * GET /api/clients/:id
- * Obtiene detalle completo de un cliente - ⚠️ PROBLEMA AQUÍ - SOLUCIONADO
- */
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Validar que el ID sea un número válido
     if (!id || isNaN(parseInt(id))) {
       console.log(`❌ ID inválido proporcionado: ${id}`);
       return res.status(400).json({
@@ -228,7 +215,6 @@ router.get('/:id', async (req, res) => {
     const clienteId = parseInt(id);
     console.log(`🔍 Buscando cliente con ID: ${clienteId}`);
 
-    // Primero verificar que el cliente existe
     const clienteExiste = await prisma.usuario.findUnique({
       where: {
         id: clienteId
@@ -255,7 +241,6 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    // Ahora obtener el cliente completo con manejo de errores más robusto
     const cliente = await prisma.usuario.findUnique({
       where: {
         id: clienteId
@@ -271,14 +256,25 @@ router.get('/:id', async (req, res) => {
         cedula: true,
         fechaRegistro: true,
         fechaNacimiento: true,
-        // Solicitudes con manejo más seguro
         solicitudes: {
           select: {
             id: true,
             fechaSolicitud: true,
             estado: true,
             montoSolicitado: true,
-            descripcionArticulo: true
+            observaciones: true,
+            plazoMeses: true,
+            modalidadPago: true,
+            articulos: {
+              select: {
+                id: true,
+                descripcion: true,
+                marca: true,
+                modelo: true,
+                color: true
+              },
+              take: 3
+            }
           },
           orderBy: { fechaSolicitud: 'desc' },
           take: 10
@@ -286,7 +282,6 @@ router.get('/:id', async (req, res) => {
       }
     });
 
-    // Esta verificación adicional es redundante pero más segura
     if (!cliente) {
       console.log(`❌ Error inesperado: Cliente ${clienteId} no encontrado en segunda consulta`);
       return res.status(404).json({
@@ -297,14 +292,31 @@ router.get('/:id', async (req, res) => {
 
     console.log(`✅ Cliente encontrado: ${cliente.nombre} ${cliente.apellido} (${cliente.solicitudes?.length || 0} solicitudes)`);
 
-    // Procesar solicitudes para asegurar datos seguros
-    const solicitudesProcesadas = (cliente.solicitudes || []).map(solicitud => ({
-      id: solicitud.id,
-      fechaSolicitud: solicitud.fechaSolicitud,
-      estado: solicitud.estado,
-      montoSolicitado: solicitud.montoSolicitado || 0,
-      descripcionArticulo: solicitud.descripcionArticulo || 'Sin descripción'
-    }));
+    const solicitudesProcesadas = (cliente.solicitudes || []).map(solicitud => {
+      const descripcionArticulos = solicitud.articulos.length > 0
+        ? solicitud.articulos
+            .map(articulo => {
+              const partes = [articulo.descripcion];
+              if (articulo.marca) partes.push(articulo.marca);
+              if (articulo.modelo) partes.push(articulo.modelo);
+              if (articulo.color) partes.push(`(${articulo.color})`);
+              return partes.join(' ');
+            })
+            .join(', ')
+        : 'Sin artículos registrados';
+
+      return {
+        id: solicitud.id,
+        fechaSolicitud: solicitud.fechaSolicitud,
+        estado: solicitud.estado,
+        montoSolicitado: solicitud.montoSolicitado || 0,
+        observaciones: solicitud.observaciones,
+        plazoMeses: solicitud.plazoMeses,
+        modalidadPago: solicitud.modalidadPago,
+        descripcionArticulos: descripcionArticulos,
+        cantidadArticulos: solicitud.articulos.length
+      };
+    });
 
     const clienteResponse = {
       ...cliente,
@@ -320,7 +332,6 @@ router.get('/:id', async (req, res) => {
     console.error('[ERROR] Error obteniendo detalle de cliente:', error);
     console.error('Error stack:', error.stack);
     
-    // Determinar tipo de error para respuesta más específica
     let statusCode = 500;
     let message = 'Error interno del servidor al obtener detalle del cliente';
 
@@ -335,7 +346,6 @@ router.get('/:id', async (req, res) => {
       message = 'No se puede conectar a la base de datos';
     }
 
-    // Logging detallado para debugging
     console.error('Error details:', {
       name: error.name,
       message: error.message,
@@ -359,10 +369,6 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-/**
- * POST /api/clients
- * Crea un nuevo cliente
- */
 router.post('/', async (req, res) => {
   try {
     const {
@@ -377,21 +383,19 @@ router.post('/', async (req, res) => {
       fechaNacimiento
     } = req.body;
 
-    // Validaciones básicas
     if (!nombre || !apellido || !email || !telefono || !direccion || !cedula || !password) {
       return res.status(400).json({
         success: false,
         message: 'Todos los campos obligatorios deben ser proporcionados'
       });
     }
-s)
+
     if (!/^\d{13,13}$/.test(cedula)) {
       return res.status(400).json({
         success: false,
         message: 'El DPI debe contener solo números y tener entre 8 y 13 dígitos'
       });
     }
-
 
     const existingUser = await prisma.usuario.findFirst({
       where: {
@@ -440,7 +444,7 @@ s)
       }
     });
 
-    console.log(`✅ Cliente creado: ${nuevoCliente.nombre} ${nuevoCliente.apellido} (ID: ${nuevoCliente.id})`);
+    console.log(`✅ Cliente creado exitosamente: ${nuevoCliente.nombre} ${nuevoCliente.apellido}`);
 
     res.status(201).json({
       success: true,
@@ -449,14 +453,6 @@ s)
 
   } catch (error) {
     console.error('[ERROR] Error creando cliente:', error);
-    
-    if (error.code === 'P2002') {
-      return res.status(400).json({
-        success: false,
-        message: 'Ya existe un cliente con estos datos'
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: 'Error creando cliente'
@@ -464,10 +460,6 @@ s)
   }
 });
 
-/**
- * PUT /api/clients/:id
- * Actualiza los datos de un cliente
- */
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -490,7 +482,6 @@ router.put('/:id', async (req, res) => {
 
     const clienteId = parseInt(id);
 
-    // Verificar que el cliente existe
     const clienteExistente = await prisma.usuario.findFirst({
       where: {
         id: clienteId,
@@ -505,7 +496,6 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Verificar email único si se está cambiando
     if (email && email !== clienteExistente.email) {
       const emailExiste = await prisma.usuario.findFirst({
         where: {
@@ -563,10 +553,6 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-/**
- * PUT /api/clients/:id/toggle-status
- * Cambia el estado de un cliente (Activo/Inactivo)
- */
 router.put('/:id/toggle-status', async (req, res) => {
   try {
     const { id } = req.params;
@@ -607,10 +593,11 @@ router.put('/:id/toggle-status', async (req, res) => {
       }
     });
 
-    console.log(`🔄 Estado cambiado: ${clienteActualizado.nombre} ${clienteActualizado.apellido} -> ${nuevoEstado}`);
+    console.log(`✅ Estado del cliente cambiado: ${clienteActualizado.nombre} ${clienteActualizado.apellido} -> ${nuevoEstado}`);
 
     res.status(200).json({
       success: true,
+      message: `Cliente ${nuevoEstado.toLowerCase()} exitosamente`,
       data: { cliente: clienteActualizado }
     });
 
