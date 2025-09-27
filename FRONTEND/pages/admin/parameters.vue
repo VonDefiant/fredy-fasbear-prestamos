@@ -1,9 +1,4 @@
-<!-- =============================================== -->
-<!-- Archivo: FRONTEND/pages/admin/parameters.vue -->
-<!-- Página de administración de parámetros del sistema -->
-<!-- =============================================== -->
-
-<template>
+  <template>
   <div class="admin-parametros">
     <!-- Botón de regreso al panel de administración -->
     <div class="navigation-header">

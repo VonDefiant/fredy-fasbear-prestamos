@@ -6,6 +6,7 @@ import solicitudesRoutes from './solicitudes.routes.js';
 import adminRoutes from './admin.routes.js';
 import personalRoutes from './personal.routes.js';
 import clientsRoutes from './clients.routes.js';
+import ecommerceRoutes from './ecommerce.routes.js'; 
 
 const router = express.Router();
 
@@ -28,7 +29,8 @@ router.use('/prestamos', prestamosRoutes);
 router.use('/solicitudes', solicitudesRoutes); 
 router.use('/admin', adminRoutes);
 router.use('/personal', personalRoutes);
-router.use('/clients', clientsRoutes);  // Corregido: sin /api/ porque ya está en el contexto
+router.use('/clients', clientsRoutes);  
+router.use('/admin/ecommerce-config', ecommerceRoutes);
 
 // Futuras rutas (placeholders)
 // router.use('/productos', productosRoutes);
@@ -50,7 +52,8 @@ router.get('/health', (req, res) => {
       storage: 'available',
       auth: 'active',
       admin: 'active',
-      personal: 'active'
+      personal: 'active',
+            ecommerce: 'active'
     }
   });
 });
@@ -145,6 +148,21 @@ router.get('/info', (req, res) => {
             'PUT /api/admin/system-parameters/:id'
           ]
         },
+          ecommerce: {
+          base: '/api/admin/ecommerce-config',
+          description: 'Configuración del módulo E-commerce',
+          endpoints: [
+            'GET /api/admin/ecommerce-config',
+            'GET /api/admin/ecommerce-config/categories',
+            'GET /api/admin/ecommerce-config/payment-methods',
+            'GET /api/admin/ecommerce-config/shipping',
+            'GET /api/admin/ecommerce-config/promotions',
+            'PUT /api/admin/ecommerce-config/:configId',
+            'POST /api/admin/ecommerce-config',
+            'DELETE /api/admin/ecommerce-config/:configId',
+            'POST /api/admin/ecommerce-config/reset'
+          ]
+        },
         // Rutas de utilidad
         system: {
           base: '/api',
@@ -162,6 +180,8 @@ router.get('/info', (req, res) => {
       rateLimit: {
         auth: '5 requests per 15 minutes',
         solicitudes: '5 requests per hour',
+        ecommerce_config: '30 requests per 15 minutes', 
+        ecommerce_write: '10 requests per 5 minutes',
         general: '100 requests per 15 minutes'
       }
     }
@@ -201,10 +221,11 @@ router.use((req, res) => {
       '/api/auth/*',
       '/api/homepage/*', 
       '/api/prestamos/*',
-      '/api/solicitudes/*',  // Corregido: eliminada coma duplicada
+      '/api/solicitudes/*', 
       '/api/personal/*',
       '/api/admin/*',
-      '/api/clients/*',  // Agregado
+      '/api/clients/*',  
+     '/api/admin/ecommerce-config/*',
       '/api/health',
       '/api/info'
     ]
