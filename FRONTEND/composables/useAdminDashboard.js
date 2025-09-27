@@ -1,13 +1,22 @@
+// ===============================================
+// Archivo: FRONTEND/composables/useAdminDashboard.js
+// Composable completo para el dashboard de administración - VERSIÓN COMPLETA
+// ===============================================
+
+import { ref } from 'vue'
+
 export const useAdminDashboard = () => {
   // ===== ESTADO REACTIVO =====
   const loading = ref(false)
   const error = ref(null)
-  
+
   // ===== COMPOSABLES INTERNOS =====
   const { api } = useApi()
 
+  // ===== FUNCIONES PARA ESTADÍSTICAS Y DASHBOARD =====
+
   /**
-   * Obtener estadísticas completas del dashboard
+   * Obtener estadísticas del dashboard de administración
    * @returns {Promise<Object>} Estadísticas del sistema
    */
   const getAdminStats = async () => {
@@ -15,73 +24,19 @@ export const useAdminDashboard = () => {
       loading.value = true
       error.value = null
       
-      console.log('📊 Cargando panel de administración...')
+      console.log('📊 Obteniendo estadísticas de admin...')
       
-      // Llamar a las APIs del backend en paralelo para mejor rendimiento
-      const [statsResponse, usersResponse] = await Promise.allSettled([
-        api('/admin/stats'),
-        api('/auth/users')
-      ])
+      const response = await api('/admin/stats')
       
-      let dashboardStats = {
-        totalUsers: 0,
-        clientsCount: 0,
-        activeStaff: 0,
-        evaluators: 0,
-        collectors: 0,
-        systemParameters: 0,
-        currentRate: 0,
-        activeSessions: 0,
-        articleTypes: 0,
-        storeProducts: 0,
-        newUsersToday: 0,
-        pendingRequests: 0,
-        overdueLoans: 0
-      }
-      
-      // Procesar respuesta de estadísticas admin
-      if (statsResponse.status === 'fulfilled' && statsResponse.value.success) {
-        const adminStats = statsResponse.value.data.stats
-        dashboardStats = { ...dashboardStats, ...adminStats }
-        console.log('✅ Datos del sistema cargados correctamente')
+      if (response.success) {
+        console.log('✅ Estadísticas obtenidas:', response.data)
+        return response.data
       } else {
-        console.log('📋 Calculando estadísticas desde base de datos...')
-        
-        // Fallback: calcular estadísticas desde usuarios si la API admin no está disponible
-        if (usersResponse.status === 'fulfilled' && usersResponse.value.success) {
-          const users = usersResponse.value.data.users || []
-          
-          dashboardStats.totalUsers = users.length
-          dashboardStats.clientsCount = users.filter(u => u.tipoUsuario === 'Cliente').length
-          dashboardStats.activeStaff = users.filter(u => 
-            ['Administrador', 'Evaluador', 'Cobrador'].includes(u.tipoUsuario) && u.estado === 'Activo'
-          ).length
-          dashboardStats.evaluators = users.filter(u => u.tipoUsuario === 'Evaluador').length
-          dashboardStats.collectors = users.filter(u => u.tipoUsuario === 'Cobrador').length
-          
-          // Calcular nuevos usuarios hoy
-          const today = new Date().toISOString().split('T')[0]
-          dashboardStats.newUsersToday = users.filter(u => {
-            if (!u.fechaRegistro) return false
-            const userDate = new Date(u.fechaRegistro).toISOString().split('T')[0]
-            return userDate === today
-          }).length
-          
-          // Valores por defecto para otras estadísticas
-          dashboardStats.systemParameters = 4
-          dashboardStats.currentRate = 5.0
-          dashboardStats.activeSessions = Math.floor(Math.random() * 10) + 1
-          dashboardStats.articleTypes = 6
-          
-          console.log('✅ Estadísticas calculadas exitosamente')
-        }
+        throw new Error(response.message || 'Error obteniendo estadísticas')
       }
-      
-      return dashboardStats
-      
     } catch (err) {
-      console.error('❌ Error cargando panel:', err)
-      error.value = 'No se pudo cargar el panel de administración'
+      console.error('❌ Error obteniendo estadísticas:', err)
+      error.value = err.message
       throw err
     } finally {
       loading.value = false
@@ -89,113 +44,13 @@ export const useAdminDashboard = () => {
   }
 
   /**
-   * Obtener resumen detallado de usuarios
-   * @returns {Promise<Object>} Resumen de usuarios por tipo
-   */
-  const getUsersOverview = async () => {
-    try {
-      console.log('👥 Obteniendo resumen de usuarios...')
-      
-      const response = await api('/admin/users-overview')
-      
-      if (response.success) {
-        console.log('✅ Resumen de usuarios obtenido:', response.data)
-        return response.data
-      } else {
-        throw new Error(response.message || 'Error obteniendo resumen de usuarios')
-      }
-    } catch (err) {
-      console.error('❌ Error obteniendo resumen de usuarios:', err)
-      
-      // Fallback: usar API básica de usuarios
-      try {
-        const fallbackResponse = await api('/auth/users')
-        if (fallbackResponse.success) {
-          const users = fallbackResponse.value.data.users || []
-          
-          // Procesar datos para simular el formato esperado
-          const usersByType = []
-          const types = ['Cliente', 'Administrador', 'Evaluador', 'Cobrador']
-          const states = ['Activo', 'Inactivo']
-          
-          types.forEach(tipo => {
-            states.forEach(estado => {
-              const count = users.filter(u => u.tipoUsuario === tipo && u.estado === estado).length
-              if (count > 0) {
-                usersByType.push({
-                  tipoUsuario: tipo,
-                  estado: estado,
-                  _count: { id: count }
-                })
-              }
-            })
-          })
-          
-          const recentUsers = users
-            .sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro))
-            .slice(0, 10)
-            .map(u => ({
-              id: u.id,
-              nombre: u.nombre,
-              apellido: u.apellido,
-              email: u.email,
-              tipoUsuario: u.tipoUsuario,
-              estado: u.estado,
-              fechaRegistro: u.fechaRegistro
-            }))
-          
-          return { usersByType, recentUsers }
-        }
-      } catch (fallbackErr) {
-        console.error('❌ Error en fallback de usuarios:', fallbackErr)
-      }
-      
-      throw err
-    }
-  }
-
-  /**
-   * Obtener salud del sistema
-   * @returns {Promise<Object>} Estado de salud del sistema
-   */
-  const getSystemHealth = async () => {
-    try {
-      console.log('🏥 Verificando salud del sistema...')
-      
-      const response = await api('/admin/system-health')
-      
-      if (response.success) {
-        console.log('✅ Salud del sistema obtenida:', response.data)
-        return response.data
-      } else {
-        throw new Error(response.message || 'Error verificando salud del sistema')
-      }
-    } catch (err) {
-      console.error('❌ Error verificando salud del sistema:', err)
-      
-      // Fallback: crear respuesta básica
-      return {
-        systemInfo: {
-          timestamp: new Date().toISOString(),
-          uptime: 'N/A',
-          nodeVersion: 'N/A',
-          environment: 'unknown',
-          databaseConnected: false,
-          memoryUsage: {}
-        },
-        lastActivity: null
-      }
-    }
-  }
-
-  /**
    * Obtener actividad reciente del sistema
-   * @param {Number} limit - Límite de registros a obtener
+   * @param {Number} limit - Número máximo de registros a obtener
    * @returns {Promise<Object>} Actividad reciente
    */
-  const getRecentActivity = async (limit = 20) => {
+  const getRecentActivity = async (limit = 10) => {
     try {
-      console.log('📋 Obteniendo actividad reciente...')
+      console.log('🔄 Obteniendo actividad reciente...')
       
       const response = await api(`/admin/recent-activity?limit=${limit}`)
       
@@ -217,25 +72,33 @@ export const useAdminDashboard = () => {
     }
   }
 
+  // ===== FUNCIONES PARA PARÁMETROS DEL SISTEMA =====
+
   /**
    * Obtener parámetros del sistema
    * @returns {Promise<Array>} Lista de parámetros del sistema
    */
   const getSystemParameters = async () => {
     try {
+      loading.value = true
+      error.value = null
+      
       console.log('⚙️ Obteniendo parámetros del sistema...')
       
       const response = await api('/admin/system-parameters')
       
       if (response.success) {
-        console.log('✅ Parámetros obtenidos:', response.data.parameters)
+        console.log('✅ Parámetros obtenidos:', response.data.parameters.length, 'parámetros')
         return response.data.parameters
       } else {
         throw new Error(response.message || 'Error obteniendo parámetros')
       }
     } catch (err) {
       console.error('❌ Error obteniendo parámetros:', err)
+      error.value = err.message
       throw err
+    } finally {
+      loading.value = false
     }
   }
 
@@ -250,9 +113,14 @@ export const useAdminDashboard = () => {
     try {
       console.log(`⚙️ Actualizando parámetro ${id}:`, { valorParametro, descripcion })
       
+      const payload = { valorParametro }
+      if (descripcion !== null && descripcion !== undefined) {
+        payload.descripcion = descripcion
+      }
+      
       const response = await api(`/admin/system-parameters/${id}`, {
         method: 'PUT',
-        body: { valorParametro, descripcion }
+        body: payload
       })
       
       if (response.success) {
@@ -268,12 +136,233 @@ export const useAdminDashboard = () => {
   }
 
   /**
+   * Crear un nuevo parámetro del sistema
+   * @param {Object} parametroData - Datos del parámetro
+   * @param {String} parametroData.nombreParametro - Nombre del parámetro
+   * @param {String} parametroData.valorParametro - Valor del parámetro
+   * @param {String} parametroData.tipoDato - Tipo de dato (STRING, INTEGER, DECIMAL, BOOLEAN, DATE)
+   * @param {String} parametroData.descripcion - Descripción (opcional)
+   * @returns {Promise<Object>} Parámetro creado
+   */
+  const createSystemParameter = async (parametroData) => {
+    try {
+      console.log('⚙️ Creando nuevo parámetro:', parametroData)
+      
+      const response = await api('/admin/system-parameters', {
+        method: 'POST',
+        body: parametroData
+      })
+      
+      if (response.success) {
+        console.log('✅ Parámetro creado:', response.data.parameter)
+        return response.data.parameter
+      } else {
+        throw new Error(response.message || 'Error creando parámetro')
+      }
+    } catch (err) {
+      console.error('❌ Error creando parámetro:', err)
+      throw err
+    }
+  }
+
+  /**
+   * Eliminar un parámetro del sistema
+   * @param {Number} id - ID del parámetro
+   * @returns {Promise<Boolean>} Éxito de la operación
+   */
+  const deleteSystemParameter = async (id) => {
+    try {
+      console.log(`⚙️ Eliminando parámetro ${id}...`)
+      
+      const response = await api(`/admin/system-parameters/${id}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.success) {
+        console.log('✅ Parámetro eliminado')
+        return true
+      } else {
+        throw new Error(response.message || 'Error eliminando parámetro')
+      }
+    } catch (err) {
+      console.error('❌ Error eliminando parámetro:', err)
+      throw err
+    }
+  }
+
+  // ===== FUNCIONES PARA TIPOS DE ARTÍCULOS =====
+
+  /**
+   * Obtener todos los tipos de artículos
+   * @returns {Promise<Array>} Lista de tipos de artículos
+   */
+  const getArticleTypes = async () => {
+    try {
+      loading.value = true
+      error.value = null
+      
+      console.log('📦 Obteniendo tipos de artículos...')
+      
+      const response = await api('/admin/article-types')
+      
+      if (response.success) {
+        console.log('✅ Tipos de artículos obtenidos:', response.data.articleTypes.length, 'tipos')
+        return response.data.articleTypes
+      } else {
+        throw new Error(response.message || 'Error obteniendo tipos de artículos')
+      }
+    } catch (err) {
+      console.error('❌ Error obteniendo tipos de artículos:', err)
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * Crear un nuevo tipo de artículo
+   * @param {Object} articleTypeData - Datos del tipo de artículo
+   * @param {String} articleTypeData.nombre - Nombre del tipo
+   * @param {Number} articleTypeData.porcentajeMinAvaluo - Porcentaje mínimo de avalúo
+   * @param {Number} articleTypeData.porcentajeMaxAvaluo - Porcentaje máximo de avalúo
+   * @param {Boolean} articleTypeData.requiereElectronico - Si requiere información electrónica
+   * @returns {Promise<Object>} Tipo de artículo creado
+   */
+  const createArticleType = async (articleTypeData) => {
+    try {
+      console.log('📦 Creando nuevo tipo de artículo:', articleTypeData)
+      
+      const response = await api('/admin/article-types', {
+        method: 'POST',
+        body: articleTypeData
+      })
+      
+      if (response.success) {
+        console.log('✅ Tipo de artículo creado:', response.data.articleType)
+        return response.data.articleType
+      } else {
+        throw new Error(response.message || 'Error creando tipo de artículo')
+      }
+    } catch (err) {
+      console.error('❌ Error creando tipo de artículo:', err)
+      throw err
+    }
+  }
+
+  /**
+   * Actualizar un tipo de artículo existente
+   * @param {Number} id - ID del tipo de artículo
+   * @param {Object} articleTypeData - Datos actualizados del tipo
+   * @returns {Promise<Object>} Tipo de artículo actualizado
+   */
+  const updateArticleType = async (id, articleTypeData) => {
+    try {
+      console.log(`📦 Actualizando tipo de artículo ${id}:`, articleTypeData)
+      
+      const response = await api(`/admin/article-types/${id}`, {
+        method: 'PUT',
+        body: articleTypeData
+      })
+      
+      if (response.success) {
+        console.log('✅ Tipo de artículo actualizado:', response.data.articleType)
+        return response.data.articleType
+      } else {
+        throw new Error(response.message || 'Error actualizando tipo de artículo')
+      }
+    } catch (err) {
+      console.error('❌ Error actualizando tipo de artículo:', err)
+      throw err
+    }
+  }
+
+  /**
+   * Cambiar el estado (Activo/Inactivo) de un tipo de artículo
+   * @param {Number} id - ID del tipo de artículo
+   * @returns {Promise<Object>} Tipo de artículo con estado actualizado
+   */
+  const toggleArticleTypeStatus = async (id) => {
+    try {
+      console.log(`📦 Cambiando estado del tipo de artículo ${id}...`)
+      
+      const response = await api(`/admin/article-types/${id}/toggle-status`, {
+        method: 'PUT'
+      })
+      
+      if (response.success) {
+        console.log('✅ Estado del tipo de artículo cambiado:', response.data.articleType)
+        return response.data.articleType
+      } else {
+        throw new Error(response.message || 'Error cambiando estado del tipo')
+      }
+    } catch (err) {
+      console.error('❌ Error cambiando estado del tipo de artículo:', err)
+      throw err
+    }
+  }
+
+  /**
+   * Eliminar un tipo de artículo
+   * @param {Number} id - ID del tipo de artículo
+   * @returns {Promise<Boolean>} Éxito de la operación
+   */
+  const deleteArticleType = async (id) => {
+    try {
+      console.log(`📦 Eliminando tipo de artículo ${id}...`)
+      
+      const response = await api(`/admin/article-types/${id}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.success) {
+        console.log('✅ Tipo de artículo eliminado')
+        return true
+      } else {
+        throw new Error(response.message || 'Error eliminando tipo de artículo')
+      }
+    } catch (err) {
+      console.error('❌ Error eliminando tipo de artículo:', err)
+      throw err
+    }
+  }
+
+  /**
+   * Obtener artículos asociados a un tipo específico
+   * @param {Number} id - ID del tipo de artículo
+   * @param {Object} options - Opciones de paginación
+   * @param {Number} options.page - Página actual (default: 1)
+   * @param {Number} options.limit - Elementos por página (default: 10)
+   * @returns {Promise<Object>} Artículos y información de paginación
+   */
+  const getArticlesByType = async (id, options = {}) => {
+    try {
+      const { page = 1, limit = 10 } = options
+      console.log(`📦 Obteniendo artículos del tipo ${id}...`)
+      
+      const response = await api(`/admin/article-types/${id}/articles?page=${page}&limit=${limit}`)
+      
+      if (response.success) {
+        console.log('✅ Artículos obtenidos:', response.data.articles.length, 'artículos')
+        return response.data
+      } else {
+        throw new Error(response.message || 'Error obteniendo artículos del tipo')
+      }
+    } catch (err) {
+      console.error('❌ Error obteniendo artículos del tipo:', err)
+      throw err
+    }
+  }
+
+  // ===== FUNCIONES DEL SISTEMA =====
+
+  /**
    * Crear respaldo de la base de datos
    * @returns {Promise<Object>} Información del respaldo
    */
   const createDatabaseBackup = async () => {
     try {
-      console.log('💾 Creando respaldo de base de datos...')
+      console.log('💾 Creando respaldo de la base de datos...')
       
       const response = await api('/admin/backup-database', {
         method: 'POST'
@@ -292,30 +381,36 @@ export const useAdminDashboard = () => {
   }
 
   /**
-   * Formatear fecha para mostrar en UI
-   * @param {String|Date} date - Fecha a formatear
-   * @returns {String} Fecha formateada
+   * Verificar estado del sistema
+   * @returns {Promise<Object>} Estado del sistema
    */
-  const formatDate = (date) => {
-    if (!date) return 'N/A'
-    
+  const getSystemHealth = async () => {
     try {
-      const dateObj = new Date(date)
-      return dateObj.toLocaleDateString('es-GT', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    } catch (error) {
-      console.error('Error formateando fecha:', error)
-      return 'Fecha inválida'
+      console.log('🏥 Verificando estado del sistema...')
+      
+      const response = await api('/admin/system-health')
+      
+      if (response.success) {
+        console.log('✅ Estado del sistema obtenido:', response.data.health)
+        return response.data.health
+      } else {
+        console.warn('⚠️ Sistema en estado degradado:', response.data?.health)
+        return response.data?.health || { systemStatus: 'unknown' }
+      }
+    } catch (err) {
+      console.error('❌ Error verificando estado del sistema:', err)
+      return { 
+        systemStatus: 'error', 
+        database: 'error',
+        timestamp: new Date().toISOString() 
+      }
     }
   }
 
+  // ===== FUNCIONES DE UTILIDAD GENERALES =====
+
   /**
-   * Formatear número con separadores de miles
+   * Formatear números con separadores de miles
    * @param {Number} number - Número a formatear
    * @returns {String} Número formateado
    */
@@ -325,33 +420,319 @@ export const useAdminDashboard = () => {
   }
 
   /**
-   * Formatear porcentaje
-   * @param {Number} value - Valor a formatear como porcentaje
-   * @param {Number} decimals - Número de decimales
+   * Formatear porcentajes
+   * @param {Number} number - Número a formatear como porcentaje
+   * @param {Number} decimals - Número de decimales (default: 1)
    * @returns {String} Porcentaje formateado
    */
-  const formatPercentage = (value, decimals = 1) => {
-    if (typeof value !== 'number') return '0%'
-    return `${value.toFixed(decimals)}%`
+  const formatPercentage = (number, decimals = 1) => {
+    if (typeof number !== 'number') return '0%'
+    return `${number.toFixed(decimals)}%`
   }
 
+  /**
+   * Formatear moneda en quetzales
+   * @param {Number} amount - Cantidad a formatear
+   * @returns {String} Cantidad formateada
+   */
+  const formatCurrency = (amount) => {
+    if (typeof amount !== 'number') return 'Q 0.00'
+    return `Q ${amount.toLocaleString('es-GT', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })}`
+  }
+
+  /**
+   * Formatear fecha relativa (hace X tiempo)
+   * @param {Date|String} date - Fecha a formatear
+   * @returns {String} Fecha formateada
+   */
+  const formatTimeAgo = (date) => {
+    if (!date) return 'Desconocido'
+    
+    const now = new Date()
+    const past = new Date(date)
+    const diffMs = now - past
+    
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    
+    if (diffMinutes < 1) return 'Hace un momento'
+    if (diffMinutes < 60) return `Hace ${diffMinutes} minuto${diffMinutes > 1 ? 's' : ''}`
+    if (diffHours < 24) return `Hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`
+    if (diffDays < 7) return `Hace ${diffDays} día${diffDays > 1 ? 's' : ''}`
+    if (diffDays < 30) return `Hace ${Math.floor(diffDays / 7)} semana${Math.floor(diffDays / 7) > 1 ? 's' : ''}`
+    
+    return past.toLocaleDateString('es-GT', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  /**
+   * Formatear fecha completa
+   * @param {Date|String} date - Fecha a formatear
+   * @returns {String} Fecha formateada
+   */
+  const formatDate = (date) => {
+    if (!date) return 'No definida'
+    
+    return new Date(date).toLocaleDateString('es-GT', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  /**
+   * Formatear fecha y hora
+   * @param {Date|String} date - Fecha a formatear
+   * @returns {String} Fecha y hora formateadas
+   */
+  const formatDateTime = (date) => {
+    if (!date) return 'No definida'
+    
+    return new Date(date).toLocaleString('es-GT', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
+
+  // ===== FUNCIONES DE VALIDACIÓN =====
+
+  /**
+   * Validar valor de parámetro según su tipo
+   * @param {String} valor - Valor a validar
+   * @param {String} tipoDato - Tipo de dato (STRING, INTEGER, DECIMAL, BOOLEAN, DATE)
+   * @returns {Object} Resultado de validación { isValid: boolean, error?: string }
+   */
+  const validateParameterValue = (valor, tipoDato) => {
+    if (!valor && valor !== 0 && valor !== false) {
+      return { isValid: false, error: 'El valor es obligatorio' }
+    }
+
+    switch (tipoDato) {
+      case 'INTEGER':
+        if (!/^-?\d+$/.test(valor.toString())) {
+          return { isValid: false, error: 'Debe ser un número entero' }
+        }
+        break
+
+      case 'DECIMAL':
+        if (!/^-?\d+(\.\d+)?$/.test(valor.toString())) {
+          return { isValid: false, error: 'Debe ser un número decimal válido' }
+        }
+        break
+
+      case 'BOOLEAN':
+        if (!['true', 'false', true, false].includes(valor)) {
+          return { isValid: false, error: 'Debe ser verdadero o falso' }
+        }
+        break
+
+      case 'DATE':
+        if (isNaN(Date.parse(valor))) {
+          return { isValid: false, error: 'Debe ser una fecha válida' }
+        }
+        break
+
+      case 'STRING':
+        if (typeof valor !== 'string' || valor.length === 0) {
+          return { isValid: false, error: 'Debe ser un texto válido' }
+        }
+        break
+
+      default:
+        return { isValid: false, error: 'Tipo de dato no válido' }
+    }
+
+    return { isValid: true }
+  }
+
+  /**
+   * Validar datos de tipo de artículo
+   * @param {Object} articleTypeData - Datos a validar
+   * @returns {Object} Resultado de validación { isValid: boolean, errors: array }
+   */
+  const validateArticleTypeData = (articleTypeData) => {
+    const errors = []
+
+    // Validar nombre
+    if (!articleTypeData.nombre?.trim()) {
+      errors.push('El nombre del tipo es obligatorio')
+    } else if (articleTypeData.nombre.trim().length < 2) {
+      errors.push('El nombre debe tener al menos 2 caracteres')
+    } else if (articleTypeData.nombre.trim().length > 100) {
+      errors.push('El nombre no puede exceder 100 caracteres')
+    }
+
+    // Validar porcentaje mínimo
+    if (articleTypeData.porcentajeMinAvaluo === undefined || articleTypeData.porcentajeMinAvaluo === null) {
+      errors.push('El porcentaje mínimo de avalúo es obligatorio')
+    } else if (articleTypeData.porcentajeMinAvaluo < 0 || articleTypeData.porcentajeMinAvaluo > 100) {
+      errors.push('El porcentaje mínimo debe estar entre 0 y 100')
+    }
+
+    // Validar porcentaje máximo
+    if (articleTypeData.porcentajeMaxAvaluo === undefined || articleTypeData.porcentajeMaxAvaluo === null) {
+      errors.push('El porcentaje máximo de avalúo es obligatorio')
+    } else if (articleTypeData.porcentajeMaxAvaluo < 0 || articleTypeData.porcentajeMaxAvaluo > 100) {
+      errors.push('El porcentaje máximo debe estar entre 0 y 100')
+    }
+
+    // Validar que el mínimo sea menor al máximo
+    if (articleTypeData.porcentajeMinAvaluo !== undefined && 
+        articleTypeData.porcentajeMaxAvaluo !== undefined &&
+        articleTypeData.porcentajeMinAvaluo >= articleTypeData.porcentajeMaxAvaluo) {
+      errors.push('El porcentaje mínimo debe ser menor al máximo')
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    }
+  }
+
+  // ===== FUNCIONES DE UTILIDAD ESPECÍFICAS =====
+
+  /**
+   * Formatear porcentaje para mostrar
+   * @param {Number} percentage - Porcentaje a formatear
+   * @returns {String} Porcentaje formateado
+   */
+  const formatPercentageDisplay = (percentage) => {
+    if (typeof percentage !== 'number') return '0%'
+    return `${percentage.toFixed(1)}%`
+  }
+
+  /**
+   * Obtener clase CSS para estado
+   * @param {String} status - Estado a evaluar
+   * @returns {String} Clase CSS correspondiente
+   */
+  const getStatusClass = (status) => {
+    const statusMap = {
+      'Activo': 'status-active',
+      'Inactivo': 'status-inactive',
+      'Pendiente': 'status-pending',
+      'Aprobado': 'status-approved',
+      'Rechazado': 'status-rejected',
+      'Completado': 'status-completed',
+      'En Proceso': 'status-processing',
+      'Error': 'status-error',
+      'Exitoso': 'status-success',
+      'healthy': 'status-success',
+      'degraded': 'status-warning',
+      'error': 'status-error'
+    }
+    
+    return statusMap[status] || 'status-unknown'
+  }
+
+  /**
+   * Obtener clase CSS para estado de tipo de artículo
+   * @param {String} estado - Estado del tipo (Activo/Inactivo)
+   * @returns {String} Clase CSS correspondiente
+   */
+  const getArticleTypeStatusClass = (estado) => {
+    const statusMap = {
+      'Activo': 'status-active',
+      'Inactivo': 'status-inactive'
+    }
+    
+    return statusMap[estado] || 'status-unknown'
+  }
+
+  /**
+   * Generar resumen de configuración de un tipo de artículo
+   * @param {Object} articleType - Tipo de artículo
+   * @returns {String} Resumen legible
+   */
+  const getArticleTypeSummary = (articleType) => {
+    if (!articleType) return 'Tipo no válido'
+    
+    const rangoAvaluo = `${articleType.porcentajeMinAvaluo}% - ${articleType.porcentajeMaxAvaluo}%`
+    const requiereInfo = articleType.requiereElectronico ? 'con información electrónica' : 'sin información electrónica'
+    
+    return `Avalúo: ${rangoAvaluo}, ${requiereInfo}`
+  }
+
+  /**
+   * Verificar si un tipo de artículo puede ser eliminado
+   * @param {Object} articleType - Tipo de artículo a verificar
+   * @returns {Object} Resultado { canDelete: boolean, reason?: string }
+   */
+  const canDeleteArticleType = (articleType) => {
+    if (!articleType) {
+      return { canDelete: false, reason: 'Tipo de artículo no válido' }
+    }
+
+    // Por ahora, permitimos eliminar solo si está inactivo
+    // En producción, deberías verificar si tiene artículos asociados
+    if (articleType.estado === 'Activo') {
+      return { 
+        canDelete: false, 
+        reason: 'No se puede eliminar un tipo activo. Desactívalo primero.' 
+      }
+    }
+
+    return { canDelete: true }
+  }
+
+  // ===== RETORNO DEL COMPOSABLE =====
   return {
     // Estado
     loading: readonly(loading),
     error: readonly(error),
     
-    // Métodos principales
+    // Métodos principales - Dashboard y estadísticas
     getAdminStats,
-    getUsersOverview,
-    getSystemHealth,
     getRecentActivity,
+    
+    // Métodos de parámetros del sistema
     getSystemParameters,
     updateSystemParameter,
-    createDatabaseBackup,
+    createSystemParameter,
+    deleteSystemParameter,
     
-    // Utilidades de formato
-    formatDate,
+    // Métodos de tipos de artículos
+    getArticleTypes,
+    createArticleType,
+    updateArticleType,
+    toggleArticleTypeStatus,
+    deleteArticleType,
+    getArticlesByType,
+    
+    // Métodos del sistema
+    createDatabaseBackup,
+    getSystemHealth,
+    
+    // Utilidades de formateo generales
     formatNumber,
-    formatPercentage
+    formatPercentage,
+    formatCurrency,
+    formatTimeAgo,
+    formatDate,
+    formatDateTime,
+    
+    // Utilidades de validación
+    validateParameterValue,
+    validateArticleTypeData,
+    
+    // Utilidades específicas
+    formatPercentageDisplay,
+    getStatusClass,
+    getArticleTypeStatusClass,
+    getArticleTypeSummary,
+    canDeleteArticleType
   }
 }

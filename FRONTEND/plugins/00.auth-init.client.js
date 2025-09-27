@@ -2,16 +2,12 @@
 export default defineNuxtPlugin(async () => {
   // Solo ejecutar en el cliente
   if (process.client) {
-    console.log('[AUTH PLUGIN] 🚀 Inicializando sistema de autenticación...')
+
     
     try {
       // Obtener composable de auth
       const { checkAuth, user, isLoggedIn } = useAuth()
       
-      // Verificar si hay datos de autenticación guardados
-      console.log('[AUTH PLUGIN] 🔍 Verificando tokens guardados...')
-      
-      // Buscar tokens con diferentes nombres posibles
       const possibleTokenKeys = ['token', 'auth_token', 'auth-token', 'authToken']
       const possibleUserKeys = ['user_data', 'user-data', 'userData']
       
@@ -34,14 +30,11 @@ export default defineNuxtPlugin(async () => {
         if (sessionData) foundUserData.push(`sessionStorage.${key}`)
       })
       
-      console.log('[AUTH PLUGIN] 📊 Tokens encontrados:', foundTokens)
-      console.log('[AUTH PLUGIN] 📊 Datos de usuario encontrados:', foundUserData)
-      
       // Inicializar autenticación
       const authResult = checkAuth()
       
       if (authResult && user.value) {
-        console.log('[AUTH PLUGIN] ✅ Usuario autenticado:', {
+        console.log('[AUTH PLUGIN] ✅ Sesión activa detectada', {
           nombre: user.value.nombre,
           email: user.value.email,
           tipoUsuario: user.value.tipoUsuario,
