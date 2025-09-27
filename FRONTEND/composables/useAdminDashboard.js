@@ -1,8 +1,3 @@
-// ===============================================
-// Archivo: FRONTEND/composables/useAdminDashboard.js
-// Composable completo para el dashboard de administración - VERSIÓN COMPLETA
-// ===============================================
-
 import { ref } from 'vue'
 
 export const useAdminDashboard = () => {
