@@ -45,7 +45,7 @@ router.get('/health', (req, res) => {
     message: 'API funcionando correctamente',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
+    environment: process.env.NODE_ENV  ,
     version: '1.0.0',
     services: {
       database: 'connected',
@@ -175,7 +175,7 @@ router.get('/info', (req, res) => {
       authentication: {
         type: 'JWT Bearer Token',
         header: 'Authorization: Bearer <token>',
-        expires: process.env.JWT_EXPIRES_IN || '24h'
+        expires: process.env.JWT_EXPIRES_IN 
       },
       rateLimit: {
         auth: '5 requests per 15 minutes',

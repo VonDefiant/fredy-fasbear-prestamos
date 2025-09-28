@@ -118,7 +118,7 @@ const authController = {
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV ? error.message : undefined
       });
     }
   },
@@ -222,7 +222,7 @@ const authController = {
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV? error.message : undefined
       });
     }
   },
@@ -351,7 +351,7 @@ updateProfile: async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV ? error.message : undefined
     });
   }
 },

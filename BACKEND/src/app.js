@@ -36,13 +36,13 @@ const app = express();
 // Helmet para headers de seguridad - ACTUALIZADO PARA CORS
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" }, // CRÍTICO: Permite archivos cross-origin
+  crossOriginResourcePolicy: { policy: "cross-origin" }, 
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:", "http:"], // Permite imágenes de cualquier protocolo
+      imgSrc: ["'self'", "data:", "https:", "http:"], 
       connectSrc: ["'self'", "http://localhost:3000", "http://127.0.0.1:3000"],
     },
   },
@@ -60,7 +60,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['Content-Disposition'] // Para descargas
+  exposedHeaders: ['Content-Disposition']  
 }));
 
 // ===== MIDDLEWARES GENERALES =====
@@ -72,7 +72,7 @@ app.use(compression());
 app.use(cookieParser());
 
 // Logging de requests en desarrollo
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV ) {
   app.use(morgan('dev'));
 }
 
@@ -100,7 +100,7 @@ app.use(fileUpload({
   },
   useTempFiles: true,
   tempFileDir: './tmp/',
-  debug: process.env.NODE_ENV === 'development',
+  debug: process.env.NODE_ENV ,
   abortOnLimit: true,
   responseOnLimit: 'El archivo es muy grande. Máximo 10MB permitido.',
   uploadTimeout: 60000, // 60 segundos timeout
@@ -156,7 +156,7 @@ app.get('/', (req, res) => {
     success: true,
     message: 'Fredy Fasbear Prestamos API',
     version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development',
+    environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
@@ -243,7 +243,7 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`🌍 Servidor corriendo en: http://${HOST}:${PORT}`);
   console.log(`📖 Documentación: http://${HOST}:${PORT}/api/info`);
   console.log(`❤️  Estado: http://${HOST}:${PORT}/api/health`);
-  console.log(`🔧 Entorno: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔧 Entorno: ${process.env.NODE_ENV}`);
   console.log(`📅 Iniciado: ${new Date().toLocaleString()}`);
   console.log('====================================\n');
   

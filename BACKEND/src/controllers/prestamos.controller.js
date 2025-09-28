@@ -145,7 +145,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo préstamos',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV  ? error.message : undefined
       });
     }
   },
@@ -269,7 +269,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo estadísticas',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV   ? error.message : undefined
       });
     }
   },
@@ -356,7 +356,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo historial',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV  ? error.message : undefined
       });
     }
   },
@@ -407,7 +407,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error calculando simulación',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV? error.message : undefined
       });
     }
   },
@@ -533,7 +533,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo detalle del préstamo',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV  ? error.message : undefined
       });
     }
   },
@@ -629,7 +629,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error procesando el pago',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV  ? error.message : undefined
       });
     }
   },
@@ -695,7 +695,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error renovando préstamo',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV  ? error.message : undefined
       });
     }
   }

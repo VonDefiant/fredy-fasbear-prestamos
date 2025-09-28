@@ -115,7 +115,7 @@ export const validateFileTypes = (req, res, next) => {
 // Servicio de upload
 export class UploadService {
   constructor() {
-    this.uploadPath = process.env.UPLOAD_PATH || './uploads';
+    this.uploadPath = process.env.UPLOAD_PATH  ;
     this.ensureDirectories();
   }
 

@@ -173,7 +173,7 @@ export const errorHandler = (err, req, res, next) => {
   }
   
   // Enviar respuesta según el entorno
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV ) {
     sendErrorDev(error, res);
   } else {
     sendErrorProd(error, res);

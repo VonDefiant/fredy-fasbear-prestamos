@@ -231,7 +231,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor al crear la solicitud',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+        error: process.env.NODE_ENV  ? error.message : 'Error interno'
       });
     }
   },
@@ -268,7 +268,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo categorías',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+        error: process.env.NODE_ENV  ? error.message : 'Error interno'
       });
     }
   },
@@ -346,7 +346,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo solicitudes',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+        error: process.env.NODE_ENV  ? error.message : 'Error interno'
       });
     }
   },
@@ -413,7 +413,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo detalle de solicitud',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+        error: process.env.NODE_ENV  ? error.message : 'Error interno'
       });
     }
   },
@@ -458,7 +458,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error cancelando solicitud',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+        error: process.env.NODE_ENV ? error.message : 'Error interno'
       });
     }
   }

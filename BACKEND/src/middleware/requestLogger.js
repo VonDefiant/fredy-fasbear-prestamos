@@ -89,7 +89,7 @@ export const requestLogger = async (req, res, next) => {
   };
   
   // Log inmediato para desarrollo
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV ) {
     console.log(`🌐 ${requestInfo.timestamp} - ${requestInfo.method} ${requestInfo.url} - IP: ${requestInfo.ip}`);
   }
   
@@ -133,7 +133,7 @@ export const requestLogger = async (req, res, next) => {
     };
     
     // Log detallado para desarrollo
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV ) {
       const statusEmoji = res.statusCode < 400 ? '✅' : res.statusCode < 500 ? '⚠️' : '❌';
       console.log(`${statusEmoji} ${responseInfo.statusCode} - ${responseInfo.duration} - ${req.method} ${req.originalUrl}`);
       
@@ -293,7 +293,7 @@ export const logError = (error, req, additionalInfo = {}) => {
   };
   
 
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV ) {
     // Ejemplo: Sentry.captureException(error, { extra: errorInfo });
   }
 };

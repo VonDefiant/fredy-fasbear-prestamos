@@ -1,105 +1,282 @@
+// ===============================================
+// BACKEND/src/controllers/ecommerce.controller.js
+// Versión con manejo robusto de errores
+// ===============================================
+
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ['error', 'warn'],
+  errorFormat: 'pretty'
+});
 
-export default {
-  // ===== CONFIGURACIONES DE E-COMMERCE =====
+const transformarConfiguracion = (config) => {
+  if (!config) return null;
+  
+  try {
+    return {
+      id: config.id || config.idParametro,
+      nombre: config.nombreParametro || config.nombre_parametro,
+      valor: config.valorParametro || config.valor_parametro,
+      descripcion: config.descripcion,
+      tipo: config.tipoDato || config.tipo_dato,
+      categoria: extraerCategoria(config.nombreParametro || config.nombre_parametro),
+      fechaModificacion: config.fechaModificacion || config.fecha_modificacion,
+      usuarioModifico: config.usuarioModifico || config.usuario_modifico
+    };
+  } catch (error) {
+    console.error('Error transformando configuración:', error);
+    return null;
+  }
+};
 
-  /**
-   * GET /api/admin/ecommerce-config
-   * Obtiene todas las configuraciones de e-commerce
-   */
+const transformarConfiguraciones = (configs) => {
+  if (!Array.isArray(configs)) return [];
+  return configs.map(transformarConfiguracion).filter(Boolean);
+};
+
+const extraerCategoria = (nombreParametro) => {
+  if (!nombreParametro || typeof nombreParametro !== 'string') return 'general';
+  
+  const nombre = nombreParametro.toUpperCase();
+  if (nombre.includes('_GENERAL_')) return 'general';
+  if (nombre.includes('_PAGOS_') || nombre.includes('_PAGO_')) return 'pagos';
+  if (nombre.includes('_ENVIOS_') || nombre.includes('_ENVIO_')) return 'envios';
+  if (nombre.includes('_PROMOCIONES_') || nombre.includes('_DESCUENTO_')) return 'promociones';
+  if (nombre.includes('_POLITICAS_') || nombre.includes('_DEVOLUCION_')) return 'politicas';
+  if (nombre.includes('_APARIENCIA_') || nombre.includes('_THEME_')) return 'apariencia';
+  return 'general';
+};
+
+const validarTipoDato = (valor, tipo) => {
+  if (valor === null || valor === undefined) return null;
+  
+  try {
+    switch (tipo) {
+      case 'STRING':
+      case 'TEXT':
+        return String(valor);
+      
+      case 'INTEGER':
+        const intVal = parseInt(valor);
+        return !isNaN(intVal) ? intVal : null;
+      
+      case 'DECIMAL':
+        const floatVal = parseFloat(valor);
+        return !isNaN(floatVal) ? floatVal : null;
+      
+      case 'BOOLEAN':
+        if (typeof valor === 'boolean') return valor;
+        if (typeof valor === 'string') {
+          return valor.toLowerCase() === 'true' || valor === '1';
+        }
+        return !!valor;
+      
+      case 'DATE':
+        const date = new Date(valor);
+        return !isNaN(date.getTime()) ? date.toISOString() : null;
+      
+      default:
+        return String(valor);
+    }
+  } catch (error) {
+    console.error('Error validando tipo de dato:', error);
+    return null;
+  }
+};
+
+const crearConfiguracionesPredeterminadas = async () => {
+  try {
+    console.log('🔧 Verificando/creando configuraciones predeterminadas...');
+    
+    const configuracionesPredeterminadas = [
+      {
+        nombreParametro: 'ECOMMERCE_GENERAL_NOMBRE_TIENDA',
+        valorParametro: 'Freddy Fasbear Store',
+        descripcion: 'Nombre oficial de la tienda en línea',
+        tipoDato: 'STRING'
+      },
+      {
+        nombreParametro: 'ECOMMERCE_GENERAL_MONEDA',
+        valorParametro: 'GTQ',
+        descripcion: 'Moneda utilizada en la tienda',
+        tipoDato: 'STRING'
+      },
+      {
+        nombreParametro: 'ECOMMERCE_GENERAL_PRODUCTOS_POR_PAGINA',
+        valorParametro: '12',
+        descripcion: 'Número de productos mostrados por página',
+        tipoDato: 'INTEGER'
+      },
+      {
+        nombreParametro: 'ECOMMERCE_PAGOS_EFECTIVO',
+        valorParametro: 'true',
+        descripcion: 'Permitir pagos en efectivo',
+        tipoDato: 'BOOLEAN'
+      },
+      {
+        nombreParametro: 'ECOMMERCE_PAGOS_TRANSFERENCIA',
+        valorParametro: 'true',
+        descripcion: 'Permitir pagos por transferencia',
+        tipoDato: 'BOOLEAN'
+      }
+    ];
+
+    for (const config of configuracionesPredeterminadas) {
+      try {
+        await prisma.parametrosSistema.upsert({
+          where: { nombreParametro: config.nombreParametro },
+          update: {},
+          create: {
+            ...config,
+            usuarioModifico: 'admin@system',
+            fechaModificacion: new Date()
+          }
+        });
+      } catch (upsertError) {
+        console.error(`Error creando configuración ${config.nombreParametro}:`, upsertError);
+      }
+    }
+    
+    console.log('✅ Configuraciones predeterminadas verificadas');
+  } catch (error) {
+    console.error('Error en crearConfiguracionesPredeterminadas:', error);
+    throw error;
+  }
+};
+
+const ecommerceController = {
   async getEcommerceConfig(req, res) {
     try {
-      console.log('📊 Obteniendo configuraciones de e-commerce...');
+      console.log('📊 [ECOMMERCE] Iniciando getEcommerceConfig...');
+      
+      const { categoria, activo } = req.query;
+      
+      // Verificar conexión a BD
+      await prisma.$connect();
+      console.log('✅ Conexión a BD establecida');
+      
+      // Asegurar configuraciones predeterminadas
+      await crearConfiguracionesPredeterminadas();
+      
+      // Construir filtros
+      const where = {
+        nombreParametro: {
+          startsWith: 'ECOMMERCE_'
+        }
+      };
 
-      // Obtener configuraciones específicas de e-commerce desde la base de datos
+      if (categoria) {
+        where.nombreParametro.contains = `_${categoria.toUpperCase()}_`;
+      }
+
+      console.log('🔍 Consultando configuraciones con filtros:', where);
+
       const configuraciones = await prisma.parametrosSistema.findMany({
-        where: {
-          nombreParametro: {
-            startsWith: 'ECOMMERCE_'
-          }
-        },
+        where,
         orderBy: [
           { nombreParametro: 'asc' }
         ]
       });
 
-      // Si no hay configuraciones, crear las predeterminadas
-      if (configuraciones.length === 0) {
-        console.log('🔧 Creando configuraciones predeterminadas de e-commerce...');
-        await crearConfiguracionesPredeterminadas();
-        
-        // Volver a obtener las configuraciones
-        const nuevasConfiguraciones = await prisma.parametrosSistema.findMany({
-          where: {
-            nombreParametro: {
-              startsWith: 'ECOMMERCE_'
-            }
-          },
-          orderBy: [
-            { nombreParametro: 'asc' }
-          ]
-        });
-        
-        return res.status(200).json({
-          success: true,
-          data: transformarConfiguraciones(nuevasConfiguraciones),
-          message: 'Configuraciones creadas y cargadas exitosamente'
-        });
-      }
+      console.log(`📦 Configuraciones encontradas: ${configuraciones.length}`);
 
-      console.log(`✅ ${configuraciones.length} configuraciones de e-commerce encontradas`);
+      const configuracionesTransformadas = transformarConfiguraciones(configuraciones);
+      
+      console.log(`✅ Configuraciones transformadas: ${configuracionesTransformadas.length}`);
 
-      res.status(200).json({
+      const response = {
         success: true,
-        data: transformarConfiguraciones(configuraciones)
-      });
+        data: configuracionesTransformadas,
+        total: configuraciones.length,
+        filtros: { categoria, activo },
+        timestamp: new Date().toISOString()
+      };
+
+      console.log('📤 Enviando respuesta exitosa');
+      return res.status(200).json(response);
 
     } catch (error) {
-      console.error('❌ Error obteniendo configuraciones de e-commerce:', error);
-      res.status(500).json({
+      console.error('❌ [ERROR] Error en getEcommerceConfig:', error);
+      console.error('Error stack:', error.stack);
+      
+      // Determinar el tipo de error y respuesta apropiada
+      let statusCode = 500;
+      let message = 'Error obteniendo configuraciones de e-commerce';
+      let errorCode = 'UNKNOWN_ERROR';
+
+      if (error.code === 'P1001') {
+        statusCode = 503;
+        message = 'No se puede conectar a la base de datos';
+        errorCode = 'DATABASE_CONNECTION_ERROR';
+      } else if (error.code === 'P2021') {
+        statusCode = 500;
+        message = 'La tabla no existe en la base de datos';
+        errorCode = 'TABLE_NOT_FOUND';
+      } else if (error.message?.includes('Invalid `prisma')) {
+        statusCode = 500;
+        message = 'Error de configuración de Prisma';
+        errorCode = 'PRISMA_CONFIG_ERROR';
+      }
+
+      const errorResponse = {
         success: false,
-        message: 'Error obteniendo configuraciones de e-commerce',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
+        message,
+        code: errorCode,
+        timestamp: new Date().toISOString()
+      };
+
+      // En desarrollo, incluir más detalles del error
+      if (process.env.NODE_ENV === 'development') {
+        errorResponse.debug = {
+          originalError: error.message,
+          code: error.code,
+          stack: error.stack
+        };
+      }
+
+      return res.status(statusCode).json(errorResponse);
     }
   },
 
-  /**
-   * PUT /api/admin/ecommerce-config/:configId
-   * Actualiza una configuración específica de e-commerce
-   */
   async updateEcommerceConfig(req, res) {
     try {
+      console.log('📝 [ECOMMERCE] Iniciando updateEcommerceConfig...');
+      
       const { configId } = req.params;
       const { valor, descripcion } = req.body;
       const usuarioId = req.user?.id;
 
-      console.log(`[ADMIN] Actualizando configuración e-commerce ${configId}...`);
+      console.log(`🔧 Actualizando configuración: ${configId}`);
 
-      // Validar que se proporcionen los datos necesarios
+      // Validar entrada
       if (valor === undefined || valor === null) {
         return res.status(400).json({
           success: false,
-          message: 'El valor es requerido'
+          message: 'El campo "valor" es requerido',
+          code: 'MISSING_VALUE'
         });
       }
 
-      // Buscar la configuración
+      // Buscar configuración existente
       const configExistente = await prisma.parametrosSistema.findFirst({
         where: {
           OR: [
-            { id: isNaN(configId) ? undefined : parseInt(configId) },
+            { id: !isNaN(parseInt(configId)) ? parseInt(configId) : undefined },
             { nombreParametro: configId }
-          ]
+          ],
+          nombreParametro: {
+            startsWith: 'ECOMMERCE_'
+          }
         }
       });
 
       if (!configExistente) {
+        console.log(`❌ Configuración no encontrada: ${configId}`);
         return res.status(404).json({
           success: false,
-          message: 'Configuración no encontrada'
+          message: 'Configuración no encontrada',
+          code: 'CONFIG_NOT_FOUND'
         });
       }
 
@@ -108,7 +285,8 @@ export default {
       if (valorValidado === null) {
         return res.status(400).json({
           success: false,
-          message: `Valor inválido para el tipo ${configExistente.tipoDato}`
+          message: `Valor inválido para el tipo ${configExistente.tipoDato}`,
+          code: 'INVALID_VALUE_TYPE'
         });
       }
 
@@ -123,123 +301,127 @@ export default {
         }
       });
 
-      console.log('✅ Configuración actualizada:', configExistente.nombreParametro);
+      console.log(`✅ Configuración actualizada: ${configExistente.nombreParametro}`);
 
-      // Ejecutar acciones post-actualización si es necesario
-      await ejecutarAccionesPostActualizacion(configExistente.nombreParametro, valorValidado);
-
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: transformarConfiguracion(configActualizada),
         message: 'Configuración actualizada exitosamente'
       });
 
     } catch (error) {
-      console.error('[ERROR] Error actualizando configuración:', error);
+      console.error('❌ [ERROR] Error en updateEcommerceConfig:', error);
       
       if (error.code === 'P2025') {
         return res.status(404).json({
           success: false,
-          message: 'Configuración no encontrada'
+          message: 'Configuración no encontrada',
+          code: 'CONFIG_NOT_FOUND'
         });
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        message: 'Error actualizando configuración'
+        message: 'Error actualizando configuración',
+        code: 'UPDATE_ERROR',
+        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
       });
     }
   },
 
-  /**
-   * POST /api/admin/ecommerce-config
-   * Crea una nueva configuración de e-commerce
-   */
   async createEcommerceConfig(req, res) {
     try {
-      const { nombre, tipo, valor, descripcion, categoria } = req.body;
+      console.log('➕ [ECOMMERCE] Iniciando createEcommerceConfig...');
+      
+      const { nombre, tipo, valor, descripcion } = req.body;
       const usuarioId = req.user?.id;
-
-      console.log('[ADMIN] Creando nueva configuración e-commerce...');
 
       // Validaciones
       if (!nombre || !tipo || valor === undefined) {
         return res.status(400).json({
           success: false,
-          message: 'Nombre, tipo y valor son requeridos'
+          message: 'Nombre, tipo y valor son requeridos',
+          code: 'MISSING_REQUIRED_FIELDS'
         });
       }
 
-      // Asegurar que el nombre tenga el prefijo correcto
-      const nombreParametro = nombre.startsWith('ECOMMERCE_') ? nombre : `ECOMMERCE_${nombre}`;
+      const nombreParametro = nombre.startsWith('ECOMMERCE_') ? 
+        nombre : `ECOMMERCE_${nombre.toUpperCase()}`;
 
-      // Verificar que no exista ya
-      const existente = await prisma.parametrosSistema.findFirst({
+      // Verificar que no exista
+      const existente = await prisma.parametrosSistema.findUnique({
         where: { nombreParametro }
       });
 
       if (existente) {
         return res.status(409).json({
           success: false,
-          message: 'Ya existe una configuración con ese nombre'
+          message: 'Ya existe una configuración con ese nombre',
+          code: 'CONFIG_ALREADY_EXISTS'
         });
       }
 
-      // Validar el tipo de dato
+      // Validar valor
       const valorValidado = validarTipoDato(valor, tipo);
       if (valorValidado === null) {
         return res.status(400).json({
           success: false,
-          message: `Valor inválido para el tipo ${tipo}`
+          message: `Valor inválido para el tipo ${tipo}`,
+          code: 'INVALID_VALUE_TYPE'
         });
       }
 
-      // Crear la configuración
+      // Crear configuración
       const nuevaConfig = await prisma.parametrosSistema.create({
         data: {
           nombreParametro,
-          tipoDato: tipo,
           valorParametro: valorValidado.toString(),
-          descripcion: descripcion || `Configuración de e-commerce: ${nombre}`,
+          descripcion: descripcion || `Configuración ${nombreParametro}`,
+          tipoDato: tipo,
           usuarioModifico: usuarioId ? `usuario_${usuarioId}` : 'admin@system',
-          fechaModificacion: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date()
+          fechaModificacion: new Date()
         }
       });
 
-      console.log('✅ Nueva configuración creada:', nombreParametro);
+      console.log(`✅ Nueva configuración creada: ${nombreParametro}`);
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         data: transformarConfiguracion(nuevaConfig),
         message: 'Configuración creada exitosamente'
       });
 
     } catch (error) {
-      console.error('[ERROR] Error creando configuración:', error);
-      res.status(500).json({
+      console.error('❌ [ERROR] Error en createEcommerceConfig:', error);
+      
+      if (error.code === 'P2002') {
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe una configuración con ese nombre',
+          code: 'DUPLICATE_CONFIG'
+        });
+      }
+
+      return res.status(500).json({
         success: false,
-        message: 'Error creando configuración'
+        message: 'Error creando configuración',
+        code: 'CREATE_ERROR',
+        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
       });
     }
   },
 
-  /**
-   * DELETE /api/admin/ecommerce-config/:configId
-   * Elimina una configuración de e-commerce
-   */
   async deleteEcommerceConfig(req, res) {
     try {
+      console.log('🗑️ [ECOMMERCE] Iniciando deleteEcommerceConfig...');
+      
       const { configId } = req.params;
 
-      console.log(`[ADMIN] Eliminando configuración e-commerce ${configId}...`);
-
-      // Buscar la configuración
+      // Buscar configuración
       const configExistente = await prisma.parametrosSistema.findFirst({
         where: {
           OR: [
-            { id: isNaN(configId) ? undefined : parseInt(configId) },
+            { id: !isNaN(parseInt(configId)) ? parseInt(configId) : undefined },
             { nombreParametro: configId }
           ],
           nombreParametro: {
@@ -251,97 +433,121 @@ export default {
       if (!configExistente) {
         return res.status(404).json({
           success: false,
-          message: 'Configuración no encontrada'
+          message: 'Configuración no encontrada',
+          code: 'CONFIG_NOT_FOUND'
         });
       }
 
-      // Verificar si es una configuración crítica que no se puede eliminar
+      // Verificar si es crítica
       const configuracionesCriticas = [
         'ECOMMERCE_GENERAL_NOMBRE_TIENDA',
         'ECOMMERCE_GENERAL_MONEDA',
-        'ECOMMERCE_PAGO_EFECTIVO'
+        'ECOMMERCE_PAGOS_EFECTIVO'
       ];
 
       if (configuracionesCriticas.includes(configExistente.nombreParametro)) {
         return res.status(400).json({
           success: false,
-          message: 'Esta configuración es crítica y no puede ser eliminada'
+          message: 'Esta configuración es crítica y no puede ser eliminada',
+          code: 'CRITICAL_CONFIG_CANNOT_DELETE'
         });
       }
 
-      // Eliminar la configuración
       await prisma.parametrosSistema.delete({
         where: { id: configExistente.id }
       });
 
-      console.log('✅ Configuración eliminada:', configExistente.nombreParametro);
+      console.log(`✅ Configuración eliminada: ${configExistente.nombreParametro}`);
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: 'Configuración eliminada exitosamente'
       });
 
     } catch (error) {
-      console.error('[ERROR] Error eliminando configuración:', error);
+      console.error('❌ [ERROR] Error en deleteEcommerceConfig:', error);
       
       if (error.code === 'P2025') {
         return res.status(404).json({
           success: false,
-          message: 'Configuración no encontrada'
+          message: 'Configuración no encontrada',
+          code: 'CONFIG_NOT_FOUND'
         });
       }
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
-        message: 'Error eliminando configuración'
+        message: 'Error eliminando configuración',
+        code: 'DELETE_ERROR'
       });
     }
   },
 
-  // ===== CONFIGURACIONES ESPECÍFICAS =====
-
-  /**
-   * GET /api/admin/ecommerce-config/categories
-   * Obtiene configuraciones agrupadas por categorías
-   */
   async getConfigByCategories(req, res) {
     try {
-      console.log('📊 Obteniendo configuraciones por categorías...');
-
-      const configuraciones = await prisma.parametrosSistema.findMany({
-        where: {
-          nombreParametro: {
-            startsWith: 'ECOMMERCE_'
+      console.log('📁 [ECOMMERCE] Iniciando getConfigByCategories...');
+      
+      // Delegar a getEcommerceConfig y transformar resultado
+      const mockReq = { ...req, query: {} };
+      let configuraciones = [];
+      
+      // Capturar la respuesta de getEcommerceConfig
+      const mockRes = {
+        status: () => ({
+          json: (data) => {
+            if (data.success) {
+              configuraciones = data.data;
+            }
           }
-        },
-        orderBy: [
-          { nombreParametro: 'asc' }
-        ]
+        })
+      };
+      
+      await this.getEcommerceConfig(mockReq, mockRes);
+      
+      // Agrupar por categorías
+      const categorias = {
+        general: { nombre: 'general', titulo: 'General', configuraciones: [] },
+        pagos: { nombre: 'pagos', titulo: 'Pagos', configuraciones: [] },
+        envios: { nombre: 'envios', titulo: 'Envíos', configuraciones: [] },
+        promociones: { nombre: 'promociones', titulo: 'Promociones', configuraciones: [] },
+        politicas: { nombre: 'politicas', titulo: 'Políticas', configuraciones: [] },
+        apariencia: { nombre: 'apariencia', titulo: 'Apariencia', configuraciones: [] }
+      };
+      
+      configuraciones.forEach(config => {
+        if (categorias[config.categoria]) {
+          categorias[config.categoria].configuraciones.push(config);
+        }
       });
 
-      const categorias = agruparPorCategorias(configuraciones);
-
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: categorias
       });
 
     } catch (error) {
-      console.error('❌ Error obteniendo configuraciones por categorías:', error);
-      res.status(500).json({
+      console.error('❌ [ERROR] Error en getConfigByCategories:', error);
+      return res.status(500).json({
         success: false,
-        message: 'Error obteniendo configuraciones'
+        message: 'Error obteniendo configuraciones por categorías',
+        code: 'CATEGORIES_ERROR'
       });
     }
   },
 
-  /**
-   * POST /api/admin/ecommerce-config/reset
-   * Restaura las configuraciones predeterminadas
-   */
   async resetToDefaults(req, res) {
     try {
-      console.log('[ADMIN] Restaurando configuraciones predeterminadas...');
+      console.log('🔄 [ECOMMERCE] Iniciando resetToDefaults...');
+      
+      const { confirmacion } = req.body;
+
+      if (confirmacion !== 'RESET_CONFIGURACIONES') {
+        return res.status(400).json({
+          success: false,
+          message: 'Se requiere confirmación explícita para restaurar configuraciones',
+          code: 'CONFIRMATION_REQUIRED'
+        });
+      }
 
       // Eliminar configuraciones existentes
       await prisma.parametrosSistema.deleteMany({
@@ -369,298 +575,22 @@ export default {
 
       console.log('✅ Configuraciones restauradas exitosamente');
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         data: transformarConfiguraciones(configuraciones),
-        message: 'Configuraciones restauradas a los valores predeterminados'
+        message: 'Configuraciones restauradas a los valores predeterminados',
+        total: configuraciones.length
       });
 
     } catch (error) {
-      console.error('[ERROR] Error restaurando configuraciones:', error);
-      res.status(500).json({
+      console.error('❌ [ERROR] Error en resetToDefaults:', error);
+      return res.status(500).json({
         success: false,
-        message: 'Error restaurando configuraciones'
+        message: 'Error restaurando configuraciones predeterminadas',
+        code: 'RESET_ERROR'
       });
     }
   }
 };
 
-// ===== FUNCIONES AUXILIARES =====
-
-/**
- * Transforma una configuración de la BD al formato del frontend
- */
-function transformarConfiguracion(config) {
-  // Extraer categoría del nombre del parámetro
-  const categoria = extraerCategoria(config.nombreParametro);
-  
-  return {
-    id: config.nombreParametro, // Usar el nombre como ID único
-    nombre: formatearNombre(config.nombreParametro),
-    categoria,
-    tipo: config.tipoDato,
-    valor: config.valorParametro,
-    descripcion: config.descripcion,
-    activo: true, // Por defecto activo
-    usuarioModifico: config.usuarioModifico || 'Sistema',
-    fechaModificacion: config.fechaModificacion || config.updatedAt
-  };
-}
-
-/**
- * Transforma múltiples configuraciones
- */
-function transformarConfiguraciones(configuraciones) {
-  return configuraciones.map(transformarConfiguracion);
-}
-
-/**
- * Extrae la categoría del nombre del parámetro
- */
-function extraerCategoria(nombreParametro) {
-  const partes = nombreParametro.split('_');
-  if (partes.length >= 2) {
-    return partes[1].toLowerCase(); // ECOMMERCE_GENERAL_NOMBRE -> general
-  }
-  return 'general';
-}
-
-/**
- * Formatea el nombre del parámetro para mostrar
- */
-function formatearNombre(nombreParametro) {
-  return nombreParametro
-    .replace('ECOMMERCE_', '')
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, l => l.toUpperCase());
-}
-
-/**
- * Valida que el valor sea del tipo correcto
- */
-function validarTipoDato(valor, tipo) {
-  switch (tipo) {
-    case 'STRING':
-    case 'TEXT':
-      return typeof valor === 'string' ? valor : String(valor);
-    
-    case 'INTEGER':
-      const intVal = parseInt(valor);
-      return !isNaN(intVal) ? intVal : null;
-    
-    case 'DECIMAL':
-      const floatVal = parseFloat(valor);
-      return !isNaN(floatVal) ? floatVal : null;
-    
-    case 'BOOLEAN':
-      if (typeof valor === 'boolean') return valor;
-      if (valor === 'true' || valor === true) return true;
-      if (valor === 'false' || valor === false) return false;
-      return null;
-    
-    case 'DATE':
-      const fecha = new Date(valor);
-      return !isNaN(fecha.getTime()) ? fecha.toISOString() : null;
-    
-    default:
-      return valor;
-  }
-}
-
-/**
- * Agrupa configuraciones por categorías
- */
-function agruparPorCategorias(configuraciones) {
-  const categorias = {};
-  
-  configuraciones.forEach(config => {
-    const categoria = extraerCategoria(config.nombreParametro);
-    
-    if (!categorias[categoria]) {
-      categorias[categoria] = {
-        nombre: categoria,
-        titulo: formatearCategoria(categoria),
-        configuraciones: []
-      };
-    }
-    
-    categorias[categoria].configuraciones.push(transformarConfiguracion(config));
-  });
-  
-  return Object.values(categorias);
-}
-
-/**
- * Formatea el nombre de la categoría
- */
-function formatearCategoria(categoria) {
-  const nombres = {
-    general: 'Configuraciones Generales',
-    pagos: 'Métodos de Pago',
-    envios: 'Configuraciones de Envío',
-    promociones: 'Promociones y Descuentos',
-    politicas: 'Políticas de la Tienda',
-    apariencia: 'Apariencia de la Tienda'
-  };
-  return nombres[categoria] || categoria.charAt(0).toUpperCase() + categoria.slice(1);
-}
-
-/**
- * Crea las configuraciones predeterminadas de e-commerce
- */
-async function crearConfiguracionesPredeterminadas() {
-  const configuracionesPredeterminadas = [
-    // Generales
-    {
-      nombreParametro: 'ECOMMERCE_GENERAL_NOMBRE_TIENDA',
-      tipoDato: 'STRING',
-      valorParametro: 'Freddy Fasbear Store',
-      descripcion: 'Nombre que aparece en la tienda en línea'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_GENERAL_MONEDA',
-      tipoDato: 'STRING',
-      valorParametro: 'GTQ',
-      descripcion: 'Código de moneda para mostrar precios'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_GENERAL_SIMBOLO_MONEDA',
-      tipoDato: 'STRING',
-      valorParametro: 'Q',
-      descripcion: 'Símbolo que se muestra antes del precio'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_GENERAL_PRODUCTOS_POR_PAGINA',
-      tipoDato: 'INTEGER',
-      valorParametro: '12',
-      descripcion: 'Número de productos que se muestran por página en el catálogo'
-    },
-    
-    // Métodos de Pago
-    {
-      nombreParametro: 'ECOMMERCE_PAGOS_EFECTIVO',
-      tipoDato: 'BOOLEAN',
-      valorParametro: 'true',
-      descripcion: 'Permitir pagos en efectivo al recoger el producto'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_PAGOS_TRANSFERENCIA',
-      tipoDato: 'BOOLEAN',
-      valorParametro: 'true',
-      descripcion: 'Permitir pagos por transferencia bancaria'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_PAGOS_TARJETA',
-      tipoDato: 'BOOLEAN',
-      valorParametro: 'false',
-      descripcion: 'Permitir pagos con tarjeta de crédito/débito'
-    },
-    
-    // Envíos
-    {
-      nombreParametro: 'ECOMMERCE_ENVIOS_COSTO_BASE',
-      tipoDato: 'DECIMAL',
-      valorParametro: '25.00',
-      descripcion: 'Costo base para envíos dentro de la ciudad'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_ENVIOS_GRATIS_MONTO',
-      tipoDato: 'DECIMAL',
-      valorParametro: '500.00',
-      descripcion: 'Monto mínimo de compra para envío gratuito'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_ENVIOS_TIEMPO_ENTREGA',
-      tipoDato: 'STRING',
-      valorParametro: '2-5 días hábiles',
-      descripcion: 'Tiempo estimado de entrega para mostrar al cliente'
-    },
-    
-    // Promociones
-    {
-      nombreParametro: 'ECOMMERCE_PROMOCIONES_DESCUENTO_TIEMPO',
-      tipoDato: 'BOOLEAN',
-      valorParametro: 'true',
-      descripcion: 'Aplicar descuentos automáticos según tiempo en inventario'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_PROMOCIONES_DIAS_DESCUENTO',
-      tipoDato: 'INTEGER',
-      valorParametro: '30',
-      descripcion: 'Días que debe estar un producto en inventario antes del descuento'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_PROMOCIONES_PORCENTAJE_DESCUENTO',
-      tipoDato: 'DECIMAL',
-      valorParametro: '10.00',
-      descripcion: 'Porcentaje de descuento a aplicar tras el tiempo configurado'
-    },
-    
-    // Políticas
-    {
-      nombreParametro: 'ECOMMERCE_POLITICAS_DEVOLUCION',
-      tipoDato: 'INTEGER',
-      valorParametro: '7',
-      descripcion: 'Días que tiene el cliente para solicitar devolución'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_POLITICAS_GARANTIA',
-      tipoDato: 'INTEGER',
-      valorParametro: '30',
-      descripcion: 'Días de garantía para productos electrónicos'
-    },
-    
-    // Apariencia
-    {
-      nombreParametro: 'ECOMMERCE_APARIENCIA_COLOR_PRIMARIO',
-      tipoDato: 'STRING',
-      valorParametro: '#2563eb',
-      descripcion: 'Color principal de la tienda en línea'
-    },
-    {
-      nombreParametro: 'ECOMMERCE_APARIENCIA_BANNER_TEXTO',
-      tipoDato: 'TEXT',
-      valorParametro: 'Encuentra artículos únicos con precios increíbles',
-      descripcion: 'Texto que aparece en el banner principal de la tienda'
-    }
-  ];
-
-  // Crear cada configuración
-  for (const config of configuracionesPredeterminadas) {
-    await prisma.parametrosSistema.create({
-      data: {
-        ...config,
-        usuarioModifico: 'admin@system',
-        fechaModificacion: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    });
-  }
-
-  console.log(`✅ ${configuracionesPredeterminadas.length} configuraciones predeterminadas creadas`);
-}
-
-/**
- * Ejecuta acciones adicionales después de actualizar configuraciones
- */
-async function ejecutarAccionesPostActualizacion(nombreParametro, valor) {
-  switch (nombreParametro) {
-    case 'ECOMMERCE_PROMOCIONES_DESCUENTO_TIEMPO':
-      if (valor === true) {
-        console.log('🎯 Activando sistema de descuentos automáticos...');
-        // Aquí podrías activar un job o proceso para aplicar descuentos
-      }
-      break;
-      
-    case 'ECOMMERCE_GENERAL_PRODUCTOS_POR_PAGINA':
-      console.log(`📄 Paginación actualizada a ${valor} productos por página`);
-      // Aquí podrías limpiar caché de páginas si usas uno
-      break;
-      
-    default:
-      // No hay acciones específicas para esta configuración
-      break;
-  }
-}
+export default ecommerceController;

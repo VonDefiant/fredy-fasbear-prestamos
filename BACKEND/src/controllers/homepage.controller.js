@@ -96,7 +96,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error interno del servidor',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV ? error.message : undefined
       });
     }
   },
@@ -144,7 +144,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo estadísticas',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV ? error.message : undefined
       });
     }
   },
@@ -197,7 +197,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error obteniendo productos destacados',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV   ? error.message : undefined
       });
     }
   },
@@ -253,7 +253,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error enviando mensaje de contacto',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV  ? error.message : undefined
       });
     }
   },
@@ -297,7 +297,7 @@ export default {
       res.status(500).json({
         success: false,
         message: 'Error en suscripción',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        error: process.env.NODE_ENV   ? error.message : undefined
       });
     }
   }
