@@ -54,7 +54,15 @@ router.get('/stats', async (req, res) => {
       }),
       
       // Total de parámetros del sistema
-      prisma.parametrosSistema.count(),
+      prisma.parametrosSistema.count({
+        where: {
+          nombreParametro: {
+            not: {
+              startsWith: 'ECOMMERCE_'
+            }
+          }
+        }
+      }),
       
       // Total de tipos de artículos
       prisma.tipoArticulo.count({

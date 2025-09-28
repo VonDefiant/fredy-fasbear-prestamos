@@ -67,7 +67,7 @@
             </svg>
           </div>
           <div class="stat-content">
-            <h3>{{ parametrosData.length }}</h3>
+          <h3>{{ totalParametrosSistema }}</h3>
             <p>Parámetros Configurados</p>
           </div>
         </div>
@@ -311,6 +311,11 @@ const notificacion = ref({
 
 const parametrosFiltrados = computed(() => {
   let resultado = [...parametrosData.value]
+   
+  resultado = resultado.filter(parametro => 
+    !parametro.nombreParametro.startsWith('ECOMMERCE_')
+  )
+
 
   if (filtros.value.busqueda) {
     const busqueda = filtros.value.busqueda.toLowerCase()
@@ -328,6 +333,7 @@ const parametrosFiltrados = computed(() => {
 
   return resultado
 })
+
 
 const ultimaModificacion = computed(() => {
   if (parametrosData.value.length === 0) return 'N/A'
@@ -422,6 +428,13 @@ const formatTipoDato = (tipo) => {
   }
   return tipos[tipo] || tipo
 }
+
+const totalParametrosSistema = computed(() => {
+  // Filtrar parámetros excluyendo los de ecommerce
+  return parametrosData.value.filter(parametro => 
+    !parametro.nombreParametro.startsWith('ECOMMERCE_')
+  ).length
+})
 
 const formatValorParametro = (valor, tipo) => {
   if (!valor) return 'No definido'
