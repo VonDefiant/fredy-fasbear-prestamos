@@ -1,56 +1,10 @@
-// ===============================================
-// BACKEND/src/controllers/ecommerce.controller.js
-// Versión con manejo robusto de errores
-// ===============================================
-
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient({
-  log: ['error', 'warn'],
-  errorFormat: 'pretty'
-});
+const prisma = new PrismaClient();
 
-const transformarConfiguracion = (config) => {
-  if (!config) return null;
-  
-  try {
-    return {
-      id: config.id || config.idParametro,
-      nombre: config.nombreParametro || config.nombre_parametro,
-      valor: config.valorParametro || config.valor_parametro,
-      descripcion: config.descripcion,
-      tipo: config.tipoDato || config.tipo_dato,
-      categoria: extraerCategoria(config.nombreParametro || config.nombre_parametro),
-      fechaModificacion: config.fechaModificacion || config.fecha_modificacion,
-      usuarioModifico: config.usuarioModifico || config.usuario_modifico
-    };
-  } catch (error) {
-    console.error('Error transformando configuración:', error);
-    return null;
-  }
-};
-
-const transformarConfiguraciones = (configs) => {
-  if (!Array.isArray(configs)) return [];
-  return configs.map(transformarConfiguracion).filter(Boolean);
-};
-
-const extraerCategoria = (nombreParametro) => {
-  if (!nombreParametro || typeof nombreParametro !== 'string') return 'general';
-  
-  const nombre = nombreParametro.toUpperCase();
-  if (nombre.includes('_GENERAL_')) return 'general';
-  if (nombre.includes('_PAGOS_') || nombre.includes('_PAGO_')) return 'pagos';
-  if (nombre.includes('_ENVIOS_') || nombre.includes('_ENVIO_')) return 'envios';
-  if (nombre.includes('_PROMOCIONES_') || nombre.includes('_DESCUENTO_')) return 'promociones';
-  if (nombre.includes('_POLITICAS_') || nombre.includes('_DEVOLUCION_')) return 'politicas';
-  if (nombre.includes('_APARIENCIA_') || nombre.includes('_THEME_')) return 'apariencia';
-  return 'general';
-};
+// ===== FUNCIONES DE UTILIDAD =====
 
 const validarTipoDato = (valor, tipo) => {
-  if (valor === null || valor === undefined) return null;
-  
   try {
     switch (tipo) {
       case 'STRING':
@@ -58,149 +12,142 @@ const validarTipoDato = (valor, tipo) => {
         return String(valor);
       
       case 'INTEGER':
-        const intVal = parseInt(valor);
-        return !isNaN(intVal) ? intVal : null;
+        const intValue = parseInt(valor);
+        if (isNaN(intValue)) throw new Error('Valor no es un entero válido');
+        return intValue;
       
       case 'DECIMAL':
-        const floatVal = parseFloat(valor);
-        return !isNaN(floatVal) ? floatVal : null;
+        const floatValue = parseFloat(valor);
+        if (isNaN(floatValue)) throw new Error('Valor no es un decimal válido');
+        return floatValue;
       
       case 'BOOLEAN':
         if (typeof valor === 'boolean') return valor;
         if (typeof valor === 'string') {
           return valor.toLowerCase() === 'true' || valor === '1';
         }
-        return !!valor;
+        return Boolean(valor);
       
       case 'DATE':
-        const date = new Date(valor);
-        return !isNaN(date.getTime()) ? date.toISOString() : null;
+        const dateValue = new Date(valor);
+        if (isNaN(dateValue.getTime())) throw new Error('Valor no es una fecha válida');
+        return dateValue.toISOString();
       
       default:
         return String(valor);
     }
   } catch (error) {
-    console.error('Error validando tipo de dato:', error);
+    console.error(`Error validando tipo ${tipo} con valor ${valor}:`, error);
     return null;
   }
 };
 
-const crearConfiguracionesPredeterminadas = async () => {
-  try {
-    console.log('🔧 Verificando/creando configuraciones predeterminadas...');
-    
-    const configuracionesPredeterminadas = [
-      {
-        nombreParametro: 'ECOMMERCE_GENERAL_NOMBRE_TIENDA',
-        valorParametro: 'Freddy Fasbear Store',
-        descripcion: 'Nombre oficial de la tienda en línea',
-        tipoDato: 'STRING'
-      },
-      {
-        nombreParametro: 'ECOMMERCE_GENERAL_MONEDA',
-        valorParametro: 'GTQ',
-        descripcion: 'Moneda utilizada en la tienda',
-        tipoDato: 'STRING'
-      },
-      {
-        nombreParametro: 'ECOMMERCE_GENERAL_PRODUCTOS_POR_PAGINA',
-        valorParametro: '12',
-        descripcion: 'Número de productos mostrados por página',
-        tipoDato: 'INTEGER'
-      },
-      {
-        nombreParametro: 'ECOMMERCE_PAGOS_EFECTIVO',
-        valorParametro: 'true',
-        descripcion: 'Permitir pagos en efectivo',
-        tipoDato: 'BOOLEAN'
-      },
-      {
-        nombreParametro: 'ECOMMERCE_PAGOS_TRANSFERENCIA',
-        valorParametro: 'true',
-        descripcion: 'Permitir pagos por transferencia',
-        tipoDato: 'BOOLEAN'
-      }
-    ];
-
-    for (const config of configuracionesPredeterminadas) {
-      try {
-        await prisma.parametrosSistema.upsert({
-          where: { nombreParametro: config.nombreParametro },
-          update: {},
-          create: {
-            ...config,
-            usuarioModifico: 'admin@system',
-            fechaModificacion: new Date()
-          }
-        });
-      } catch (upsertError) {
-        console.error(`Error creando configuración ${config.nombreParametro}:`, upsertError);
-      }
+const transformarConfiguracion = (config) => {
+  if (!config) return null;
+  
+  // Extraer categoria del nombreParametro (ej: ECOMMERCE_GENERAL_NOMBRE -> general)
+  let categoria = 'general';
+  if (config.nombreParametro && config.nombreParametro.startsWith('ECOMMERCE_')) {
+    const partes = config.nombreParametro.split('_');
+    if (partes.length >= 2) {
+      categoria = partes[1].toLowerCase();
     }
-    
-    console.log('✅ Configuraciones predeterminadas verificadas');
-  } catch (error) {
-    console.error('Error en crearConfiguracionesPredeterminadas:', error);
-    throw error;
   }
+
+  // Crear nombre amigable del nombreParametro
+  let nombreAmigable = config.nombreParametro || 'Sin nombre';
+  if (nombreAmigable.startsWith('ECOMMERCE_')) {
+    nombreAmigable = nombreAmigable
+      .replace('ECOMMERCE_', '')
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, l => l.toUpperCase());
+  }
+
+  return {
+    id: config.id,
+    nombre: nombreAmigable,
+    nombreParametro: config.nombreParametro,
+    valor: config.valorParametro,
+    descripcion: config.descripcion || '',
+    tipo: config.tipoDato || 'STRING',
+    categoria: categoria,
+    fechaCreacion: config.fechaCreacion,
+    fechaModificacion: config.fechaModificacion,
+    usuarioCreo: config.usuarioCreo,
+    usuarioModifico: config.usuarioModifico
+  };
 };
 
+// ===== CONTROLADORES =====
+
 const ecommerceController = {
+  
   async getEcommerceConfig(req, res) {
     try {
-      console.log('📊 [ECOMMERCE] Iniciando getEcommerceConfig...');
+      console.log('📋 [ECOMMERCE] Iniciando getEcommerceConfig...');
       
-      const { categoria, activo } = req.query;
-      
-      // Verificar conexión a BD
-      await prisma.$connect();
-      console.log('✅ Conexión a BD establecida');
-      
-      // Asegurar configuraciones predeterminadas
-      await crearConfiguracionesPredeterminadas();
-      
-      // Construir filtros
-      const where = {
+      const { categoria, tipo, busqueda } = req.query;
+
+      let whereClause = {
         nombreParametro: {
           startsWith: 'ECOMMERCE_'
         }
       };
 
+      // Filtro por categoría
       if (categoria) {
-        where.nombreParametro.contains = `_${categoria.toUpperCase()}_`;
+        whereClause.nombreParametro = {
+          startsWith: `ECOMMERCE_${categoria.toUpperCase()}_`
+        };
       }
 
-      console.log('🔍 Consultando configuraciones con filtros:', where);
+      // Filtro por tipo
+      if (tipo) {
+        whereClause.tipoDato = tipo;
+      }
+
+      // Filtro por búsqueda
+      if (busqueda) {
+        whereClause.OR = [
+          {
+            nombreParametro: {
+              contains: busqueda,
+              mode: 'insensitive'
+            }
+          },
+          {
+            descripcion: {
+              contains: busqueda,
+              mode: 'insensitive'
+            }
+          }
+        ];
+      }
 
       const configuraciones = await prisma.parametrosSistema.findMany({
-        where,
+        where: whereClause,
         orderBy: [
           { nombreParametro: 'asc' }
         ]
       });
 
-      console.log(`📦 Configuraciones encontradas: ${configuraciones.length}`);
+      const configuracionesTransformadas = configuraciones
+        .map(transformarConfiguracion)
+        .filter(config => config !== null);
 
-      const configuracionesTransformadas = transformarConfiguraciones(configuraciones);
-      
-      console.log(`✅ Configuraciones transformadas: ${configuracionesTransformadas.length}`);
+      console.log(`✅ Se encontraron ${configuracionesTransformadas.length} configuraciones`);
 
-      const response = {
+      return res.status(200).json({
         success: true,
         data: configuracionesTransformadas,
-        total: configuraciones.length,
-        filtros: { categoria, activo },
-        timestamp: new Date().toISOString()
-      };
-
-      console.log('📤 Enviando respuesta exitosa');
-      return res.status(200).json(response);
+        total: configuracionesTransformadas.length,
+        message: 'Configuraciones obtenidas exitosamente'
+      });
 
     } catch (error) {
       console.error('❌ [ERROR] Error en getEcommerceConfig:', error);
-      console.error('Error stack:', error.stack);
       
-      // Determinar el tipo de error y respuesta apropiada
       let statusCode = 500;
       let message = 'Error obteniendo configuraciones de e-commerce';
       let errorCode = 'UNKNOWN_ERROR';
@@ -213,10 +160,6 @@ const ecommerceController = {
         statusCode = 500;
         message = 'La tabla no existe en la base de datos';
         errorCode = 'TABLE_NOT_FOUND';
-      } else if (error.message?.includes('Invalid `prisma')) {
-        statusCode = 500;
-        message = 'Error de configuración de Prisma';
-        errorCode = 'PRISMA_CONFIG_ERROR';
       }
 
       const errorResponse = {
@@ -226,7 +169,6 @@ const ecommerceController = {
         timestamp: new Date().toISOString()
       };
 
-      // En desarrollo, incluir más detalles del error
       if (process.env.NODE_ENV === 'development') {
         errorResponse.debug = {
           originalError: error.message,
@@ -248,6 +190,7 @@ const ecommerceController = {
       const usuarioId = req.user?.id;
 
       console.log(`🔧 Actualizando configuración: ${configId}`);
+      console.log(`📋 Datos recibidos:`, { valor, descripcion, tipo: typeof valor });
 
       // Validar entrada
       if (valor === undefined || valor === null) {
@@ -258,13 +201,20 @@ const ecommerceController = {
         });
       }
 
-      // Buscar configuración existente
+      // Buscar configuración existente - mejorado para manejar tanto ID numérico como nombre
+      let whereCondition;
+      if (!isNaN(parseInt(configId))) {
+        // Es un ID numérico
+        whereCondition = { id: parseInt(configId) };
+      } else {
+        // Es un nombre de parámetro
+        whereCondition = { nombreParametro: configId };
+      }
+
+      // Agregar filtro para que solo sean configuraciones de ecommerce
       const configExistente = await prisma.parametrosSistema.findFirst({
         where: {
-          OR: [
-            { id: !isNaN(parseInt(configId)) ? parseInt(configId) : undefined },
-            { nombreParametro: configId }
-          ],
+          ...whereCondition,
           nombreParametro: {
             startsWith: 'ECOMMERCE_'
           }
@@ -280,38 +230,51 @@ const ecommerceController = {
         });
       }
 
+      console.log(`📋 Configuración encontrada:`, {
+        id: configExistente.id,
+        nombre: configExistente.nombreParametro,
+        tipo: configExistente.tipoDato,
+        valorActual: configExistente.valorParametro
+      });
+
       // Validar el tipo de dato
       const valorValidado = validarTipoDato(valor, configExistente.tipoDato);
       if (valorValidado === null) {
         return res.status(400).json({
           success: false,
-          message: `Valor inválido para el tipo ${configExistente.tipoDato}`,
+          message: `Valor inválido para el tipo ${configExistente.tipoDato}. Valor recibido: ${valor}`,
           code: 'INVALID_VALUE_TYPE'
         });
       }
+
+      console.log(`✅ Valor validado: ${valorValidado} (tipo: ${configExistente.tipoDato})`);
 
       // Actualizar la configuración
       const configActualizada = await prisma.parametrosSistema.update({
         where: { id: configExistente.id },
         data: {
-          valorParametro: valorValidado.toString(),
+          valorParametro: String(valorValidado), // Siempre guardar como string en la DB
           descripcion: descripcion || configExistente.descripcion,
           usuarioModifico: usuarioId ? `usuario_${usuarioId}` : 'admin@system',
           fechaModificacion: new Date()
         }
       });
 
-      console.log(`✅ Configuración actualizada: ${configExistente.nombreParametro}`);
+      console.log(`✅ Configuración actualizada exitosamente: ${configExistente.nombreParametro}`);
+
+      // Transformar la respuesta
+      const configTransformada = transformarConfiguracion(configActualizada);
 
       return res.status(200).json({
         success: true,
-        data: transformarConfiguracion(configActualizada),
+        data: configTransformada,
         message: 'Configuración actualizada exitosamente'
       });
 
     } catch (error) {
       console.error('❌ [ERROR] Error en updateEcommerceConfig:', error);
       
+      // Manejo específico de errores de Prisma
       if (error.code === 'P2025') {
         return res.status(404).json({
           success: false,
@@ -320,11 +283,34 @@ const ecommerceController = {
         });
       }
 
+      if (error.code === 'P2002') {
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe una configuración con ese nombre',
+          code: 'DUPLICATE_CONFIG'
+        });
+      }
+
+      // Error de validación de datos
+      if (error.message.includes('Valor no es')) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+          code: 'VALIDATION_ERROR'
+        });
+      }
+
       return res.status(500).json({
         success: false,
         message: 'Error actualizando configuración',
         code: 'UPDATE_ERROR',
-        ...(process.env.NODE_ENV === 'development' && { debug: error.message })
+        ...(process.env.NODE_ENV === 'development' && { 
+          debug: {
+            message: error.message,
+            code: error.code,
+            stack: error.stack
+          }
+        })
       });
     }
   },
@@ -333,7 +319,7 @@ const ecommerceController = {
     try {
       console.log('➕ [ECOMMERCE] Iniciando createEcommerceConfig...');
       
-      const { nombre, tipo, valor, descripcion } = req.body;
+      const { nombre, tipo, valor, descripcion, categoria = 'general' } = req.body;
       const usuarioId = req.user?.id;
 
       // Validaciones
@@ -345,11 +331,13 @@ const ecommerceController = {
         });
       }
 
+      // Crear el nombre del parámetro
       const nombreParametro = nombre.startsWith('ECOMMERCE_') ? 
-        nombre : `ECOMMERCE_${nombre.toUpperCase()}`;
+        nombre : 
+        `ECOMMERCE_${categoria.toUpperCase()}_${nombre.toUpperCase().replace(/\s+/g, '_')}`;
 
-      // Verificar que no exista
-      const existente = await prisma.parametrosSistema.findUnique({
+      // Validar que no exista
+      const existente = await prisma.parametrosSistema.findFirst({
         where: { nombreParametro }
       });
 
@@ -361,7 +349,16 @@ const ecommerceController = {
         });
       }
 
-      // Validar valor
+      // Validar el tipo de dato
+      const tiposValidos = ['STRING', 'INTEGER', 'DECIMAL', 'BOOLEAN', 'DATE', 'TEXT'];
+      if (!tiposValidos.includes(tipo)) {
+        return res.status(400).json({
+          success: false,
+          message: `Tipo de dato inválido. Tipos válidos: ${tiposValidos.join(', ')}`,
+          code: 'INVALID_DATA_TYPE'
+        });
+      }
+
       const valorValidado = validarTipoDato(valor, tipo);
       if (valorValidado === null) {
         return res.status(400).json({
@@ -371,23 +368,27 @@ const ecommerceController = {
         });
       }
 
-      // Crear configuración
+      // Crear la configuración
       const nuevaConfig = await prisma.parametrosSistema.create({
         data: {
           nombreParametro,
-          valorParametro: valorValidado.toString(),
-          descripcion: descripcion || `Configuración ${nombreParametro}`,
+          valorParametro: String(valorValidado),
           tipoDato: tipo,
+          descripcion: descripcion || '',
+          usuarioCreo: usuarioId ? `usuario_${usuarioId}` : 'admin@system',
           usuarioModifico: usuarioId ? `usuario_${usuarioId}` : 'admin@system',
+          fechaCreacion: new Date(),
           fechaModificacion: new Date()
         }
       });
 
       console.log(`✅ Nueva configuración creada: ${nombreParametro}`);
 
+      const configTransformada = transformarConfiguracion(nuevaConfig);
+
       return res.status(201).json({
         success: true,
-        data: transformarConfiguracion(nuevaConfig),
+        data: configTransformada,
         message: 'Configuración creada exitosamente'
       });
 
@@ -417,7 +418,7 @@ const ecommerceController = {
       
       const { configId } = req.params;
 
-      // Buscar configuración
+      // Buscar configuración existente
       const configExistente = await prisma.parametrosSistema.findFirst({
         where: {
           OR: [
@@ -485,48 +486,49 @@ const ecommerceController = {
 
   async getConfigByCategories(req, res) {
     try {
-      console.log('📁 [ECOMMERCE] Iniciando getConfigByCategories...');
-      
-      // Delegar a getEcommerceConfig y transformar resultado
-      const mockReq = { ...req, query: {} };
-      let configuraciones = [];
-      
-      // Capturar la respuesta de getEcommerceConfig
-      const mockRes = {
-        status: () => ({
-          json: (data) => {
-            if (data.success) {
-              configuraciones = data.data;
-            }
+      console.log('📂 [ECOMMERCE] Iniciando getConfigByCategories...');
+
+      const configuraciones = await prisma.parametrosSistema.findMany({
+        where: {
+          nombreParametro: {
+            startsWith: 'ECOMMERCE_'
           }
-        })
-      };
-      
-      await this.getEcommerceConfig(mockReq, mockRes);
-      
-      // Agrupar por categorías
-      const categorias = {
-        general: { nombre: 'general', titulo: 'General', configuraciones: [] },
-        pagos: { nombre: 'pagos', titulo: 'Pagos', configuraciones: [] },
-        envios: { nombre: 'envios', titulo: 'Envíos', configuraciones: [] },
-        promociones: { nombre: 'promociones', titulo: 'Promociones', configuraciones: [] },
-        politicas: { nombre: 'politicas', titulo: 'Políticas', configuraciones: [] },
-        apariencia: { nombre: 'apariencia', titulo: 'Apariencia', configuraciones: [] }
-      };
-      
+        },
+        orderBy: [
+          { nombreParametro: 'asc' }
+        ]
+      });
+
+      const configsPorCategoria = {};
+
       configuraciones.forEach(config => {
-        if (categorias[config.categoria]) {
-          categorias[config.categoria].configuraciones.push(config);
+        const configTransformada = transformarConfiguracion(config);
+        if (configTransformada) {
+          const categoria = configTransformada.categoria;
+          
+          if (!configsPorCategoria[categoria]) {
+            configsPorCategoria[categoria] = {
+              nombre: categoria,
+              titulo: categoria.charAt(0).toUpperCase() + categoria.slice(1),
+              configuraciones: []
+            };
+          }
+          
+          configsPorCategoria[categoria].configuraciones.push(configTransformada);
         }
       });
 
+      console.log(`✅ Configuraciones agrupadas en ${Object.keys(configsPorCategoria).length} categorías`);
+
       return res.status(200).json({
         success: true,
-        data: categorias
+        data: configsPorCategoria,
+        message: 'Configuraciones agrupadas por categorías'
       });
 
     } catch (error) {
       console.error('❌ [ERROR] Error en getConfigByCategories:', error);
+      
       return res.status(500).json({
         success: false,
         message: 'Error obteniendo configuraciones por categorías',
@@ -540,16 +542,16 @@ const ecommerceController = {
       console.log('🔄 [ECOMMERCE] Iniciando resetToDefaults...');
       
       const { confirmacion } = req.body;
-
+      
       if (confirmacion !== 'RESET_CONFIGURACIONES') {
         return res.status(400).json({
           success: false,
-          message: 'Se requiere confirmación explícita para restaurar configuraciones',
-          code: 'CONFIRMATION_REQUIRED'
+          message: 'Para restaurar las configuraciones, debes enviar confirmacion: "RESET_CONFIGURACIONES"',
+          code: 'MISSING_CONFIRMATION'
         });
       }
 
-      // Eliminar configuraciones existentes
+      // Eliminar todas las configuraciones de ecommerce existentes
       await prisma.parametrosSistema.deleteMany({
         where: {
           nombreParametro: {
@@ -558,32 +560,82 @@ const ecommerceController = {
         }
       });
 
-      // Crear configuraciones predeterminadas
-      await crearConfiguracionesPredeterminadas();
-
-      // Obtener las nuevas configuraciones
-      const configuraciones = await prisma.parametrosSistema.findMany({
-        where: {
-          nombreParametro: {
-            startsWith: 'ECOMMERCE_'
-          }
+      // Configuraciones predeterminadas
+      const configsDefault = [
+        {
+          nombreParametro: 'ECOMMERCE_GENERAL_NOMBRE_TIENDA',
+          valorParametro: 'Mi Tienda Online',
+          tipoDato: 'STRING',
+          descripcion: 'Nombre de la tienda que aparecerá en el sitio web'
         },
-        orderBy: [
-          { nombreParametro: 'asc' }
-        ]
-      });
+        {
+          nombreParametro: 'ECOMMERCE_GENERAL_MONEDA',
+          valorParametro: 'GTQ',
+          tipoDato: 'STRING',
+          descripcion: 'Moneda predeterminada para los precios'
+        },
+        {
+          nombreParametro: 'ECOMMERCE_GENERAL_IVA',
+          valorParametro: '12',
+          tipoDato: 'DECIMAL',
+          descripcion: 'Porcentaje de IVA aplicado a los productos'
+        },
+        {
+          nombreParametro: 'ECOMMERCE_PAGOS_EFECTIVO',
+          valorParametro: 'true',
+          tipoDato: 'BOOLEAN',
+          descripcion: 'Permitir pagos en efectivo'
+        },
+        {
+          nombreParametro: 'ECOMMERCE_PAGOS_TARJETA',
+          valorParametro: 'false',
+          tipoDato: 'BOOLEAN',
+          descripcion: 'Permitir pagos con tarjeta de crédito'
+        },
+        {
+          nombreParametro: 'ECOMMERCE_ENVIOS_COSTO_BASE',
+          valorParametro: '25.00',
+          tipoDato: 'DECIMAL',
+          descripcion: 'Costo base de envío'
+        },
+        {
+          nombreParametro: 'ECOMMERCE_ENVIOS_GRATIS_DESDE',
+          valorParametro: '300.00',
+          tipoDato: 'DECIMAL',
+          descripcion: 'Monto mínimo para envío gratis'
+        },
+        {
+          nombreParametro: 'ECOMMERCE_PROMOCIONES_ACTIVAS',
+          valorParametro: 'true',
+          tipoDato: 'BOOLEAN',
+          descripcion: 'Activar sistema de promociones'
+        }
+      ];
 
-      console.log('✅ Configuraciones restauradas exitosamente');
+      // Crear las configuraciones predeterminadas
+      for (const config of configsDefault) {
+        await prisma.parametrosSistema.create({
+          data: {
+            ...config,
+            usuarioCreo: 'system@reset',
+            usuarioModifico: 'system@reset',
+            fechaCreacion: new Date(),
+            fechaModificacion: new Date()
+          }
+        });
+      }
+
+      console.log(`✅ Se restauraron ${configsDefault.length} configuraciones predeterminadas`);
 
       return res.status(200).json({
         success: true,
-        data: transformarConfiguraciones(configuraciones),
-        message: 'Configuraciones restauradas a los valores predeterminados',
-        total: configuraciones.length
+        message: `Se restauraron ${configsDefault.length} configuraciones predeterminadas`,
+        data: { configuracionesCreadas: configsDefault.length }
       });
 
     } catch (error) {
       console.error('❌ [ERROR] Error en resetToDefaults:', error);
+      
       return res.status(500).json({
         success: false,
         message: 'Error restaurando configuraciones predeterminadas',
