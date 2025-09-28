@@ -255,7 +255,7 @@ const ecommerceController = {
         data: {
           valorParametro: String(valorValidado), // Siempre guardar como string en la DB
           descripcion: descripcion || configExistente.descripcion,
-          usuarioModifico: usuarioId ? `usuario_${usuarioId}` : 'admin@system',
+usuarioModificoId: usuarioId && !isNaN(parseInt(usuarioId)) ? parseInt(usuarioId) : null,
           fechaModificacion: new Date()
         }
       });
@@ -376,7 +376,7 @@ const ecommerceController = {
           tipoDato: tipo,
           descripcion: descripcion || '',
           usuarioCreo: usuarioId ? `usuario_${usuarioId}` : 'admin@system',
-          usuarioModifico: usuarioId ? `usuario_${usuarioId}` : 'admin@system',
+usuarioModificoId: usuarioId && !isNaN(parseInt(usuarioId)) ? parseInt(usuarioId) : null,
           fechaCreacion: new Date(),
           fechaModificacion: new Date()
         }
@@ -625,8 +625,6 @@ const ecommerceController = {
         });
       }
 
-      console.log(`✅ Se restauraron ${configsDefault.length} configuraciones predeterminadas`);
-
       return res.status(200).json({
         success: true,
         message: `Se restauraron ${configsDefault.length} configuraciones predeterminadas`,
@@ -634,7 +632,7 @@ const ecommerceController = {
       });
 
     } catch (error) {
-      console.error('❌ [ERROR] Error en resetToDefaults:', error);
+
       
       return res.status(500).json({
         success: false,
