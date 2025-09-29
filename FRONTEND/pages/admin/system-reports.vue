@@ -1,59 +1,50 @@
 <template>
   <div class="system-reports-page">
-    
-    <!-- Header del Admin Panel -->
+    <!-- Loading Overlay -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Cargando reportes del sistema...</p>
+      </div>
+    </div>
+
+    <!-- Admin Header -->
     <header class="admin-header">
       <div class="header-container">
         <div class="header-left">
-          <NuxtLink to="/" class="logo">
-            <img src="~/assets/images/logo.png" alt="Logo">
+          <NuxtLink to="/admin" class="logo">
+            <img src="~/assets/images/logo.png"  alt="Fredy Fasbear Logo" />
             <div>
               <h1>Fredy Fasbear</h1>
-              <span class="admin-badge">Panel Admin</span>
+              <span class="admin-badge">PANEL ADMIN</span>
             </div>
           </NuxtLink>
         </div>
         
         <div class="header-right">
           <div class="admin-info">
-            <span class="welcome-text">{{ userDisplayName }}</span>
-            <div class="user-avatar">
-              {{ getUserInitials() }}
-            </div>
+            <span class="welcome-text">Administrador Sistema</span>
+            <div class="user-avatar">{{ getUserInitials() }}</div>
           </div>
-          
-          <div class="admin-actions">
-            <NuxtLink to="/admin" class="btn-back">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2"/>
-              </svg>
-              Volver al Dashboard
-            </NuxtLink>
-          </div>
+          <NuxtLink to="/admin" class="btn-back">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            Volver al Dashboard
+          </NuxtLink>
         </div>
       </div>
     </header>
 
-    <!-- Loading Overlay -->
-    <div v-if="loading" class="loading-overlay">
-      <div class="loading-spinner">
-        <div class="spinner"></div>
-        <p>Generando reportes del sistema...</p>
-      </div>
-    </div>
-
     <!-- Main Content -->
-    <main v-if="!loading" class="reports-main">
+    <main class="reports-main">
       <div class="container">
-        
         <!-- Page Header -->
         <section class="page-header">
           <div class="section-header">
             <h2>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                <path d="M9 17H7A5 5 0 0 1 7 7h2m6 0h2a5 5 0 1 1 0 10h-2" stroke="currentColor" stroke-width="2"/>
-                <path d="M12 12h-2m0 0V8m0 4v4" stroke="currentColor" stroke-width="2"/>
-                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke="currentColor" stroke-width="2"/>
               </svg>
               Reportes del Sistema
             </h2>
@@ -180,10 +171,10 @@
                 </h4>
               </div>
               <div class="chart-container">
-                <canvas ref="dbmsChart" width="400" height="300"></canvas>
+                <canvas ref="dbmsChart"></canvas>
               </div>
               <div class="chart-legend">
-                <div v-for="(value, key) in dbmsDistribution" :key="key" class="legend-item">
+                <div v-for="(value, key) in dbmsDistribution" :key="key" class="legend-item" v-show="value > 0">
                   <span class="legend-color" :style="{ backgroundColor: getDBMSColor(key) }"></span>
                   <span class="legend-label">{{ key }}: {{ value }}</span>
                 </div>
@@ -204,7 +195,7 @@
                 </h4>
               </div>
               <div class="chart-container">
-                <canvas ref="dataTypesChart" width="400" height="300"></canvas>
+                <canvas ref="dataTypesChart"></canvas>
               </div>
               <div class="data-types-list">
                 <div v-for="(count, type) in dataTypesDistribution" :key="type" class="data-type-item">
@@ -222,22 +213,16 @@
               <div class="card-header">
                 <h4>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="currentColor" stroke-width="2"/>
-                    <polyline points="3.27,6.96 12,12.01 20.73,6.96" stroke="currentColor" stroke-width="2"/>
-                    <line x1="12" y1="22.08" x2="12" y2="12" stroke="currentColor" stroke-width="2"/>
+                    <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke="currentColor" stroke-width="2"/>
                   </svg>
                   Estadísticas por Esquema
                 </h4>
-                <div class="card-actions">
-                  <button @click="refreshSchemaStats" class="btn-refresh">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" stroke="currentColor" stroke-width="2"/>
-                      <path d="M21 3v5h-5" stroke="currentColor" stroke-width="2"/>
-                      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" stroke="currentColor" stroke-width="2"/>
-                      <path d="M8 16H3v5" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                  </button>
-                </div>
+                <button @click="refreshSchemaStats" class="btn-refresh">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2"/>
+                    <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
               </div>
               <div class="table-container">
                 <table class="schema-table">
@@ -251,9 +236,9 @@
                   </thead>
                   <tbody>
                     <tr v-for="schema in schemaStats" :key="schema.name">
-                      <td class="schema-name">{{ schema.name }}</td>
-                      <td class="table-count">{{ schema.tableCount }}</td>
-                      <td class="column-count">{{ schema.columnCount }}</td>
+                      <td><span class="schema-name">{{ schema.name }}</span></td>
+                      <td><span class="table-count">{{ schema.tableCount }}</span></td>
+                      <td><span class="column-count">{{ schema.columnCount }}</span></td>
                       <td>
                         <span class="status-badge" :class="schema.status">
                           {{ schema.status === 'active' ? 'Activo' : 'Inactivo' }}
@@ -275,7 +260,7 @@
           </div>
 
           <div class="health-grid">
-            <div class="health-card cpu">
+            <div class="health-card">
               <div class="health-header">
                 <h4>CPU</h4>
                 <span class="health-percentage">{{ systemHealth.cpu }}%</span>
@@ -286,7 +271,7 @@
               <p class="health-status">Normal</p>
             </div>
 
-            <div class="health-card memory">
+            <div class="health-card">
               <div class="health-header">
                 <h4>Memoria</h4>
                 <span class="health-percentage">{{ systemHealth.memory }}%</span>
@@ -297,7 +282,7 @@
               <p class="health-status">Normal</p>
             </div>
 
-            <div class="health-card storage">
+            <div class="health-card">
               <div class="health-header">
                 <h4>Almacenamiento</h4>
                 <span class="health-percentage">{{ systemHealth.storage }}%</span>
@@ -308,17 +293,17 @@
               <p class="health-status">Normal</p>
             </div>
 
-            <div class="health-card network">
+            <div class="health-card">
               <div class="health-header">
                 <h4>Red</h4>
                 <span class="health-value">{{ systemHealth.network }} Mbps</span>
               </div>
               <div class="network-indicator">
                 <div class="signal-bars">
-                  <div class="bar active"></div>
-                  <div class="bar active"></div>
-                  <div class="bar active"></div>
-                  <div class="bar"></div>
+                  <div class="bar" :class="{ active: systemHealth.network > 200 }"></div>
+                  <div class="bar" :class="{ active: systemHealth.network > 400 }"></div>
+                  <div class="bar" :class="{ active: systemHealth.network > 600 }"></div>
+                  <div class="bar" :class="{ active: systemHealth.network > 800 }"></div>
                 </div>
               </div>
               <p class="health-status">Buena</p>
@@ -333,20 +318,46 @@
             <p>Últimas operaciones en el sistema</p>
           </div>
 
-          <div class="activity-card">
-            <div class="activity-list">
-              <div v-for="activity in recentActivities" :key="activity.id" class="activity-item">
-                <div class="activity-icon" :class="activity.type">
-                  <component :is="getActivityIcon(activity.type)"></component>
+          <div class="activity-list">
+            <div v-if="filteredActivities.length === 0" class="empty-state">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2"/>
+                <line x1="12" y1="16" x2="12.01" y2="16" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              <p>No hay actividad reciente para mostrar</p>
+            </div>
+            
+            <div v-for="activity in filteredActivities" :key="activity.id" class="activity-item" :class="activity.type">
+              <div class="activity-icon" :class="activity.type">
+                <svg v-if="activity.type === 'database'" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="2"/>
+                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" stroke="currentColor" stroke-width="2"/>
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <svg v-else-if="activity.type === 'security'" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                  <polyline points="12 6 12 12 16 14" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </div>
+              
+              <div class="activity-content">
+                <h4>{{ activity.title }}</h4>
+                <p>{{ activity.description }}</p>
+                <div class="activity-meta">
+                  <span class="activity-user">{{ activity.user }}</span>
+                  <span class="activity-time">{{ formatTimeAgo(activity.timestamp) }}</span>
                 </div>
-                <div class="activity-content">
-                  <h5>{{ activity.title }}</h5>
-                  <p>{{ activity.description }}</p>
-                  <time>{{ formatTime(activity.timestamp) }}</time>
-                </div>
-                <div class="activity-status" :class="activity.status">
+              </div>
+              
+              <div class="activity-status">
+                <span class="status-dot" :class="activity.status"></span>
+                <span class="status-text">
                   {{ activity.status === 'success' ? 'Exitoso' : activity.status === 'warning' ? 'Advertencia' : 'Error' }}
-                </div>
+                </span>
               </div>
             </div>
           </div>
@@ -357,7 +368,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { ref, onMounted, computed, onUnmounted, nextTick } from 'vue'
+
+// Importar Chart.js solo en el cliente
+let Chart = null
+if (process.client) {
+  Chart = (await import('chart.js/auto')).default
+}
 
 // Middleware de autenticación admin
 definePageMeta({
@@ -427,6 +444,14 @@ const systemHealth = ref({
   uptime: 0
 })
 const recentActivities = ref([])
+
+// Referencias para canvas
+const dbmsChart = ref(null)
+const dataTypesChart = ref(null)
+
+// Instancias de gráficas
+let dbmsChartInstance = null
+let dataTypesChartInstance = null
 
 // Intervalos para actualización automática
 const refreshInterval = ref(null)
@@ -513,8 +538,117 @@ const loadInitialData = async () => {
     
     console.log('✅ Datos iniciales cargados exitosamente')
     
+    // Renderizar gráficas después de cargar los datos
+    await nextTick()
+    renderCharts()
+    
   } catch (err) {
     console.error('❌ Error cargando datos iniciales:', err)
+  }
+}
+
+/**
+ * Renderizar las gráficas con Chart.js
+ */
+const renderCharts = async () => {
+  // Solo renderizar en el cliente
+  if (!process.client) return
+  
+  try {
+    // Importar Chart.js dinámicamente
+    const { default: Chart } = await import('chart.js/auto')
+    
+    // Destruir gráficas existentes
+    if (dbmsChartInstance) {
+      dbmsChartInstance.destroy()
+    }
+    if (dataTypesChartInstance) {
+      dataTypesChartInstance.destroy()
+    }
+    
+    // Gráfica de DBMS
+    if (dbmsChart.value) {
+      const dbmsData = Object.entries(dbmsDistribution.value)
+        .filter(([_, value]) => value > 0)
+      
+      if (dbmsData.length > 0) {
+        const ctx = dbmsChart.value.getContext('2d')
+        dbmsChartInstance = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: dbmsData.map(([key]) => key),
+            datasets: [{
+              data: dbmsData.map(([_, value]) => value),
+              backgroundColor: dbmsData.map(([key]) => getDBMSColor(key)),
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const label = context.label || ''
+                    const value = context.parsed || 0
+                    return `${label}: ${value} columnas`
+                  }
+                }
+              }
+            }
+          }
+        })
+      }
+    }
+    
+    // Gráfica de tipos de datos
+    if (dataTypesChart.value) {
+      const dataTypesData = Object.entries(dataTypesDistribution.value)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10) // Top 10 tipos
+      
+      if (dataTypesData.length > 0) {
+        const ctx = dataTypesChart.value.getContext('2d')
+        dataTypesChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: dataTypesData.map(([key]) => key),
+            datasets: [{
+              label: 'Cantidad',
+              data: dataTypesData.map(([_, value]) => value),
+              backgroundColor: 'rgba(212, 175, 55, 0.8)',
+              borderColor: '#D4AF37',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: {
+                display: false
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  precision: 0
+                }
+              }
+            }
+          }
+        })
+      }
+    }
+    
+    console.log('✅ Gráficas renderizadas')
+  } catch (err) {
+    console.error('❌ Error renderizando gráficas:', err)
   }
 }
 
@@ -554,120 +688,118 @@ const exportReport = async () => {
   try {
     console.log('📤 Iniciando exportación de reporte...')
     
-    const exportInfo = await exportSystemReport({
-      reportType: 'system-overview',
-      format: 'csv',
-      dateRange: {
-        start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 días
-        end: new Date()
-      }
+    // Usar el composable useAuth para obtener el token
+    const { getToken } = useAuth()
+    const token = getToken()
+    
+    if (!token) {
+      console.error('❌ No hay token de autenticación')
+      alert('❌ Sesión expirada. Por favor, inicia sesión nuevamente.')
+      return
+    }
+    
+    console.log('🔑 Token encontrado:', token.substring(0, 20) + '...')
+    
+    // URL del backend
+    const config = useRuntimeConfig()
+    const baseURL = config.public.apiBase || 'http://localhost:3001/api'
+    
+    console.log('📡 Haciendo petición a:', `${baseURL}/system-reports/export`)
+    
+    // Hacer la petición al backend
+    const response = await fetch(`${baseURL}/system-reports/export`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        reportType: 'system-overview',
+        format: 'csv',
+        dateRange: {
+          start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          end: new Date()
+        }
+      })
     })
     
-    // Mostrar mensaje de éxito (podrías usar una notificación)
-    console.log('✅ Reporte exportado:', exportInfo.fileName)
-    alert(`Reporte exportado exitosamente: ${exportInfo.fileName}`)
+    console.log('📡 Respuesta recibida:', response.status, response.statusText)
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        alert('❌ No autorizado. Por favor, inicia sesión nuevamente.')
+        navigateTo('/login')
+        return
+      }
+      const errorText = await response.text()
+      console.error('❌ Error del servidor:', errorText)
+      throw new Error(`Error al generar el reporte: ${response.status}`)
+    }
+    
+    // Obtener el blob del CSV
+    const blob = await response.blob()
+    console.log('📦 Blob recibido:', blob.size, 'bytes')
+    
+    // Crear URL temporal para descarga
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `system-report-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(a)
+    a.click()
+    
+    // Limpiar después de un pequeño delay
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    }, 100)
+    
+    console.log('✅ Reporte descargado exitosamente')
+    alert('✅ Reporte CSV descargado exitosamente')
     
   } catch (err) {
     console.error('❌ Error exportando reporte:', err)
-    alert('Error exportando el reporte. Inténtalo de nuevo.')
-  }
-}
-
-/**
- * Actualizar todos los datos manualmente
- */
-const refreshAllReports = async () => {
-  try {
-    console.log('🔄 Actualizando todos los reportes...')
-    await loadInitialData()
-    console.log('✅ Todos los reportes actualizados')
-  } catch (err) {
-    console.error('❌ Error actualizando reportes:', err)
-  }
-}
-
-/**
- * Configurar intervalos de actualización automática
- */
-const setupAutoRefresh = () => {
-  // Actualizar todos los datos cada 5 minutos
-  refreshInterval.value = setInterval(() => {
-    console.log('🔄 Actualización automática programada...')
-    loadInitialData()
-  }, 5 * 60 * 1000)
-  
-  // Actualizar métricas de salud cada 30 segundos
-  healthInterval.value = setInterval(() => {
-    updateHealthMetrics()
-  }, 30 * 1000)
-}
-
-/**
- * Limpiar intervalos
- */
-const clearIntervals = () => {
-  if (refreshInterval.value) {
-    clearInterval(refreshInterval.value)
-    refreshInterval.value = null
-  }
-  
-  if (healthInterval.value) {
-    clearInterval(healthInterval.value)
-    healthInterval.value = null
+    alert(`❌ ${err.message || 'Error exportando el reporte. Inténtalo de nuevo.'}`)
   }
 }
 
 // ===== LIFECYCLE HOOKS =====
 onMounted(async () => {
-  try {
-    // Cargar datos iniciales
-    await loadInitialData()
-    
-    // Configurar actualización automática
-    setupAutoRefresh()
-    
-    console.log('🎉 Panel de reportes del sistema listo')
-    
-  } catch (error) {
-    console.error('❌ Error inicializando panel de reportes:', error)
-  }
+  console.log('📊 Componente System Reports montado')
+  
+  // Cargar datos iniciales
+  await loadInitialData()
+  
+  // Configurar actualización automática de métricas de salud cada 30 segundos
+  healthInterval.value = setInterval(updateHealthMetrics, 30000)
+  
+  // Configurar actualización completa cada 5 minutos
+  refreshInterval.value = setInterval(loadInitialData, 300000)
 })
 
 onUnmounted(() => {
-  // Limpiar intervalos al destruir el componente
-  clearIntervals()
-  console.log('🧹 Intervalos de actualización limpiados')
+  console.log('📊 Limpiando intervalos y gráficas...')
+  
+  // Limpiar intervalos
+  if (healthInterval.value) {
+    clearInterval(healthInterval.value)
+  }
+  if (refreshInterval.value) {
+    clearInterval(refreshInterval.value)
+  }
+  
+  // Destruir gráficas
+  if (dbmsChartInstance) {
+    dbmsChartInstance.destroy()
+  }
+  if (dataTypesChartInstance) {
+    dataTypesChartInstance.destroy()
+  }
 })
-
-// ===== FUNCIONES DE TEMPLATE =====
-
-/**
- * Determinar clase CSS para el estado de salud
- */
-const getHealthClass = (value, thresholds = { warning: 70, critical: 90 }) => {
-  if (value >= thresholds.critical) return 'critical'
-  if (value >= thresholds.warning) return 'warning'
-  return 'normal'
-}
-
-/**
- * Formatear tiempo de uptime
- */
-const formatUptime = (seconds) => {
-  if (!seconds) return 'Desconocido'
-  
-  const days = Math.floor(seconds / (24 * 60 * 60))
-  const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60))
-  const minutes = Math.floor((seconds % (60 * 60)) / 60)
-  
-  if (days > 0) return `${days}d ${hours}h ${minutes}m`
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
 </script>
 
 <style scoped>
-/* Paleta de colores del sistema */
+/* General Styles */
 .system-reports-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #2C3E50 0%, #4A4A4A 50%, #1A1A1A 100%);
@@ -802,7 +934,7 @@ const formatUptime = (seconds) => {
 
 .btn-back:hover {
   background: rgba(212, 175, 55, 0.3);
-  color: white;
+  border-color: #D4AF37;
 }
 
 /* Main Content */
@@ -1107,6 +1239,9 @@ const formatUptime = (seconds) => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-refresh:hover {
@@ -1345,20 +1480,22 @@ const formatUptime = (seconds) => {
 
 .signal-bars {
   display: flex;
-  gap: 2px;
-  align-items: end;
+  gap: 4px;
+  align-items: flex-end;
+  height: 30px;
 }
 
 .bar {
-  width: 8px;
+  flex: 1;
   background: #e9ecef;
   border-radius: 2px;
+  transition: background 0.3s ease;
 }
 
-.bar:nth-child(1) { height: 10px; }
-.bar:nth-child(2) { height: 15px; }
-.bar:nth-child(3) { height: 20px; }
-.bar:nth-child(4) { height: 25px; }
+.bar:nth-child(1) { height: 30%; }
+.bar:nth-child(2) { height: 50%; }
+.bar:nth-child(3) { height: 70%; }
+.bar:nth-child(4) { height: 100%; }
 
 .bar.active {
   background: linear-gradient(180deg, #27AE60, #58D68D);
@@ -1372,6 +1509,10 @@ const formatUptime = (seconds) => {
 }
 
 /* Recent Activity */
+.recent-activity {
+  margin-bottom: 3rem;
+}
+
 .recent-activity .section-header {
   background: white;
   border-radius: 16px;
@@ -1386,33 +1527,50 @@ const formatUptime = (seconds) => {
   margin: 0 0 0.5rem;
 }
 
-.activity-card {
+.activity-list {
   background: white;
   border-radius: 16px;
+  padding: 1.5rem;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
 }
 
-.activity-list {
-  padding: 1.5rem;
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #6c757d;
+}
+
+.empty-state svg {
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 1.1rem;
 }
 
 .activity-item {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid #f8f9fa;
+  padding: 1rem;
+  border-bottom: 1px solid #e9ecef;
+  transition: background 0.3s ease;
 }
 
 .activity-item:last-child {
   border-bottom: none;
 }
 
+.activity-item:hover {
+  background: #f8f9fa;
+}
+
 .activity-icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1429,12 +1587,7 @@ const formatUptime = (seconds) => {
   color: #E74C3C;
 }
 
-.activity-icon.maintenance {
-  background: rgba(212, 175, 55, 0.1);
-  color: #D4AF37;
-}
-
-.activity-icon.error {
+.activity-icon.system {
   background: rgba(155, 89, 182, 0.1);
   color: #9B59B6;
 }
@@ -1443,91 +1596,90 @@ const formatUptime = (seconds) => {
   flex: 1;
 }
 
-.activity-content h5 {
+.activity-content h4 {
+  margin: 0 0 0.25rem;
   color: #2C3E50;
   font-weight: 600;
-  margin: 0 0 0.25rem;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .activity-content p {
-  color: #4A4A4A;
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.5rem;
+  color: #6c757d;
   font-size: 0.9rem;
 }
 
-.activity-content time {
-  color: #6c757d;
-  font-size: 0.8rem;
+.activity-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: #95A5A6;
+}
+
+.activity-user {
+  font-weight: 500;
 }
 
 .activity-status {
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
-.activity-status.success {
-  background: rgba(39, 174, 96, 0.1);
-  color: #27AE60;
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
-.activity-status.warning {
-  background: rgba(241, 196, 15, 0.1);
-  color: #F1C40F;
+.status-dot.success {
+  background: #27AE60;
 }
 
-.activity-status.error {
-  background: rgba(231, 76, 60, 0.1);
-  color: #E74C3C;
+.status-dot.warning {
+  background: #F39C12;
 }
 
-/* Responsive Design */
+.status-dot.error {
+  background: #E74C3C;
+}
+
+.status-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #6c757d;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
-  .container {
-    padding: 0 1rem;
-  }
-
   .header-container {
-    padding: 0 1rem;
+    flex-direction: column;
+    gap: 1rem;
   }
-
+  
   .filters-row {
     flex-direction: column;
     align-items: stretch;
   }
-
+  
   .search-box {
-    min-width: auto;
+    min-width: 100%;
   }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
+  
   .analysis-grid {
     grid-template-columns: 1fr;
   }
-
-  .health-grid {
-    grid-template-columns: 1fr;
-  }
-
+  
+  .analysis-card:first-child,
+  .analysis-card:nth-child(2),
   .analysis-card:last-child {
-    grid-column: auto;
+    border-radius: 16px;
   }
-
+  
   .activity-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
-  }
-
-  .activity-status {
-    align-self: flex-start;
   }
 }
 </style>
