@@ -3,68 +3,92 @@ export const useApi = () => {
   const config = useRuntimeConfig()
   const baseURL = config.public.apiBase || 'http://localhost:3001/api'
 
+  const fetchWithRetry = async (url, options = {}, maxRetries = 3) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await $fetch(url, { baseURL, ...options })
+        return response
+      } catch (error) {
+        const isRetryable = error.statusCode === 500 || error.statusCode === 503
+        const shouldRetry = isRetryable && attempt < maxRetries
+        
+        if (shouldRetry) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+          continue
+        }
+
+        if (error.statusCode === 401 && process.client) {
+          const { logout } = useAuth()
+          logout()
+          navigateTo('/login')
+        }
+
+        throw error
+      }
+    }
+  }
+
+  const createRequest = (method) => {
+    return (url, body = null, customOptions = {}) => {
+      const options = {
+        method,
+        ...customOptions
+      }
+
+      if (process.client) {
+        const { getToken } = useAuth()
+        const token = getToken()
+        
+        if (token) {
+          options.headers = {
+            ...options.headers,
+            Authorization: `Bearer ${token}`
+          }
+        }
+      }
+
+      if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+        options.body = body
+      }
+
+      return fetchWithRetry(url, options)
+    }
+  }
+
   const api = $fetch.create({
     baseURL,
     headers: {
       'Content-Type': 'application/json'
     },
-    onRequest({ request, options }) {
-      // Agregar token automáticamente si existe
+    onRequest({ options }) {
       if (process.client) {
-        try {
-          const { getToken } = useAuth()
-          const token = getToken()
-          
-          if (token) {
-            options.headers = {
-              ...options.headers,
-              Authorization: `Bearer ${token}`
-            }
-            console.log(`[API] ✅ Token agregado a petición: ${request}`)
-          } else {
-            console.log(`[API] ⚠️ No hay token para: ${request}`)
+        const { getToken } = useAuth()
+        const token = getToken()
+        
+        if (token) {
+          options.headers = {
+            ...options.headers,
+            Authorization: `Bearer ${token}`
           }
-        } catch (error) {
-          console.error('[API] Error obteniendo token:', error)
         }
       }
     },
-    onResponse({ request, response }) {
-      const status = response.status
-      const statusIcon = status >= 200 && status < 300 ? '✅' : status >= 400 ? '❌' : '⚠️'
-      console.log(`[API] ${statusIcon} ${status} - ${request}`)
-    },
-    onResponseError({ request, response }) {
-      console.error(`[API] ❌ Error ${response.status} - ${request}:`, response._data)
-      
-      // Manejar errores de autenticación
-      if (response.status === 401) {
-        console.log('[API] 🚨 Token expirado/inválido, cerrando sesión...')
-        
-        if (process.client) {
-          try {
-            const { logout } = useAuth()
-            logout()
-            
-            // Redirigir al login después de un pequeño delay
-            setTimeout(() => {
-              navigateTo('/login')
-            }, 100)
-          } catch (error) {
-            console.error('[API] Error durante logout automático:', error)
-            // Fallback: redirigir directamente
-            window.location.href = '/login'
-          }
-        }
+    onResponseError({ response }) {
+      if (response.status === 401 && process.client) {
+        const { logout } = useAuth()
+        logout()
+        setTimeout(() => navigateTo('/login'), 100)
       }
     }
   })
 
   return { 
     api,
-    // Función auxiliar para compatibilidad
-    $api: (url, options = {}) => {
-      return api(url, options)
-    }
+    get: createRequest('GET'),
+    post: createRequest('POST'),
+    put: createRequest('PUT'),
+    patch: createRequest('PATCH'),
+    delete: createRequest('DELETE'),
+    $api: (url, options = {}) => api(url, options)
   }
 }

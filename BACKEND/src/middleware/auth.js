@@ -2,48 +2,83 @@
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+});
 
-// Middleware principal de autenticación
+async function executeWithRetry(fn, maxRetries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isConnectionError = 
+        error.code === 'P1001' || 
+        error.code === 'P1008' ||
+        error.message?.includes("Can't reach database");
+
+      if (isConnectionError && attempt < maxRetries) {
+        console.log(`⚠️ Intento ${attempt}/${maxRetries} falló, reintentando en ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 export const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; 
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Token de acceso requerido'
+        message: 'Token de autenticación requerido'
       });
     }
 
-    // Verificar token usando solo la variable de entorno
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Buscar usuario en base de datos
-    const user = await prisma.usuario.findUnique({
-      where: { id: decoded.id }
+
+    const usuario = await executeWithRetry(async () => {
+      return await prisma.usuario.findUnique({
+        where: { id: decoded.id },
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          email: true,
+          tipoUsuario: true,
+          estado: true
+        }
+      });
     });
 
-    if (!user || user.estado !== 'Activo') {
+    if (!usuario) {
       return res.status(401).json({
         success: false,
-        message: 'Token inválido o usuario inactivo'
+        message: 'Usuario no encontrado'
       });
     }
 
-    // Agregar usuario al request
-    req.user = {
-      id: user.id,
-      email: user.email,
-      tipoUsuario: user.tipoUsuario,
-      nombre: user.nombre,
-      apellido: user.apellido
-    };
+    if (usuario.estado !== 'Activo') {
+      return res.status(403).json({
+        success: false,
+        message: 'Usuario inactivo'
+      });
+    }
 
+    req.user = usuario;
     next();
 
   } catch (error) {
+    console.error('[ERROR] Error en middleware de auth:', error.message);
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
@@ -58,62 +93,31 @@ export const authenticateToken = async (req, res, next) => {
       });
     }
 
-    console.error('[ERROR] Error en middleware de auth:', error);
-    return res.status(500).json({
+    return res.status(503).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Servicio temporalmente no disponible, reintente en unos segundos'
     });
   }
 };
 
-// Middleware para verificar rol de administrador
 export const requireAdmin = (req, res, next) => {
-  if (req.user.tipoUsuario !== 'Administrador') {
+  if (req.user?.tipoUsuario !== 'Administrador') {
     return res.status(403).json({
       success: false,
-      message: 'Acceso denegado. Se requieren permisos de administrador'
+      message: 'Acceso denegado: Se requieren permisos de administrador'
     });
   }
   next();
 };
 
-// Middleware para verificar rol de cliente
 export const requireClient = (req, res, next) => {
-  if (req.user.tipoUsuario !== 'Cliente') {
+  if (req.user?.tipoUsuario !== 'Cliente') {
     return res.status(403).json({
       success: false,
-      message: 'Acceso denegado. Se requieren permisos de cliente'
+      message: 'Acceso denegado: Se requieren permisos de cliente'
     });
   }
   next();
 };
 
-// Middleware opcional de auth (no falla si no hay token)
-export const optionalAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await prisma.usuario.findUnique({
-        where: { id: decoded.id }
-      });
-
-      if (user && user.estado === 'Activo') {
-        req.user = {
-          id: user.id,
-          email: user.email,
-          tipoUsuario: user.tipoUsuario,
-          nombre: user.nombre,
-          apellido: user.apellido
-        };
-      }
-    }
-
-    next();
-  } catch (error) {
-
-    next();
-  }
-};
+export default authenticateToken;

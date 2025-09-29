@@ -1,4 +1,6 @@
+// BACKEND/src/routes/index.js
 import express from 'express';
+import { PrismaClient } from '@prisma/client';
 import homepageRoutes from './homepage.routes.js';
 import authRoutes from './auth.routes.js';
 import prestamosRoutes from './prestamos.routes.js';  
@@ -10,22 +12,15 @@ import ecommerceRoutes from './ecommerce.routes.js';
 import systemReportsRoutes from './system-reports.routes.js';
 
 const router = express.Router();
+const prisma = new PrismaClient();
 
-// Middleware para logging general
 router.use((req, res, next) => {
-  console.log(`🌐 API Request: ${req.method} ${req.originalUrl}`);
-  console.log(`📍 IP: ${req.ip}`);
-  console.log(`🕐 Timestamp: ${new Date().toISOString()}`);
+  console.log(`🌐 ${new Date().toISOString()} - ${req.method} ${req.originalUrl} - IP: ${req.ip}`);
   next();
 });
 
-// ===== REGISTRO DE RUTAS =====
-
-// Rutas públicas (sin autenticación)
 router.use('/homepage', homepageRoutes);
 router.use('/auth', authRoutes);
-
-// Rutas protegidas (requieren autenticación)
 router.use('/prestamos', prestamosRoutes);     
 router.use('/solicitudes', solicitudesRoutes); 
 router.use('/admin', adminRoutes);
@@ -34,34 +29,39 @@ router.use('/clients', clientsRoutes);
 router.use('/admin/ecommerce-config', ecommerceRoutes);
 router.use('/system-reports', systemReportsRoutes);
 
-// Futuras rutas (placeholders)
-// router.use('/productos', productosRoutes);
-// router.use('/tienda', tiendaRoutes);
-// router.use('/reportes', reportesRoutes);
-// router.use('/notificaciones', notificacionesRoutes);
-
-// ===== HEALTH CHECK =====
-router.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'API funcionando correctamente',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV  ,
-    version: '1.0.0',
-    services: {
+router.get('/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    
+    res.status(200).json({
+      success: true,
+      message: 'API funcionando correctamente',
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV,
+      version: '1.0.0',
       database: 'connected',
-      storage: 'available',
-      auth: 'active',
-      admin: 'active',
-      personal: 'active',
-      ecommerce: 'active',
-      systemReports: 'active'
-    }
-  });
+      services: {
+        auth: 'active',
+        admin: 'active',
+        personal: 'active',
+        clients: 'active',
+        ecommerce: 'active',
+        systemReports: 'active'
+      }
+    });
+  } catch (error) {
+    res.status(503).json({
+      success: false,
+      status: 'unhealthy',
+      message: 'Error de conexión a la base de datos',
+      database: 'disconnected',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
-// ===== API INFO =====
 router.get('/info', (req, res) => {
   res.status(200).json({
     success: true,
@@ -71,7 +71,6 @@ router.get('/info', (req, res) => {
       description: 'API para sistema de empeño y préstamos pignoraticios',
       author: 'Fredy Fasbear Industries',
       endpoints: {
-        // Rutas públicas
         auth: {
           base: '/api/auth',
           endpoints: [
@@ -93,7 +92,7 @@ router.get('/info', (req, res) => {
             'PUT /api/clients/:id',
             'PUT /api/clients/:id/toggle-status'
           ]
-        }, // Agregada coma faltante
+        },
         homepage: {
           base: '/api/homepage',
           endpoints: [
@@ -104,7 +103,6 @@ router.get('/info', (req, res) => {
             'POST /api/homepage/newsletter'
           ]
         },
-        // Rutas protegidas
         prestamos: {
           base: '/api/prestamos',
           endpoints: [
@@ -151,7 +149,7 @@ router.get('/info', (req, res) => {
             'PUT /api/admin/system-parameters/:id'
           ]
         },
-          ecommerce: {
+        ecommerce: {
           base: '/api/admin/ecommerce-config',
           description: 'Configuración del módulo E-commerce',
           endpoints: [
@@ -166,7 +164,7 @@ router.get('/info', (req, res) => {
             'POST /api/admin/ecommerce-config/reset'
           ]
         },
-          systemReports: {
+        systemReports: {
           base: '/api/system-reports',
           description: 'Reportes y monitoreo del sistema',
           endpoints: [
@@ -177,7 +175,6 @@ router.get('/info', (req, res) => {
             'POST /api/system-reports/export'
           ]
         },
-        // Rutas de utilidad
         system: {
           base: '/api',
           endpoints: [
@@ -202,7 +199,6 @@ router.get('/info', (req, res) => {
   });
 });
 
-// ===== RUTA DE PRUEBA PARA DESARROLLO =====
 if (process.env.NODE_ENV === 'development') {
   router.get('/test', (req, res) => {
     res.status(200).json({
@@ -219,10 +215,7 @@ if (process.env.NODE_ENV === 'development') {
   });
 }
 
-// ===== MANEJO DE RUTAS NO ENCONTRADAS =====
 router.use((req, res) => {
-  console.log(`❌ Ruta no encontrada: ${req.method} ${req.originalUrl}`);
-  
   res.status(404).json({
     success: false,
     message: 'Endpoint no encontrado',
@@ -239,18 +232,17 @@ router.use((req, res) => {
       '/api/personal/*',
       '/api/admin/*',
       '/api/clients/*',  
-     '/api/admin/ecommerce-config/*',
+      '/api/admin/ecommerce-config/*',
+      '/api/system-reports/*',
       '/api/health',
       '/api/info'
     ]
   });
 });
 
-// ===== MIDDLEWARE DE ERROR GLOBAL =====
 router.use((error, req, res, next) => {
-  console.error('❌ Error en API:', error);
+  console.error('❌ Error en API:', error.message);
   
-  // Error de validación de Prisma
   if (error.code === 'P2002') {
     return res.status(400).json({
       success: false,
@@ -259,16 +251,13 @@ router.use((error, req, res, next) => {
     });
   }
   
-  // Error de registro no encontrado en Prisma
   if (error.code === 'P2025') {
     return res.status(404).json({
       success: false,
-      message: 'Registro no encontrado',
-      error: 'El recurso solicitado no existe'
+      message: 'Registro no encontrado'
     });
   }
   
-  // Error de conexión a base de datos
   if (error.code === 'P1001') {
     return res.status(503).json({
       success: false,
@@ -277,24 +266,20 @@ router.use((error, req, res, next) => {
     });
   }
   
-  // Error de JWT
   if (error.name === 'JsonWebTokenError') {
     return res.status(401).json({
       success: false,
-      message: 'Token inválido',
-      error: 'El token de autenticación no es válido'
+      message: 'Token inválido'
     });
   }
   
   if (error.name === 'TokenExpiredError') {
     return res.status(401).json({
       success: false,
-      message: 'Token expirado',
-      error: 'El token de autenticación ha expirado'
+      message: 'Token expirado'
     });
   }
   
-  // Error de validación
   if (error.name === 'ValidationError') {
     return res.status(400).json({
       success: false,
@@ -303,33 +288,25 @@ router.use((error, req, res, next) => {
     });
   }
   
-  // Error de límite de archivos
   if (error.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       success: false,
-      message: 'Archivo muy grande',
-      error: 'El archivo excede el tamaño máximo permitido'
+      message: 'Archivo muy grande'
     });
   }
   
   if (error.code === 'LIMIT_FILE_COUNT') {
     return res.status(400).json({
       success: false,
-      message: 'Demasiados archivos',
-      error: 'Se ha excedido el número máximo de archivos'
+      message: 'Demasiados archivos'
     });
   }
   
-  // Error genérico
   res.status(error.status || 500).json({
     success: false,
     message: error.message || 'Error interno del servidor',
-    error: process.env.NODE_ENV === 'development' ? {
-      stack: error.stack,
-      details: error
-    } : 'Error interno del servidor',
-    timestamp: new Date().toISOString(),
-    requestId: req.id || 'unknown'
+    error: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    timestamp: new Date().toISOString()
   });
 });
 
