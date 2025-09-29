@@ -7,6 +7,7 @@ import adminRoutes from './admin.routes.js';
 import personalRoutes from './personal.routes.js';
 import clientsRoutes from './clients.routes.js';
 import ecommerceRoutes from './ecommerce.routes.js'; 
+import systemReportsRoutes from './system-reports.routes.js';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.use('/admin', adminRoutes);
 router.use('/personal', personalRoutes);
 router.use('/clients', clientsRoutes);  
 router.use('/admin/ecommerce-config', ecommerceRoutes);
+router.use('/system-reports', systemReportsRoutes);
 
 // Futuras rutas (placeholders)
 // router.use('/productos', productosRoutes);
@@ -53,7 +55,8 @@ router.get('/health', (req, res) => {
       auth: 'active',
       admin: 'active',
       personal: 'active',
-            ecommerce: 'active'
+      ecommerce: 'active',
+      systemReports: 'active'
     }
   });
 });
@@ -161,6 +164,17 @@ router.get('/info', (req, res) => {
             'POST /api/admin/ecommerce-config',
             'DELETE /api/admin/ecommerce-config/:configId',
             'POST /api/admin/ecommerce-config/reset'
+          ]
+        },
+          systemReports: {
+          base: '/api/system-reports',
+          description: 'Reportes y monitoreo del sistema',
+          endpoints: [
+            'GET /api/system-reports/overview',
+            'GET /api/system-reports/database-analysis',
+            'GET /api/system-reports/health-monitoring',
+            'GET /api/system-reports/recent-activity',
+            'POST /api/system-reports/export'
           ]
         },
         // Rutas de utilidad
