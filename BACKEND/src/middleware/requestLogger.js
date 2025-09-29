@@ -53,112 +53,10 @@ const determinarEntidad = (path) => {
   return 'sistema';
 };
 
-const sanitizarDatos = (data) => {
-  if (!data || typeof data !== 'object') return data;
-  
-  const sensitiveFields = ['password', 'token', 'authorization', 'cookie'];
-  const sanitized = { ...data };
-  
-  Object.keys(sanitized).forEach(key => {
-    if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
-      sanitized[key] = '[REDACTED]';
-    }
-  });
-  
-  return sanitized;
-};
-
-export const requestLogger = async (req, res, next) => {
-  const startTime = Date.now();
-  const timestamp = new Date().toISOString();
-  
-  const requestInfo = {
-    method: req.method,
-    url: req.originalUrl,
-    path: req.path,
-    ip: getClientIP(req),
-    userAgent: getUserAgent(req),
-    timestamp
-  };
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`🌐 ${requestInfo.timestamp} - ${requestInfo.method} ${requestInfo.url} - IP: ${requestInfo.ip}`);
-  }
-  
-  const originalSend = res.send;
-  const originalJson = res.json;
-  let responseBody = null;
-  let responseLogged = false;
-  
-  res.send = function(data) {
-    if (!responseLogged) {
-      responseBody = data;
-      logResponse();
-    }
-    return originalSend.call(this, data);
-  };
-  
-  res.json = function(data) {
-    if (!responseLogged) {
-      responseBody = data;
-      logResponse();
-    }
-    return originalJson.call(this, data);
-  };
-  
-  const logResponse = async () => {
-    if (responseLogged) return;
-    responseLogged = true;
-    
-    const endTime = Date.now();
-    const duration = endTime - startTime;
-    
-    const responseInfo = {
-      statusCode: res.statusCode,
-      duration: `${duration}ms`,
-      contentLength: res.get('content-length') || 0
-    };
-    
-    if (process.env.NODE_ENV === 'development') {
-      const statusEmoji = res.statusCode < 400 ? '✅' : res.statusCode < 500 ? '⚠️' : '❌';
-      console.log(`${statusEmoji} ${responseInfo.statusCode} - ${responseInfo.duration} - ${req.method} ${req.originalUrl}`);
-      
-      if (res.statusCode >= 400) {
-        console.log(`   Error details: ${JSON.stringify(sanitizarDatos(responseBody), null, 2)}`);
-      }
-    }
-    
-    if (shouldLogToDatabase(req, res)) {
-      try {
-        await logToDatabase(req, res, requestInfo, responseInfo, duration);
-      } catch (error) {
-        // Silencioso en producción para no afectar rendimiento
-      }
-    }
-  };
-  
-  req.on('error', (error) => {
-    console.error('🚨 Request Error:', error);
-  });
-  
-  res.on('error', (error) => {
-    console.error('🚨 Response Error:', error);
-  });
-  
-  next();
-};
-
-// MODIFICACIÓN PRINCIPAL: Función más inclusiva
-const shouldLogToDatabase = (req, res) => {
-  if (req.path.includes('/health') || req.path.includes('/info')) {
-    return false;
-  }
-  
-  if (req.path.includes('/uploads/') || req.path.includes('/static/')) {
-    return false;
-  }
-  
-  if (req.path.includes('/audit-logs')) {
+const shouldLogToDatabase = (req) => {
+  if (req.path.includes('/health') || req.path.includes('/info') ||
+      req.path.includes('/uploads/') || req.path.includes('/static/') ||
+      req.path.includes('/audit-logs')) {
     return false;
   }
   
@@ -169,134 +67,81 @@ const shouldLogToDatabase = (req, res) => {
   ];
   
   const isImportantPath = importantPaths.some(path => req.path.includes(path));
-  const isError = res.statusCode >= 400;
   const isModifyAction = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
-  
   const isImportantGET = req.method === 'GET' && (
-    req.path.includes('/stats') ||
-    req.path.includes('/dashboard') ||
-    req.path.includes('/me') ||
-    req.path.match(/\/\d+$/)
+    req.path.includes('/stats') || req.path.includes('/dashboard') || 
+    req.path.includes('/me') || req.path.match(/\/\d+$/)
   );
   
-  return (isImportantPath && (isModifyAction || isError || isImportantGET)) ||
-         (req.user && isModifyAction);
+  return (isImportantPath && (isModifyAction || isImportantGET)) || (req.user && isModifyAction);
 };
 
-const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
-  try {
-    const userId = req.user?.id || req.user?.userId || null;
-    const accion = determinarTipoAccion(req.method, req.path);
-    const entidad = determinarEntidad(req.path);
-    const entidadId = extraerEntidadId(req.path);
-    
-    const detalles = {
-      request: {
-        method: req.method,
-        url: req.originalUrl,
-        headers: sanitizarDatos(req.headers),
-        query: req.query,
-        body: sanitizarDatos(req.body)
-      },
-      response: {
-        statusCode: res.statusCode,
-        duration,
-        contentLength: responseInfo.contentLength
-      },
-      metadata: {
-        userAgent: requestInfo.userAgent,
-        timestamp: requestInfo.timestamp
-      }
-    };
+// Guardar log de forma NO bloqueante
+const saveLogAsync = (logData) => {
+  prisma.logActividad.create({ data: logData })
+    .then(() => console.log('✅ Log guardado:', logData.accion, logData.entidad))
+    .catch(err => console.error('❌ Error guardando log:', err.message));
+};
 
-    try {
-      const tableExists = await prisma.$queryRaw`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'log_actividad'
-        );
-      `;
-      
-      if (tableExists[0]?.exists) {
-        await prisma.logActividad.create({
-          data: {
-            usuarioId,
-            accion,
-            entidad,
-            entidadId,
-            detalles,
-            ipAddress: requestInfo.ip,
-            userAgent: requestInfo.userAgent,
-            fechaHora: new Date()
-          }
-        });
-      }
-    } catch (dbError) {
-      // Silencioso para no afectar rendimiento
+export const requestLogger = (req, res, next) => {
+  const startTime = Date.now();
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`🌐 ${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  }
+  
+  const oldEnd = res.end;
+  res.end = function(...args) {
+    const duration = Date.now() - startTime;
+    
+    if (process.env.NODE_ENV === 'development') {
+      const statusEmoji = res.statusCode < 400 ? '✅' : res.statusCode < 500 ? '⚠️' : '❌';
+      console.log(`${statusEmoji} ${res.statusCode} - ${duration}ms - ${req.method} ${req.originalUrl}`);
     }
     
-  } catch (error) {
-    // CRÍTICO: No relanzar el error para no afectar el request principal
-  }
-};
-
-export const logError = (error, req, additionalInfo = {}) => {
-  const errorInfo = {
-    message: error.message,
-    stack: error.stack,
-    code: error.code,
-    statusCode: error.statusCode,
-    url: req.originalUrl,
-    method: req.method,
-    ip: getClientIP(req),
-    userAgent: getUserAgent(req),
-    userId: req.user?.id || req.user?.userId || null,
-    timestamp: new Date().toISOString(),
-    ...additionalInfo
+    if (shouldLogToDatabase(req)) {
+      const logData = {
+        usuarioId: req.user?.id || req.user?.userId || null,
+        accion: determinarTipoAccion(req.method, req.path),
+        entidad: determinarEntidad(req.path),
+        entidadId: extraerEntidadId(req.path),
+        detalles: { method: req.method, url: req.originalUrl, statusCode: res.statusCode },
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req),
+        fechaHora: new Date()
+      };
+      
+      saveLogAsync(logData);
+    }
+    
+    oldEnd.apply(res, args);
   };
   
-  console.error('❌ ERROR:', errorInfo);
+  next();
+};
+
+export const logError = (error, req) => {
+  console.error('❌ ERROR:', error.message);
 };
 
 export const logSecurityEvent = async (eventType, req, details = {}) => {
-  const securityInfo = {
-    eventType,
-    ip: getClientIP(req),
-    userAgent: getUserAgent(req),
-    url: req.originalUrl,
-    userId: req.user?.id || req.user?.userId || null,
-    timestamp: new Date().toISOString(),
-    details
-  };
+  console.warn('🔒 SECURITY EVENT:', eventType);
   
-  console.warn('🔒 SECURITY EVENT:', securityInfo);
-
   try {
-    const tableExists = await prisma.$queryRaw`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' 
-        AND table_name = 'log_actividad'
-      );
-    `;
-    
-    if (tableExists[0]?.exists) {
-      await prisma.logActividad.create({
-        data: {
-          usuarioId: req.user?.id || req.user?.userId || null,
-          accion: 'SECURITY_EVENT',
-          entidad: 'security',
-          entidadId: eventType,
-          detalles: securityInfo,
-          ipAddress: getClientIP(req),
-          userAgent: getUserAgent(req),
-          fechaHora: new Date()
-        }
-      });
-    }
+    await prisma.logActividad.create({
+      data: {
+        usuarioId: req.user?.id || req.user?.userId || null,
+        accion: 'SECURITY_EVENT',
+        entidad: 'security',
+        entidadId: eventType,
+        detalles: { eventType, details },
+        ipAddress: getClientIP(req),
+        userAgent: getUserAgent(req),
+        fechaHora: new Date()
+      }
+    });
   } catch (error) {
-    // Silencioso
+    console.error('Error logging security event:', error.message);
   }
 };
 
