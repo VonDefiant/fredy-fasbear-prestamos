@@ -10,6 +10,7 @@ import personalRoutes from './personal.routes.js';
 import clientsRoutes from './clients.routes.js';
 import ecommerceRoutes from './ecommerce.routes.js'; 
 import systemReportsRoutes from './system-reports.routes.js';
+import auditLogsRoutes from './audit-logs.routes.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -28,6 +29,7 @@ router.use('/personal', personalRoutes);
 router.use('/clients', clientsRoutes);  
 router.use('/admin/ecommerce-config', ecommerceRoutes);
 router.use('/system-reports', systemReportsRoutes);
+router.use('/audit-logs', auditLogsRoutes);
 
 router.get('/health', async (req, res) => {
   try {
@@ -164,6 +166,17 @@ router.get('/info', (req, res) => {
             'POST /api/admin/ecommerce-config/reset'
           ]
         },
+        auditLogs: {  
+        base: '/api/audit-logs',
+        description: 'Logs de auditoría y seguridad',
+        endpoints: [
+          'GET /api/audit-logs',
+          'GET /api/audit-logs/:id',
+          'GET /api/audit-logs/stats',
+          'GET /api/audit-logs/export',
+          'POST /api/audit-logs/cleanup'
+        ]
+      },
         systemReports: {
           base: '/api/system-reports',
           description: 'Reportes y monitoreo del sistema',
@@ -234,6 +247,7 @@ router.use((req, res) => {
       '/api/clients/*',  
       '/api/admin/ecommerce-config/*',
       '/api/system-reports/*',
+      '/api/audit-logs/*',
       '/api/health',
       '/api/info'
     ]

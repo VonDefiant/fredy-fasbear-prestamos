@@ -1,10 +1,7 @@
-
-
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Función para obtener la dirección IP real del cliente
 const getClientIP = (req) => {
   return req.ip ||
          req.connection?.remoteAddress ||
@@ -14,14 +11,11 @@ const getClientIP = (req) => {
          'unknown';
 };
 
-// Función para obtener el User Agent
 const getUserAgent = (req) => {
   return req.headers['user-agent'] || 'unknown';
 };
 
-// Función para determinar el tipo de acción basado en la ruta y método
 const determinarTipoAccion = (method, path) => {
-  // Mapeo de rutas a tipos de acción
   if (path.includes('/auth/login')) return 'LOGIN';
   if (path.includes('/auth/logout')) return 'LOGOUT';
   if (path.includes('/solicitudes') && method === 'POST') return 'CREAR';
@@ -29,7 +23,6 @@ const determinarTipoAccion = (method, path) => {
   if (path.includes('/prestamos') && path.includes('/renovar')) return 'RENOVACION';
   if (path.includes('/avaluos')) return 'AVALUO';
   
-  // Mapeo genérico por método HTTP
   switch (method) {
     case 'POST': return 'CREAR';
     case 'PUT':
@@ -40,24 +33,26 @@ const determinarTipoAccion = (method, path) => {
   }
 };
 
-// Función para extraer el ID de entidad de la URL
 const extraerEntidadId = (path) => {
-  // Buscar patrones como /api/prestamos/123 o /api/solicitudes/abc-def
   const matches = path.match(/\/api\/\w+\/([a-zA-Z0-9\-_]+)/);
   return matches ? matches[1] : null;
 };
 
-// Función para determinar el tipo de entidad
 const determinarEntidad = (path) => {
   if (path.includes('/prestamos')) return 'prestamo';
   if (path.includes('/solicitudes')) return 'solicitud';
-  if (path.includes('/usuarios') || path.includes('/auth')) return 'usuario';
+  if (path.includes('/usuarios') || path.includes('/auth') || path.includes('/personal') || path.includes('/clients')) return 'usuario';
   if (path.includes('/avaluos')) return 'avaluo';
   if (path.includes('/articulos')) return 'articulo';
+  if (path.includes('/parametro')) return 'parametro';
+  if (path.includes('/admin')) return 'admin';
+  if (path.includes('/pago')) return 'pago';
+  if (path.includes('/producto')) return 'producto';
+  if (path.includes('/pedido')) return 'pedido';
+  if (path.includes('/ecommerce')) return 'ecommerce';
   return 'sistema';
 };
 
-// Función para sanitizar datos sensibles antes del logging
 const sanitizarDatos = (data) => {
   if (!data || typeof data !== 'object') return data;
   
@@ -73,12 +68,10 @@ const sanitizarDatos = (data) => {
   return sanitized;
 };
 
-// Middleware principal de logging
 export const requestLogger = async (req, res, next) => {
   const startTime = Date.now();
   const timestamp = new Date().toISOString();
   
-  // Información básica del request
   const requestInfo = {
     method: req.method,
     url: req.originalUrl,
@@ -88,18 +81,15 @@ export const requestLogger = async (req, res, next) => {
     timestamp
   };
   
-  // Log inmediato para desarrollo
-  if (process.env.NODE_ENV ) {
+  if (process.env.NODE_ENV === 'development') {
     console.log(`🌐 ${requestInfo.timestamp} - ${requestInfo.method} ${requestInfo.url} - IP: ${requestInfo.ip}`);
   }
   
-  // Interceptar la respuesta para logging
   const originalSend = res.send;
   const originalJson = res.json;
   let responseBody = null;
   let responseLogged = false;
   
-  // Sobrescribir res.send
   res.send = function(data) {
     if (!responseLogged) {
       responseBody = data;
@@ -108,7 +98,6 @@ export const requestLogger = async (req, res, next) => {
     return originalSend.call(this, data);
   };
   
-  // Sobrescribir res.json
   res.json = function(data) {
     if (!responseLogged) {
       responseBody = data;
@@ -117,7 +106,6 @@ export const requestLogger = async (req, res, next) => {
     return originalJson.call(this, data);
   };
   
-  // Función para hacer el log de la respuesta
   const logResponse = async () => {
     if (responseLogged) return;
     responseLogged = true;
@@ -125,36 +113,30 @@ export const requestLogger = async (req, res, next) => {
     const endTime = Date.now();
     const duration = endTime - startTime;
     
-    // Información de la respuesta
     const responseInfo = {
       statusCode: res.statusCode,
       duration: `${duration}ms`,
       contentLength: res.get('content-length') || 0
     };
     
-    // Log detallado para desarrollo
-    if (process.env.NODE_ENV ) {
+    if (process.env.NODE_ENV === 'development') {
       const statusEmoji = res.statusCode < 400 ? '✅' : res.statusCode < 500 ? '⚠️' : '❌';
       console.log(`${statusEmoji} ${responseInfo.statusCode} - ${responseInfo.duration} - ${req.method} ${req.originalUrl}`);
       
-      // Log adicional para errores
       if (res.statusCode >= 400) {
         console.log(`   Error details: ${JSON.stringify(sanitizarDatos(responseBody), null, 2)}`);
       }
     }
     
-    // Guardar en base de datos para acciones importantes (opcional)
     if (shouldLogToDatabase(req, res)) {
       try {
         await logToDatabase(req, res, requestInfo, responseInfo, duration);
       } catch (error) {
-        console.error('Error guardando log en base de datos:', error);
-        // No fallar el request por errores de logging
+        // Silencioso en producción para no afectar rendimiento
       }
     }
   };
   
-  // Manejar errores en el request
   req.on('error', (error) => {
     console.error('🚨 Request Error:', error);
   });
@@ -166,31 +148,40 @@ export const requestLogger = async (req, res, next) => {
   next();
 };
 
-// Función para determinar si se debe guardar el log en la base de datos
+// MODIFICACIÓN PRINCIPAL: Función más inclusiva
 const shouldLogToDatabase = (req, res) => {
-  // No loguear requests de salud/info
   if (req.path.includes('/health') || req.path.includes('/info')) {
     return false;
   }
   
-  // No loguear assets estáticos
   if (req.path.includes('/uploads/') || req.path.includes('/static/')) {
     return false;
   }
   
-  // Loguear solo APIs importantes
-  const importantPaths = ['/auth/', '/prestamos/', '/solicitudes/', '/avaluos/'];
+  if (req.path.includes('/audit-logs')) {
+    return false;
+  }
+  
+  const importantPaths = [
+    '/auth/', '/prestamos/', '/solicitudes/', '/avaluos/', '/pagos/',
+    '/admin/', '/personal/', '/clients/', '/parametro', '/ecommerce',
+    '/productos/', '/pedidos/', '/system-reports/'
+  ];
+  
   const isImportantPath = importantPaths.some(path => req.path.includes(path));
-  
-  // Loguear errores siempre
   const isError = res.statusCode >= 400;
-  
-  // Loguear acciones de modificación siempre
   const isModifyAction = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
   
-  return isImportantPath && (isModifyAction || isError);
+  const isImportantGET = req.method === 'GET' && (
+    req.path.includes('/stats') ||
+    req.path.includes('/dashboard') ||
+    req.path.includes('/me') ||
+    req.path.match(/\/\d+$/)
+  );
+  
+  return (isImportantPath && (isModifyAction || isError || isImportantGET)) ||
+         (req.user && isModifyAction);
 };
-
 
 const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
   try {
@@ -199,7 +190,6 @@ const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
     const entidad = determinarEntidad(req.path);
     const entidadId = extraerEntidadId(req.path);
     
-    // Preparar detalles del log
     const detalles = {
       request: {
         method: req.method,
@@ -218,10 +208,8 @@ const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
         timestamp: requestInfo.timestamp
       }
     };
-    
 
     try {
-      // Verificar si el modelo logActividad existe
       const tableExists = await prisma.$queryRaw`
         SELECT EXISTS (
           SELECT FROM information_schema.tables 
@@ -231,7 +219,6 @@ const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
       `;
       
       if (tableExists[0]?.exists) {
-        // El modelo existe, intentar guardar
         await prisma.logActividad.create({
           data: {
             usuarioId,
@@ -244,39 +231,16 @@ const logToDatabase = async (req, res, requestInfo, responseInfo, duration) => {
             fechaHora: new Date()
           }
         });
-        
-        console.log('📝 Log guardado en BD exitosamente');
-      } else {
-        // El modelo no existe, solo log en consola
-        console.log('📝 LOG (BD no disponible):', {
-          userId,
-          accion,
-          entidad,
-          entidadId,
-          ip: requestInfo.ip,
-          timestamp: new Date().toISOString()
-        });
       }
     } catch (dbError) {
-      // Error de base de datos, continuar sin fallar
-      console.log('📝 LOG (Error BD):', {
-        userId,
-        accion,
-        entidad,
-        entidadId,
-        ip: requestInfo.ip,
-        timestamp: new Date().toISOString(),
-        error: dbError.message
-      });
+      // Silencioso para no afectar rendimiento
     }
     
   } catch (error) {
-    console.error('Error en logToDatabase:', error);
     // CRÍTICO: No relanzar el error para no afectar el request principal
   }
 };
 
-// Middleware para logging de errores específicos
 export const logError = (error, req, additionalInfo = {}) => {
   const errorInfo = {
     message: error.message,
@@ -292,13 +256,9 @@ export const logError = (error, req, additionalInfo = {}) => {
     ...additionalInfo
   };
   
-
-  if (process.env.NODE_ENV ) {
-    // Ejemplo: Sentry.captureException(error, { extra: errorInfo });
-  }
+  console.error('❌ ERROR:', errorInfo);
 };
 
-// Middleware para logging de eventos de seguridad
 export const logSecurityEvent = async (eventType, req, details = {}) => {
   const securityInfo = {
     eventType,
@@ -310,8 +270,8 @@ export const logSecurityEvent = async (eventType, req, details = {}) => {
     details
   };
   
+  console.warn('🔒 SECURITY EVENT:', securityInfo);
 
-  // Intentar guardar eventos de seguridad importantes en la base de datos
   try {
     const tableExists = await prisma.$queryRaw`
       SELECT EXISTS (
@@ -336,8 +296,7 @@ export const logSecurityEvent = async (eventType, req, details = {}) => {
       });
     }
   } catch (error) {
-    console.error('Error logging security event:', error);
-
+    // Silencioso
   }
 };
 
