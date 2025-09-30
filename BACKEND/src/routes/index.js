@@ -11,6 +11,7 @@ import clientsRoutes from './clients.routes.js';
 import ecommerceRoutes from './ecommerce.routes.js'; 
 import systemReportsRoutes from './system-reports.routes.js';
 import auditLogsRoutes from './audit-logs.routes.js';
+import backupsRoutes from './backups.routes.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -30,6 +31,7 @@ router.use('/clients', clientsRoutes);
 router.use('/admin/ecommerce-config', ecommerceRoutes);
 router.use('/system-reports', systemReportsRoutes);
 router.use('/audit-logs', auditLogsRoutes);
+router.use('/admin/backups', authenticateToken, authorizeRoles(['administrador']), backupsRoutes);
 
 router.get('/health', async (req, res) => {
   try {

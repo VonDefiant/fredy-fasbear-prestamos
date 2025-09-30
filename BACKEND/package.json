@@ -24,6 +24,7 @@
    "description": "",
    "dependencies": {
       "@prisma/client": "^6.15.0",
+      "archiver": "^7.0.1",
       "bcryptjs": "^3.0.2",
       "chart.js": "^4.5.0",
       "compression": "^1.8.1",
@@ -37,7 +38,10 @@
       "jsonwebtoken": "^9.0.2",
       "morgan": "^1.10.1",
       "multer": "^2.0.2",
-      "prisma": "^6.15.0"
+      "node-cron": "^4.2.1",
+      "nodemailer": "^7.0.6",
+      "prisma": "^6.15.0",
+      "unzipper": "^0.12.3"
    },
    "devDependencies": {
       "@types/node": "^24.3.1",
