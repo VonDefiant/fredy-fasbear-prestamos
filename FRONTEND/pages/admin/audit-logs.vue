@@ -1,547 +1,314 @@
 <template>
   <div class="audit-logs-panel">
-    <!-- Header del Admin Panel -->
-    <header class="admin-header">
-      <div class="header-container">
-        <div class="header-left">
-          <NuxtLink to="/" class="logo">
-            <img src="~/assets/images/logo.png" alt="Logo">
-            <div>
-              <h1>Fredy Fasbear</h1>
-              <span class="admin-badge">Panel Admin</span>
-            </div>
-          </NuxtLink>
-        </div>
-        
-        <div class="header-right">
-          <div class="admin-info">
-            <span class="welcome-text">{{ userDisplayName }}</span>
-            <div class="user-avatar">
-              {{ getUserInitials() }}
-            </div>
-          </div>
-          
-          <div class="admin-actions">
-            <button class="btn-logout" @click="handleLogout" title="Cerrar Sesión">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke="currentColor" stroke-width="2"/>
-                <polyline points="16,17 21,12 16,7" stroke="currentColor" stroke-width="2"/>
-                <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Loading Overlay -->
-    <div v-if="loading && !logs.length" class="loading-overlay">
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-state">
       <div class="loading-spinner">
         <div class="spinner"></div>
         <p>Cargando logs de auditoría...</p>
       </div>
     </div>
 
+    <!-- Error State -->
+    <div v-if="error && !loading" class="error-state">
+      <div class="error-content">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+          <line x1="15" y1="9" x2="9" y2="15" stroke="currentColor" stroke-width="2"/>
+          <line x1="9" y1="9" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <h3>Error al cargar logs</h3>
+        <p>{{ error }}</p>
+        <button @click="cargarLogs" class="btn-retry">
+          Reintentar
+        </button>
+      </div>
+    </div>
+
     <!-- Main Content -->
-    <main v-if="!loading || logs.length" class="admin-main">
-      <div class="container">
+    <div v-if="!loading && !error" class="logs-content">
+      <!-- Header -->
+      <div class="page-header">
+        <div class="header-left">
+          <div class="icon-wrapper">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+              <path d="M12 22S8 18 8 13V7L12 5L16 7V13C16 18 12 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+              <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </div>
+          <div>
+            <h1>Auditoría y Seguridad</h1>
+            <p>Logs de actividad y auditoría del sistema</p>
+          </div>
+        </div>
         
-        <!-- Page Header -->
-        <section class="page-header">
-          <div class="header-content">
-            <div class="title-section">
-              <button @click="navigateTo('/admin')" class="btn-back">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </button>
-              <div>
-                <h2>Auditoría y Logs del Sistema</h2>
-                <p>Monitoreo de actividades y acciones de usuarios</p>
-              </div>
-            </div>
-            
-            <div class="header-actions">
-              <button @click="refreshLogs" class="btn-refresh" :disabled="loading">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 10C21 10 18.995 7.26822 17.3662 5.63824C15.7373 4.00827 13.4864 3 11 3C6.02944 3 2 7.02944 2 12C2 16.9706 6.02944 21 11 21C15.1031 21 18.5649 18.2543 19.6482 14.5" stroke="currentColor" stroke-width="2"/>
-                  <path d="M21 10V4M21 10H15" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                Actualizar
-              </button>
-              <button @click="exportLogs" class="btn-export">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="currentColor" stroke-width="2"/>
-                  <polyline points="7,10 12,15 17,10" stroke="currentColor" stroke-width="2"/>
-                  <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                Exportar
-              </button>
-            </div>
+        <button @click="cargarLogs" class="btn-primary" :disabled="loading">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M1 4V10H7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M23 20V14H17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10M23 14L18.36 18.36A9 9 0 0 1 3.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Actualizar
+        </button>
+      </div>
+
+      <!-- Stats Overview -->
+      <div class="stats-overview">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" stroke-width="2"/>
+              <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
+            </svg>
           </div>
-        </section>
-
-        <!-- Stats Cards -->
-        <section class="stats-section">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-icon total">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" stroke-width="2"/>
-                  <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </div>
-              <div class="stat-content">
-                <h3>{{ formatNumber(totalLogs) }}</h3>
-                <p>Total de Registros</p>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-icon today">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                  <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </div>
-              <div class="stat-content">
-                <h3>{{ formatNumber(logsToday) }}</h3>
-                <p>Hoy</p>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-icon users">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21" stroke="currentColor" stroke-width="2"/>
-                  <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-                  <path d="M23 21V19C22.9993 18.1137 22.7044 17.2528 22.1614 16.5523C21.6184 15.8519 20.8581 15.3516 20 15.13" stroke="currentColor" stroke-width="2"/>
-                  <path d="M16 3.13C16.8604 3.35031 17.623 3.85071 18.1676 4.55232C18.7122 5.25392 19.0078 6.11683 19.0078 7.005C19.0078 7.89318 18.7122 8.75608 18.1676 9.45769C17.623 10.1593 16.8604 10.6597 16 10.88" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </div>
-              <div class="stat-content">
-                <h3>{{ formatNumber(uniqueUsers) }}</h3>
-                <p>Usuarios Activos</p>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-icon actions">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </div>
-              <div class="stat-content">
-                <h3>{{ formatNumber(totalActions) }}</h3>
-                <p>Acciones Registradas</p>
-              </div>
-            </div>
+          <div class="stat-content">
+            <h3>{{ totalLogs }}</h3>
+            <p>{{ totalLogs === 1 ? 'Log registrado' : 'Logs registrados' }}</p>
           </div>
-        </section>
+        </div>
 
-        <!-- Filters Section -->
-        <section class="filters-section">
-          <div class="filters-card">
-            <div class="filters-header">
-              <h3>Filtros de Búsqueda</h3>
-              <button @click="clearFilters" class="btn-clear">
-                Limpiar Filtros
-              </button>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="stat-content">
+            <h3>{{ ultimaActualizacion }}</h3>
+            <p>Última actualización</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="filtros-section">
+        <div class="filtros-header">
+          <h2>Filtros de búsqueda</h2>
+        </div>
+        <div class="filtros-content">
+          <div class="search-box">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+              <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <input 
+              v-model="filtros.search" 
+              @input="debouncedSearch"
+              type="text" 
+              placeholder="Buscar por usuario, acción, IP..."
+            />
+          </div>
+
+          <div class="filtros-grid">
+            <div class="filtro-item">
+              <label>Acción:</label>
+              <select v-model="filtros.accion" @change="aplicarFiltros">
+                <option value="">Todas las acciones</option>
+                <option value="LOGIN">Login</option>
+                <option value="LOGOUT">Logout</option>
+                <option value="CREAR">Crear</option>
+                <option value="ACTUALIZAR">Actualizar</option>
+                <option value="ELIMINAR">Eliminar</option>
+                <option value="CONSULTAR">Consultar</option>
+                <option value="PAGO">Pago</option>
+              </select>
             </div>
-            
-            <div class="filters-grid">
-              <!-- Búsqueda por texto -->
-              <div class="filter-group">
-                <label>Buscar</label>
-                <div class="search-input">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                    <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
-                    <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2"/>
+
+            <div class="filtro-item">
+              <label>Entidad:</label>
+              <select v-model="filtros.entidad" @change="aplicarFiltros">
+                <option value="">Todas las entidades</option>
+                <option value="Usuario">Usuario</option>
+                <option value="Solicitud">Solicitud</option>
+                <option value="Prestamo">Préstamo</option>
+                <option value="Pago">Pago</option>
+                <option value="Avaluo">Avalúo</option>
+              </select>
+            </div>
+
+            <button 
+              v-if="filtrosActivos" 
+              @click="limpiarFiltros" 
+              class="btn-secondary"
+            >
+              Limpiar filtros
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-if="!logs.length" class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+          <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" stroke-width="2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <h3>No se encontraron logs</h3>
+        <p>{{ filtrosActivos ? 'Intenta ajustar los filtros de búsqueda' : 'Los logs aparecerán aquí cuando se realicen actividades en el sistema' }}</p>
+      </div>
+
+      <!-- Logs Grid -->
+      <div v-else class="logs-grid">
+        <div 
+          v-for="log in logs" 
+          :key="log.id" 
+          class="log-card"
+          @click="toggleDetalles(log)"
+          :class="{ 'expandido': logExpandido === log.id }"
+        >
+          <div class="log-header">
+            <div class="log-info">
+              <div class="log-title">
+                <span :class="['action-badge', getActionClass(log.accion)]">
+                  {{ log.accion }}
+                </span>
+                <h3>{{ log.entidad || 'Sistema' }}</h3>
+              </div>
+              <div class="log-meta">
+                <span class="user">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
                   </svg>
-                  <input 
-                    v-model="filters.search" 
-                    type="text" 
-                    placeholder="Buscar por usuario, acción, entidad..."
-                    @input="debouncedSearch"
-                  >
-                </div>
-              </div>
-
-              <!-- Filtro por Acción -->
-              <div class="filter-group">
-                <label>Acción</label>
-                <select v-model="filters.accion" @change="applyFilters">
-                  <option value="">Todas las acciones</option>
-                  <option value="LOGIN">Login</option>
-                  <option value="LOGOUT">Logout</option>
-                  <option value="CREAR">Crear</option>
-                  <option value="ACTUALIZAR">Actualizar</option>
-                  <option value="ELIMINAR">Eliminar</option>
-                  <option value="CONSULTAR">Consultar</option>
-                  <option value="PAGO">Pago</option>
-                  <option value="AVALUO">Avalúo</option>
-                  <option value="SECURITY_EVENT">Evento de Seguridad</option>
-                </select>
-              </div>
-
-              <!-- Filtro por Entidad -->
-              <div class="filter-group">
-                <label>Entidad</label>
-                <select v-model="filters.entidad" @change="applyFilters">
-                  <option value="">Todas las entidades</option>
-                  <option value="usuario">Usuario</option>
-                  <option value="solicitud">Solicitud</option>
-                  <option value="prestamo">Préstamo</option>
-                  <option value="pago">Pago</option>
-                  <option value="producto">Producto</option>
-                  <option value="pedido">Pedido</option>
-                  <option value="parametro">Parámetro</option>
-                  <option value="security">Seguridad</option>
-                </select>
-              </div>
-
-              <!-- Filtro por Fecha Desde -->
-              <div class="filter-group">
-                <label>Desde</label>
-                <input 
-                  v-model="filters.fechaDesde" 
-                  type="date" 
-                  @change="applyFilters"
-                >
-              </div>
-
-              <!-- Filtro por Fecha Hasta -->
-              <div class="filter-group">
-                <label>Hasta</label>
-                <input 
-                  v-model="filters.fechaHasta" 
-                  type="date" 
-                  @change="applyFilters"
-                >
-              </div>
-
-              <!-- Filtro por Usuario -->
-              <div class="filter-group">
-                <label>Usuario ID</label>
-                <input 
-                  v-model="filters.usuarioId" 
-                  type="number" 
-                  placeholder="ID del usuario"
-                  @input="debouncedSearch"
-                >
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Logs Table -->
-        <section class="logs-section">
-          <div class="logs-card">
-            <div class="logs-header">
-              <h3>Registros de Auditoría ({{ formatNumber(totalLogs) }})</h3>
-              <div class="pagination-info">
-                <span>
-                  Mostrando {{ (currentPage - 1) * pageSize + 1 }} - 
-                  {{ Math.min(currentPage * pageSize, totalLogs) }} de {{ formatNumber(totalLogs) }}
+                  {{ log.usuario ? `${log.usuario.nombre} ${log.usuario.apellido}` : 'Sistema' }}
+                </span>
+                <span class="date">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <polyline points="12,6 12,12 16,14" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  {{ formatFecha(log.fechaHora) }}
                 </span>
               </div>
             </div>
-
-            <!-- Loading State -->
-            <div v-if="loading" class="logs-loading">
-              <div class="spinner"></div>
-              <p>Cargando registros...</p>
-            </div>
-
-            <!-- Empty State -->
-            <div v-else-if="!logs.length" class="empty-state">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2"/>
+            <button class="toggle-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path :d="logExpandido === log.id ? 'M18 15L12 9L6 15' : 'M6 9L12 15L18 9'" stroke="currentColor" stroke-width="2"/>
               </svg>
-              <h3>No se encontraron registros</h3>
-              <p>Intenta ajustar los filtros de búsqueda</p>
+            </button>
+          </div>
+
+          <div v-if="logExpandido === log.id" class="log-details">
+            <div class="detail-row">
+              <span class="label">ID:</span>
+              <span class="value">#{{ log.id }}</span>
             </div>
-
-            <!-- Logs Table -->
-            <div v-else class="logs-table-container">
-              <table class="logs-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Fecha y Hora</th>
-                    <th>Usuario</th>
-                    <th>Acción</th>
-                    <th>Entidad</th>
-                    <th>IP</th>
-                    <th>Detalles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr 
-                    v-for="log in logs" 
-                    :key="log.id"
-                    class="log-row"
-                    @click="toggleLogDetails(log)"
-                  >
-                    <td>
-                      <span class="log-id">#{{ log.id }}</span>
-                    </td>
-                    <td>
-                      <div class="log-date">
-                        <div class="date">{{ formatDate(log.fechaHora) }}</div>
-                        <div class="time">{{ formatTime(log.fechaHora) }}</div>
-                      </div>
-                    </td>
-                    <td>
-                      <div class="log-user">
-                        <div class="user-avatar-small">
-                          {{ getInitials(log.usuario) }}
-                        </div>
-                        <div class="user-info">
-                          <div class="user-name">{{ log.usuario?.nombre || 'Sistema' }}</div>
-                          <div class="user-email">{{ log.usuario?.email || 'N/A' }}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span :class="['action-badge', getActionClass(log.accion)]">
-                        {{ log.accion }}
-                      </span>
-                    </td>
-                    <td>
-                      <span class="entity-badge">
-                        {{ log.entidad || 'N/A' }}
-                      </span>
-                    </td>
-                    <td>
-                      <span class="ip-address">{{ log.ipAddress }}</span>
-                    </td>
-                    <td>
-                      <button 
-                        class="btn-details"
-                        @click.stop="toggleLogDetails(log)"
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                          <circle cx="12" cy="12" r="1" fill="currentColor"/>
-                          <circle cx="12" cy="5" r="1" fill="currentColor"/>
-                          <circle cx="12" cy="19" r="1" fill="currentColor"/>
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                  
-                  <!-- Expandable Details Row -->
-                  <tr 
-                    v-if="expandedLog === log.id" 
-                    v-for="log in logs" 
-                    :key="`details-${log.id}`"
-                    class="log-details-row"
-                  >
-                    <td colspan="7">
-                      <div class="log-details">
-                        <div class="details-grid">
-                          <div class="detail-item">
-                            <label>ID de Entidad:</label>
-                            <span>{{ log.entidadId || 'N/A' }}</span>
-                          </div>
-                          <div class="detail-item">
-                            <label>User Agent:</label>
-                            <span class="user-agent">{{ log.userAgent || 'N/A' }}</span>
-                          </div>
-                          <div class="detail-item full-width">
-                            <label>Detalles JSON:</label>
-                            <pre class="json-details">{{ formatJSON(log.detalles) }}</pre>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="detail-row">
+              <span class="label">Entidad ID:</span>
+              <span class="value">{{ log.entidadId || 'N/A' }}</span>
             </div>
-
-            <!-- Pagination -->
-            <div v-if="totalPages > 1" class="pagination">
-              <button 
-                @click="goToPage(1)"
-                :disabled="currentPage === 1"
-                class="pagination-btn"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M18 17L13 12L18 7M11 17L6 12L11 7" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </button>
-              
-              <button 
-                @click="goToPage(currentPage - 1)"
-                :disabled="currentPage === 1"
-                class="pagination-btn"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </button>
-
-              <div class="pagination-numbers">
-                <button
-                  v-for="page in visiblePages"
-                  :key="page"
-                  @click="goToPage(page)"
-                  :class="['pagination-number', { active: currentPage === page }]"
-                >
-                  {{ page }}
-                </button>
-              </div>
-
-              <button 
-                @click="goToPage(currentPage + 1)"
-                :disabled="currentPage === totalPages"
-                class="pagination-btn"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </button>
-
-              <button 
-                @click="goToPage(totalPages)"
-                :disabled="currentPage === totalPages"
-                class="pagination-btn"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M6 17L11 12L6 7M13 17L18 12L13 7" stroke="currentColor" stroke-width="2"/>
-                </svg>
-              </button>
+            <div class="detail-row">
+              <span class="label">Dirección IP:</span>
+              <span class="value ip">{{ log.ipAddress }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">User Agent:</span>
+              <span class="value user-agent">{{ log.userAgent || 'N/A' }}</span>
+            </div>
+            <div v-if="log.detalles" class="detail-row full-width">
+              <span class="label">Detalles:</span>
+              <pre class="json-details">{{ formatJSON(log.detalles) }}</pre>
             </div>
           </div>
-        </section>
-
+        </div>
       </div>
-    </main>
+
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="pagination">
+        <button 
+          @click="cambiarPagina(paginaActual - 1)"
+          :disabled="paginaActual === 1"
+          class="pagination-btn"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Anterior
+        </button>
+
+        <span class="pagination-info">
+          Página {{ paginaActual }} de {{ totalPages }}
+        </span>
+
+        <button 
+          @click="cambiarPagina(paginaActual + 1)"
+          :disabled="paginaActual === totalPages"
+          class="pagination-btn"
+        >
+          Siguiente
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
-// Middleware de autenticación admin
+// Middleware - IMPORTANTE: usa layout 'admin' como parameters.vue
 definePageMeta({
   middleware: ['auth', 'admin'],
-  layout: false
+  layout: 'admin'  // ← ESTO ES CLAVE
 })
 
 // Meta tags
 useHead({
-  title: 'Auditoría y Logs - Fredy Fasbear Admin',
-  meta: [
-    { name: 'description', content: 'Panel de auditoría y logs del sistema' }
-  ]
+  title: 'Auditoría y Logs - Admin'
 })
 
-// ===== COMPOSABLES =====
-const { user } = useAuth()
-const { getLogs, exportLogsToCSV } = useAuditLogs()
+// Composables
+const { getLogs } = useAuditLogs()
 
-// ===== ESTADO REACTIVO =====
+// Estado
 const loading = ref(false)
+const error = ref(null)
 const logs = ref([])
 const totalLogs = ref(0)
-const currentPage = ref(1)
-const pageSize = ref(20)
-const expandedLog = ref(null)
+const paginaActual = ref(1)
+const registrosPorPagina = ref(20)
+const logExpandido = ref(null)
 
 // Filtros
-const filters = ref({
+const filtros = ref({
   search: '',
   accion: '',
-  entidad: '',
-  usuarioId: '',
-  fechaDesde: '',
-  fechaHasta: ''
+  entidad: ''
 })
-
-// Estadísticas
-const logsToday = ref(0)
-const uniqueUsers = ref(0)
-const totalActions = ref(0)
 
 // Debounce timer
 let searchTimeout = null
 
-// ===== COMPUTED PROPERTIES =====
-const userDisplayName = computed(() => {
-  if (!user.value) return 'Administrador Sistema'
-  
-  const nombre = user.value.nombre || ''
-  const apellido = user.value.apellido || ''
-  
-  if (nombre && apellido) {
-    return `${nombre} ${apellido}`
-  } else if (nombre) {
-    return nombre
-  } else if (user.value.email) {
-    return user.value.email.split('@')[0]
-  }
-  
-  return 'Administrador Sistema'
-})
-
-const getUserInitials = () => {
-  if (!user.value) return 'AS'
-  
-  const nombre = user.value.nombre || ''
-  const apellido = user.value.apellido || ''
-  
-  const inicial1 = nombre.charAt(0).toUpperCase() || 'A'
-  const inicial2 = apellido.charAt(0).toUpperCase() || 'S'
-  
-  return `${inicial1}${inicial2}`
-}
-
+// Computed
 const totalPages = computed(() => {
-  return Math.ceil(totalLogs.value / pageSize.value)
+  return Math.ceil(totalLogs.value / registrosPorPagina.value)
 })
 
-const visiblePages = computed(() => {
-  const pages = []
-  const total = totalPages.value
-  const current = currentPage.value
-  
-  if (total <= 7) {
-    for (let i = 1; i <= total; i++) {
-      pages.push(i)
-    }
-  } else {
-    if (current <= 4) {
-      for (let i = 1; i <= 5; i++) pages.push(i)
-      pages.push('...')
-      pages.push(total)
-    } else if (current >= total - 3) {
-      pages.push(1)
-      pages.push('...')
-      for (let i = total - 4; i <= total; i++) pages.push(i)
-    } else {
-      pages.push(1)
-      pages.push('...')
-      for (let i = current - 1; i <= current + 1; i++) pages.push(i)
-      pages.push('...')
-      pages.push(total)
-    }
-  }
-  
-  return pages
+const ultimaActualizacion = computed(() => {
+  if (!logs.value.length) return 'N/A'
+  const now = new Date()
+  const diff = Math.floor((now - new Date()) / 1000)
+  if (diff < 60) return 'Ahora'
+  if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`
+  return `Hace ${Math.floor(diff / 3600)} hrs`
 })
 
-// ===== MÉTODOS =====
-const loadLogs = async () => {
+const filtrosActivos = computed(() => {
+  return filtros.value.search || filtros.value.accion || filtros.value.entidad
+})
+
+// Métodos
+const cargarLogs = async () => {
   try {
     loading.value = true
+    error.value = null
     
     const params = {
-      page: currentPage.value,
-      limit: pageSize.value,
-      ...filters.value
+      page: paginaActual.value,
+      limit: registrosPorPagina.value,
+      ...filtros.value
     }
     
     const response = await getLogs(params)
@@ -549,54 +316,27 @@ const loadLogs = async () => {
     if (response.success) {
       logs.value = response.data.logs || []
       totalLogs.value = response.data.total || 0
-      
-      // Calcular estadísticas
-      calculateStats()
     }
-  } catch (error) {
-    console.error('Error cargando logs:', error)
+  } catch (err) {
+    console.error('Error cargando logs:', err)
+    error.value = err.message || 'Error al cargar los logs'
   } finally {
     loading.value = false
   }
 }
 
-const calculateStats = () => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
-  logsToday.value = logs.value.filter(log => {
-    const logDate = new Date(log.fechaHora)
-    logDate.setHours(0, 0, 0, 0)
-    return logDate.getTime() === today.getTime()
-  }).length
-  
-  const userIds = new Set(logs.value.map(log => log.usuarioId).filter(Boolean))
-  uniqueUsers.value = userIds.size
-  
-  const actions = new Set(logs.value.map(log => log.accion))
-  totalActions.value = actions.size
+const aplicarFiltros = () => {
+  paginaActual.value = 1
+  cargarLogs()
 }
 
-const refreshLogs = () => {
-  currentPage.value = 1
-  loadLogs()
-}
-
-const applyFilters = () => {
-  currentPage.value = 1
-  loadLogs()
-}
-
-const clearFilters = () => {
-  filters.value = {
+const limpiarFiltros = () => {
+  filtros.value = {
     search: '',
     accion: '',
-    entidad: '',
-    usuarioId: '',
-    fechaDesde: '',
-    fechaHasta: ''
+    entidad: ''
   }
-  applyFilters()
+  aplicarFiltros()
 }
 
 const debouncedSearch = () => {
@@ -605,58 +345,30 @@ const debouncedSearch = () => {
   }
   
   searchTimeout = setTimeout(() => {
-    applyFilters()
+    aplicarFiltros()
   }, 500)
 }
 
-const goToPage = (page) => {
-  if (page !== '...' && page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-    loadLogs()
+const cambiarPagina = (nuevaPagina) => {
+  if (nuevaPagina >= 1 && nuevaPagina <= totalPages.value) {
+    paginaActual.value = nuevaPagina
+    cargarLogs()
   }
 }
 
-const toggleLogDetails = (log) => {
-  expandedLog.value = expandedLog.value === log.id ? null : log.id
+const toggleDetalles = (log) => {
+  logExpandido.value = logExpandido.value === log.id ? null : log.id
 }
 
-const exportLogs = async () => {
-  try {
-    loading.value = true
-    await exportLogsToCSV(filters.value)
-  } catch (error) {
-    console.error('Error exportando logs:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleLogout = async () => {
-  const { logout } = useAuth()
-  await logout()
-  navigateTo('/login')
-}
-
-// ===== FORMATTERS =====
-const formatNumber = (num) => {
-  return new Intl.NumberFormat('es-GT').format(num)
-}
-
-const formatDate = (dateStr) => {
+// Formatters
+const formatFecha = (dateStr) => {
   const date = new Date(dateStr)
-  return date.toLocaleDateString('es-GT', {
+  return date.toLocaleString('es-GT', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
-  })
-}
-
-const formatTime = (dateStr) => {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString('es-GT', {
+    day: 'numeric',
     hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
+    minute: '2-digit'
   })
 }
 
@@ -669,19 +381,6 @@ const formatJSON = (json) => {
   }
 }
 
-const getInitials = (usuario) => {
-  if (!usuario) return 'S'
-  const nombre = usuario.nombre || ''
-  const apellido = usuario.apellido || ''
-  
-  if (nombre && apellido) {
-    return `${nombre.charAt(0)}${apellido.charAt(0)}`.toUpperCase()
-  } else if (nombre) {
-    return nombre.substring(0, 2).toUpperCase()
-  }
-  return 'S'
-}
-
 const getActionClass = (accion) => {
   const actionMap = {
     'LOGIN': 'success',
@@ -690,63 +389,57 @@ const getActionClass = (accion) => {
     'ACTUALIZAR': 'warning',
     'ELIMINAR': 'danger',
     'CONSULTAR': 'info',
-    'PAGO': 'success',
-    'AVALUO': 'primary',
-    'SECURITY_EVENT': 'danger'
+    'PAGO': 'success'
   }
   return actionMap[accion] || 'default'
 }
 
-// ===== LIFECYCLE =====
+// Lifecycle
 onMounted(() => {
-  loadLogs()
+  cargarLogs()
 })
-
-// Watch for filter changes
-watch(() => filters.value.accion, applyFilters)
-watch(() => filters.value.entidad, applyFilters)
-watch(() => filters.value.fechaDesde, applyFilters)
-watch(() => filters.value.fechaHasta, applyFilters)
 </script>
 
 <style scoped>
-/* ===== VARIABLES ===== */
+/* Variables - MISMA PALETA que parameters.vue */
 :root {
-  --primary-color: #D4AF37;
-  --dark-bg: #2C3E50;
-  --darker-bg: #1A1A1A;
-  --text-dark: #2C3E50;
-  --text-light: #4A4A4A;
-  --border-color: #e9ecef;
-  --success-color: #27AE60;
-  --warning-color: #F39C12;
-  --danger-color: #E74C3C;
-  --info-color: #3498DB;
+  --color-primary: #D4AF37;
+  --color-success: #27AE60;
+  --color-warning: #F39C12;
+  --color-danger: #E74C3C;
+  --color-info: #3498DB;
+  --color-dark: #2C3E50;
+  --color-text: #4A4A4A;
+  --color-border: #e9ecef;
 }
 
-/* ===== LOADING OVERLAY ===== */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.95);
+/* Contenedor principal - sin padding extra, el layout ya lo tiene */
+.audit-logs-panel {
+  padding: 0;
+}
+
+/* Loading State */
+.loading-state {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  min-height: 400px;
 }
 
 .loading-spinner {
   text-align: center;
 }
 
+.loading-spinner p {
+  margin-top: 1rem;
+  color: var(--color-text);
+}
+
 .spinner {
   width: 50px;
   height: 50px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid var(--primary-color);
+  border-top: 4px solid var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem;
@@ -757,175 +450,98 @@ watch(() => filters.value.fechaHasta, applyFilters)
   100% { transform: rotate(360deg); }
 }
 
-/* ===== HEADER ===== */
-.admin-header {
-  background: linear-gradient(135deg, var(--dark-bg) 0%, var(--darker-bg) 100%);
-  color: white;
-  padding: 1rem 0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
-.header-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-left .logo {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  text-decoration: none;
-  color: white;
-}
-
-.logo img {
-  height: 50px;
-  width: auto;
-  object-fit: contain;
-}
-
-.logo h1 {
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin: 0;
-  line-height: 1;
-}
-
-.admin-badge {
-  background: var(--primary-color);
-  color: var(--darker-bg);
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: bold;
-  text-transform: uppercase;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.admin-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.welcome-text {
-  font-weight: 500;
-  color: var(--primary-color);
-}
-
-.user-avatar {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(45deg, var(--primary-color), #F4D03F);
-  border-radius: 50%;
+/* Error State */
+.error-state {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--darker-bg);
-  font-weight: bold;
-  font-size: 0.9rem;
+  min-height: 400px;
 }
 
-.btn-logout {
-  background: rgba(231, 76, 60, 0.2);
-  border: 1px solid rgba(231, 76, 60, 0.3);
-  color: #ff6b6b;
-  padding: 0.5rem;
+.error-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.error-content svg {
+  color: var(--color-danger);
+  margin-bottom: 1rem;
+}
+
+.error-content h3 {
+  color: var(--color-dark);
+  margin-bottom: 0.5rem;
+}
+
+.error-content p {
+  color: var(--color-text);
+  margin-bottom: 1.5rem;
+}
+
+.btn-retry {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
   border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.btn-logout:hover {
-  background: rgba(231, 76, 60, 0.3);
-  color: white;
+.btn-retry:hover {
+  background: #B8941F;
+  transform: translateY(-2px);
 }
 
-/* ===== MAIN CONTENT ===== */
-.admin-main {
-  padding: 2rem 0;
-  min-height: calc(100vh - 80px);
-  background: #f8f9fa;
+/* Main Content */
+.logs-content {
+  padding: 0;
 }
 
-.container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 2rem;
-}
-
-/* ===== PAGE HEADER ===== */
+/* Page Header - EXACTO como parameters.vue */
 .page-header {
-  margin-bottom: 2rem;
-}
-
-.header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 2rem;
   flex-wrap: wrap;
   gap: 1rem;
 }
 
-.title-section {
+.header-left {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.btn-back {
-  background: white;
-  border: 1px solid var(--border-color);
-  padding: 0.75rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+.icon-wrapper {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, var(--color-primary), #F4D03F);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-dark);
-}
-
-.btn-back:hover {
-  background: var(--primary-color);
   color: white;
-  border-color: var(--primary-color);
 }
 
-.title-section h2 {
-  color: var(--text-dark);
+.header-left h1 {
+  color: var(--color-dark);
   font-size: 1.8rem;
   font-weight: bold;
   margin: 0 0 0.25rem;
 }
 
-.title-section p {
-  color: var(--text-light);
+.header-left p {
+  color: var(--color-text);
   margin: 0;
 }
 
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.btn-refresh,
-.btn-export {
-  background: white;
-  border: 1px solid var(--border-color);
-  color: var(--text-dark);
+.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   font-weight: 600;
@@ -936,36 +552,22 @@ watch(() => filters.value.fechaHasta, applyFilters)
   gap: 0.5rem;
 }
 
-.btn-refresh:hover {
-  background: var(--info-color);
-  color: white;
-  border-color: var(--info-color);
-}
-
-.btn-export {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-}
-
-.btn-export:hover {
+.btn-primary:hover:not(:disabled) {
   background: #B8941F;
+  transform: translateY(-2px);
 }
 
-.btn-refresh:disabled {
+.btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* ===== STATS SECTION ===== */
-.stats-section {
-  margin-bottom: 2rem;
-}
-
-.stats-grid {
+/* Stats Overview - EXACTO como parameters.vue */
+.stats-overview {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .stat-card {
@@ -984,536 +586,411 @@ watch(() => filters.value.fechaHasta, applyFilters)
 }
 
 .stat-icon {
-  padding: 1rem;
+  width: 56px;
+  height: 56px;
+  background: rgba(212, 175, 55, 0.1);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.stat-icon.total {
-  background: rgba(52, 152, 219, 0.1);
-  color: var(--info-color);
-}
-
-.stat-icon.today {
-  background: rgba(39, 174, 96, 0.1);
-  color: var(--success-color);
-}
-
-.stat-icon.users {
-  background: rgba(155, 89, 182, 0.1);
-  color: #9B59B6;
-}
-
-.stat-icon.actions {
-  background: rgba(243, 156, 18, 0.1);
-  color: var(--warning-color);
+  color: var(--color-primary);
+  flex-shrink: 0;
 }
 
 .stat-content h3 {
   font-size: 2rem;
   font-weight: bold;
   margin: 0 0 0.25rem;
-  color: var(--text-dark);
+  color: var(--color-dark);
 }
 
 .stat-content p {
-  color: var(--text-light);
+  color: var(--color-text);
   margin: 0;
   font-weight: 500;
 }
 
-/* ===== FILTERS SECTION ===== */
-.filters-section {
-  margin-bottom: 2rem;
-}
-
-.filters-card {
+/* Filtros - EXACTO como parameters.vue */
+.filtros-section {
   background: white;
   padding: 1.5rem;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 2rem;
 }
 
-.filters-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
+.filtros-header {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.filters-header h3 {
-  color: var(--text-dark);
-  margin: 0;
+.filtros-header h2 {
   font-size: 1.2rem;
+  color: var(--color-dark);
+  margin: 0;
+  font-weight: 600;
 }
 
-.btn-clear {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-light);
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-weight: 500;
-}
-
-.btn-clear:hover {
-  background: var(--danger-color);
-  color: white;
-  border-color: var(--danger-color);
-}
-
-.filters-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+.filtros-content {
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
 }
 
-.filter-group {
+.search-box {
+  position: relative;
+  flex: 1;
+}
+
+.search-box svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6c757d;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.filtro-item {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.filter-group label {
-  color: var(--text-dark);
+.filtro-item label {
   font-weight: 600;
+  color: var(--color-dark);
   font-size: 0.9rem;
 }
 
-.search-input {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-input svg {
-  position: absolute;
-  left: 0.75rem;
-  color: var(--text-light);
-}
-
-.search-input input {
-  width: 100%;
-  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.filter-group input,
-.filter-group select {
+.filtro-item select {
   padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 0.9rem;
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  cursor: pointer;
   transition: all 0.3s ease;
+  background: white;
 }
 
-.filter-group input:focus,
-.filter-group select:focus,
-.search-input input:focus {
+.filtro-item select:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
 }
 
-/* ===== LOGS SECTION ===== */
-.logs-section {
-  margin-bottom: 2rem;
+.btn-secondary {
+  background: white;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.logs-card {
+.btn-secondary:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Empty State */
+.empty-state {
   background: white;
+  padding: 3rem;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-}
-
-.logs-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logs-header h3 {
-  color: var(--text-dark);
-  margin: 0;
-  font-size: 1.2rem;
-}
-
-.pagination-info {
-  color: var(--text-light);
-  font-size: 0.9rem;
-}
-
-/* ===== LOGS LOADING ===== */
-.logs-loading {
-  padding: 3rem;
-  text-align: center;
-  color: var(--text-light);
-}
-
-/* ===== EMPTY STATE ===== */
-.empty-state {
-  padding: 3rem;
   text-align: center;
 }
 
 .empty-state svg {
-  color: var(--text-light);
+  color: var(--color-text);
   margin-bottom: 1rem;
+  opacity: 0.5;
 }
 
 .empty-state h3 {
-  color: var(--text-dark);
+  color: var(--color-dark);
   margin-bottom: 0.5rem;
+  font-size: 1.3rem;
 }
 
 .empty-state p {
-  color: var(--text-light);
+  color: var(--color-text);
+  margin: 0;
 }
 
-/* ===== LOGS TABLE ===== */
-.logs-table-container {
-  overflow-x: auto;
-}
-
-.logs-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.logs-table thead {
-  background: #f8f9fa;
-}
-
-.logs-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  color: var(--text-dark);
-  font-size: 0.9rem;
-  border-bottom: 2px solid var(--border-color);
-}
-
-.logs-table tbody tr {
-  border-bottom: 1px solid var(--border-color);
-  transition: background 0.2s ease;
-  cursor: pointer;
-}
-
-.logs-table tbody tr:hover {
-  background: #f8f9fa;
-}
-
-.logs-table td {
-  padding: 1rem;
-  font-size: 0.9rem;
-}
-
-.log-id {
-  font-weight: 600;
-  color: var(--text-light);
-}
-
-.log-date {
+/* Logs Grid */
+.logs-grid {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-}
-
-.log-date .date {
-  color: var(--text-dark);
-  font-weight: 500;
-}
-
-.log-date .time {
-  color: var(--text-light);
-  font-size: 0.85rem;
-}
-
-.log-user {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.user-avatar-small {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(45deg, var(--primary-color), #F4D03F);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: bold;
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
-
-.user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.user-name {
-  color: var(--text-dark);
-  font-weight: 500;
-}
-
-.user-email {
-  color: var(--text-light);
-  font-size: 0.85rem;
-}
-
-.action-badge {
-  padding: 0.35rem 0.75rem;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.action-badge.success {
-  background: rgba(39, 174, 96, 0.1);
-  color: var(--success-color);
-}
-
-.action-badge.info {
-  background: rgba(52, 152, 219, 0.1);
-  color: var(--info-color);
-}
-
-.action-badge.warning {
-  background: rgba(243, 156, 18, 0.1);
-  color: var(--warning-color);
-}
-
-.action-badge.danger {
-  background: rgba(231, 76, 60, 0.1);
-  color: var(--danger-color);
-}
-
-.action-badge.primary {
-  background: rgba(212, 175, 55, 0.1);
-  color: var(--primary-color);
-}
-
-.action-badge.default {
-  background: rgba(149, 165, 166, 0.1);
-  color: #95A5A6;
-}
-
-.entity-badge {
-  padding: 0.35rem 0.75rem;
-  border-radius: 20px;
-  background: rgba(52, 73, 94, 0.1);
-  color: #34495E;
-  font-weight: 500;
-  font-size: 0.85rem;
-}
-
-.ip-address {
-  font-family: 'Courier New', monospace;
-  color: var(--text-light);
-  font-size: 0.85rem;
-}
-
-.btn-details {
-  background: transparent;
-  border: none;
-  color: var(--primary-color);
-  padding: 0.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-details:hover {
-  background: rgba(212, 175, 55, 0.1);
-}
-
-/* ===== LOG DETAILS ROW ===== */
-.log-details-row {
-  background: #f8f9fa;
-}
-
-.log-details {
-  padding: 1.5rem;
-}
-
-.details-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1rem;
 }
 
-.detail-item {
+.log-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.log-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+.log-card.expandido {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.log-header {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.detail-item.full-width {
-  grid-column: 1 / -1;
+.log-info {
+  flex: 1;
 }
 
-.detail-item label {
+.log-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.log-title h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-dark);
   font-weight: 600;
-  color: var(--text-dark);
-  font-size: 0.9rem;
 }
 
-.detail-item span {
-  color: var(--text-light);
-  font-size: 0.9rem;
+.action-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-.user-agent {
+.action-badge.primary {
+  background: rgba(212, 175, 55, 0.15);
+  color: var(--color-primary);
+}
+
+.action-badge.success {
+  background: rgba(39, 174, 96, 0.15);
+  color: var(--color-success);
+}
+
+.action-badge.warning {
+  background: rgba(243, 156, 18, 0.15);
+  color: var(--color-warning);
+}
+
+.action-badge.danger {
+  background: rgba(231, 76, 60, 0.15);
+  color: var(--color-danger);
+}
+
+.action-badge.info {
+  background: rgba(52, 152, 219, 0.15);
+  color: var(--color-info);
+}
+
+.action-badge.default {
+  background: rgba(74, 74, 74, 0.15);
+  color: var(--color-text);
+}
+
+.log-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.log-meta span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.log-meta svg {
+  opacity: 0.6;
+}
+
+.toggle-btn {
+  background: rgba(212, 175, 55, 0.1);
+  border: none;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  transition: all 0.3s ease;
+}
+
+.toggle-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
+}
+
+/* Log Details */
+.log-details {
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid var(--color-border);
+}
+
+.detail-row {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+}
+
+.detail-row:last-child {
+  margin-bottom: 0;
+}
+
+.detail-row.full-width {
+  flex-direction: column;
+}
+
+.detail-row .label {
+  font-weight: 600;
+  color: var(--color-dark);
+  min-width: 120px;
+}
+
+.detail-row .value {
+  color: var(--color-text);
+  flex: 1;
+}
+
+.detail-row .value.ip {
   font-family: 'Courier New', monospace;
+  background: rgba(212, 175, 55, 0.1);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.detail-row .value.user-agent {
   font-size: 0.85rem;
+  word-break: break-word;
 }
 
 .json-details {
-  background: var(--darker-bg);
-  color: #a9dc76;
+  background: #2d2d2d;
+  color: #f8f8f2;
   padding: 1rem;
   border-radius: 8px;
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
   overflow-x: auto;
-  max-height: 300px;
-  overflow-y: auto;
+  margin: 0;
 }
 
-/* ===== PAGINATION ===== */
+/* Pagination - EXACTO como parameters.vue */
 .pagination {
-  padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .pagination-btn {
   background: white;
-  border: 1px solid var(--border-color);
-  color: var(--text-dark);
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
+  border: 2px solid var(--color-border);
+  color: var(--color-dark);
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.5rem;
 }
 
 .pagination-btn:hover:not(:disabled) {
-  background: var(--primary-color);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: white;
-  border-color: var(--primary-color);
 }
 
 .pagination-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.pagination-numbers {
-  display: flex;
-  gap: 0.25rem;
+.pagination-info {
+  font-weight: 600;
+  color: var(--color-dark);
+  padding: 0 1rem;
 }
 
-.pagination-number {
-  background: white;
-  border: 1px solid var(--border-color);
-  color: var(--text-dark);
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-width: 40px;
-  font-weight: 500;
-}
-
-.pagination-number:hover {
-  background: rgba(212, 175, 55, 0.1);
-  border-color: var(--primary-color);
-}
-
-.pagination-number.active {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 1024px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .filters-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
+/* Responsive */
 @media (max-width: 768px) {
-  .container {
-    padding: 0 1rem;
-  }
-  
-  .header-content {
+  .page-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .filters-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .logs-table-container {
-    overflow-x: scroll;
-  }
-  
-  .logs-table {
-    min-width: 1000px;
-  }
-}
 
-@media (max-width: 640px) {
-  .title-section {
-    flex-direction: column;
-    align-items: flex-start;
+  .stats-overview {
+    grid-template-columns: 1fr;
   }
-  
-  .header-actions {
-    width: 100%;
-    flex-direction: column;
+
+  .filtros-grid {
+    grid-template-columns: 1fr;
   }
-  
-  .btn-refresh,
-  .btn-export {
-    width: 100%;
-    justify-content: center;
+
+  .log-meta {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
   }
 }
 </style>
