@@ -1,5 +1,5 @@
 // FRONTEND/middleware/guest.js
-
+// Middleware para páginas que solo usuarios NO autenticados pueden ver
 export default defineNuxtRouteMiddleware((to, from) => {
   const { user } = useAuth()
   

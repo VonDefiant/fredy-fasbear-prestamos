@@ -13,6 +13,8 @@ import systemReportsRoutes from './system-reports.routes.js';
 import auditLogsRoutes from './audit-logs.routes.js';
 import backupsRoutes from './backups.routes.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import evaluadorRoutes from './evaluador.routes.js';
+
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -33,6 +35,7 @@ router.use('/admin/ecommerce-config', ecommerceRoutes);
 router.use('/system-reports', systemReportsRoutes);
 router.use('/audit-logs', auditLogsRoutes);
 router.use('/admin/backups', authenticateToken, requireAdmin, backupsRoutes);
+router.use('/evaluador', evaluadorRoutes);
 
 router.get('/health', async (req, res) => {
   try {
@@ -169,6 +172,18 @@ router.get('/info', (req, res) => {
             'POST /api/admin/ecommerce-config/reset'
           ]
         },
+        evaluador: {
+        base: '/api/evaluador',
+        description: 'Gestión del panel de evaluador',
+        endpoints: [
+          'GET /api/evaluador/stats',
+          'GET /api/evaluador/solicitudes',
+          'GET /api/evaluador/solicitudes/:id',
+          'POST /api/evaluador/solicitudes/:id/evaluar',
+          'GET /api/evaluador/recent-activity',
+          'GET /api/evaluador/mis-avaluos'
+        ]
+      },
         auditLogs: {  
         base: '/api/audit-logs',
         description: 'Logs de auditoría y seguridad',

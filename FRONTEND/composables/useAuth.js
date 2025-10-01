@@ -54,11 +54,9 @@ export const useAuth = () => {
   }
 
   // ===== INICIALIZACIÓN AUTOMÁTICA DEL ESTADO =====
-  // CLAVE: Esta función se ejecuta SÍNCRONAMENTE cuando se accede al composable
   const initializeUserState = () => {
     if (!process.client) return null
     
-    // Buscar en localStorage sin logs para no saturar
     const token = findExistingToken()
     const userData = findExistingUserData()
     
@@ -71,6 +69,30 @@ export const useAuth = () => {
 
   // Estado reactivo con inicialización automática
   const user = useState('auth.user', () => initializeUserState())
+
+  // ===== FUNCIÓN DE REDIRECCIÓN SEGÚN TIPO DE USUARIO =====
+  
+  const redirectAfterLogin = (tipoUsuario) => {
+    console.log('[AUTH] 🔄 Redirigiendo usuario tipo:', tipoUsuario)
+    
+    switch(tipoUsuario) {
+      case 'Administrador':
+        return navigateTo('/admin')
+        
+      case 'Evaluador':
+        return navigateTo('/evaluador')
+        
+      case 'Cobrador':
+        return navigateTo('/cobrador')
+        
+      case 'Cliente':
+        return navigateTo('/cliente')
+        
+      default:
+        console.error('[AUTH] ⚠️ Tipo de usuario desconocido:', tipoUsuario)
+        return navigateTo('/')
+    }
+  }
 
   // ===== FUNCIONES PRINCIPALES =====
   
@@ -110,6 +132,9 @@ export const useAuth = () => {
     user.value = { ...userData }
     
     console.log('[AUTH LOGIN] ✅ Login completado')
+    
+    // Redirigir según tipo de usuario
+    redirectAfterLogin(userData.tipoUsuario)
   }
 
   // Cerrar sesión
@@ -187,6 +212,8 @@ export const useAuth = () => {
       isLoggedIn: isLoggedIn.value,
       isAdmin: isAdmin.value,
       isClient: isClient.value,
+      isEvaluator: isEvaluator.value,
+      isCollector: isCollector.value,
       token: getToken() ? 'Present' : 'Missing',
       tokensInStorage: {
         localStorage: Object.keys(localStorage).filter(key => 
@@ -212,6 +239,9 @@ export const useAuth = () => {
     checkAuth,
     getToken,
     initAuth,
+    
+    // Redirección
+    redirectAfterLogin,
     
     // Utilidades
     requireAuth,

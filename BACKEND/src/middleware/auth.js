@@ -120,4 +120,62 @@ export const requireClient = (req, res, next) => {
   next();
 };
 
+// ===== NUEVOS MIDDLEWARE PARA EVALUADOR =====
+
+export const requireEvaluador = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Usuario no autenticado'
+    });
+  }
+
+  if (req.user.tipoUsuario !== 'Evaluador') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado: Se requieren permisos de evaluador'
+    });
+  }
+
+  next();
+};
+
+export const requireCobrador = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Usuario no autenticado'
+    });
+  }
+
+  if (req.user.tipoUsuario !== 'Cobrador') {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado: Se requieren permisos de cobrador'
+    });
+  }
+
+  next();
+};
+
+export const requireStaff = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Usuario no autenticado'
+    });
+  }
+
+  const rolesPermitidos = ['Administrador', 'Evaluador', 'Cobrador'];
+  
+  if (!rolesPermitidos.includes(req.user.tipoUsuario)) {
+    return res.status(403).json({
+      success: false,
+      message: 'Acceso denegado: Se requieren permisos de personal interno'
+    });
+  }
+
+  next();
+};
+
 export default authenticateToken;
