@@ -1,6 +1,5 @@
 <template>
   <div class="admin-panel">
-    <!-- Header del Admin Panel -->
     <header class="admin-header">
       <div class="header-container">
         <div class="header-left">
@@ -34,7 +33,6 @@
       </div>
     </header>
 
-    <!-- Loading Overlay -->
     <div v-if="loading" class="loading-overlay">
       <div class="loading-spinner">
         <div class="spinner"></div>
@@ -42,7 +40,6 @@
       </div>
     </div>
 
-    <!-- Error State -->
     <div v-if="error && !loading" class="error-state">
       <div class="container">
         <div class="error-content">
@@ -60,18 +57,15 @@
       </div>
     </div>
 
-    <!-- Main Content -->
     <main v-if="!loading && !error" class="admin-main">
       <div class="container">
         
-        <!-- Dashboard Overview -->
         <section class="dashboard-overview">
           <div class="section-header">
             <h2>Panel de Administración del Sistema</h2>
             <p>Configuración, parámetros y gestión general de Fredy Fasbear Industries</p>
           </div>
 
-          <!-- Estadísticas del Sistema -->
           <div class="stats-grid">
             <div class="stat-card users">
               <div class="stat-icon">
@@ -133,7 +127,6 @@
           </div>
         </section>
 
-        <!-- Módulos de Administración -->
         <section class="admin-modules">
           <div class="section-header">
             <h2>Módulos de Administración del Sistema</h2>
@@ -141,7 +134,6 @@
           </div>
 
           <div class="modules-grid">
-            <!-- Gestión de Personal Interno -->
             <div class="module-card" @click="navigateToModule('/admin/staff')">
               <div class="module-icon staff">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -165,7 +157,6 @@
               </div>
             </div>
 
-            <!-- Parámetros del Sistema -->
             <div class="module-card" @click="navigateToModule('/admin/parameters')">
               <div class="module-icon parameters">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -187,7 +178,6 @@
               </div>
             </div>
 
-            <!-- Tipos de Artículos -->
             <div class="module-card" @click="navigateToModule('/admin/article-types')">
               <div class="module-icon articles">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -208,7 +198,6 @@
               </div>
             </div>
 
-            <!-- Gestión de Clientes -->
             <div class="module-card" @click="navigateToModule('/admin/clients')">
               <div class="module-icon clients">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -230,7 +219,6 @@
               </div>
             </div>
 
-            <!-- Configuración E-commerce -->
             <div class="module-card" @click="navigateToModule('/admin/ecommerce-config')">
               <div class="module-icon ecommerce">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -251,7 +239,6 @@
               </div>
             </div>
 
-            <!-- Reportes del Sistema -->
             <div class="module-card" @click="navigateToModule('/admin/system-reports')">
               <div class="module-icon reports">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -274,7 +261,6 @@
               </div>
             </div>
 
-            <!-- Auditoría y Logs -->
             <div class="module-card" @click="navigateToModule('/admin/audit-logs')">
               <div class="module-icon audit">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -296,7 +282,6 @@
               </div>
             </div>
 
-            <!-- Respaldos del Sistema -->
             <div class="module-card" @click="navigateToModule('/admin/backups')">
               <div class="module-icon backups">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
@@ -323,15 +308,24 @@
           </div>
         </section>
 
-        <!-- Actividad Administrativa Reciente -->
         <section class="recent-activity">
           <div class="section-header">
             <h2>Actividad Administrativa Reciente</h2>
-            <button class="btn-secondary">Ver Historial Completo</button>
+            <button class="btn-secondary" @click="loadRecentActivity" :disabled="loadingActivity">
+              {{ loadingActivity ? 'Actualizando...' : 'Ver Historial Completo' }}
+            </button>
           </div>
 
           <div class="activity-list">
-            <div class="activity-item" v-for="activity in recentActivity" :key="activity.id">
+            <div v-if="loadingActivity" style="text-align: center; padding: 2rem; color: #95a5a6;">
+              Cargando actividad reciente...
+            </div>
+            
+            <div v-else-if="recentActivity.length === 0" style="text-align: center; padding: 2rem; color: #95a5a6;">
+              No hay actividad reciente para mostrar
+            </div>
+
+            <div v-else class="activity-item" v-for="activity in recentActivity" :key="activity.id">
               <div class="activity-icon" :class="activity.type">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <circle v-if="activity.type === 'parameter'" cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
@@ -354,12 +348,10 @@
 </template>
 
 <script setup>
-// Proteger la ruta solo para administradores
 definePageMeta({
   middleware: 'admin'
 })
 
-// Meta tags
 useHead({
   title: 'Panel de Administración - Fredy Fasbear',
   meta: [
@@ -367,17 +359,16 @@ useHead({
   ]
 })
 
-// ===== COMPOSABLES =====
 const { user, logout } = useAuth()
 const { 
   loading, 
   error, 
-  getAdminStats, 
+  getAdminStats,
+  getRecentActivity,
   formatNumber, 
   formatPercentage 
 } = useAdminDashboard()
 
-// ===== ESTADO REACTIVO =====
 const dashboardStats = ref({
   totalUsers: 0,
   clientsCount: 0,
@@ -395,36 +386,9 @@ const dashboardStats = ref({
 })
 
 const refreshInterval = ref(null)
+const recentActivity = ref([])
+const loadingActivity = ref(false)
 
-// Actividad administrativa reciente (datos estáticos por ahora)
-const recentActivity = ref([
-  {
-    id: 1,
-    type: 'parameter',
-    description: 'Tasa de interés actualizada de 4.5% a 5.0%',
-    timestamp: new Date(Date.now() - 15 * 60 * 1000)
-  },
-  {
-    id: 2,
-    type: 'user',
-    description: 'Nuevo evaluador creado: Dr. Carlos Méndez',
-    timestamp: new Date(Date.now() - 45 * 60 * 1000)
-  },
-  {
-    id: 3,
-    type: 'system',
-    description: 'Tipo de artículo "Instrumentos Musicales" agregado',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
-  },
-  {
-    id: 4,
-    type: 'backup',
-    description: 'Respaldo automático del sistema completado',
-    timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000)
-  }
-])
-
-// ===== COMPUTED PROPERTIES =====
 const userDisplayName = computed(() => {
   if (!user.value) return 'Administrador'
   
@@ -442,41 +406,97 @@ const userDisplayName = computed(() => {
   return 'Administrador'
 })
 
-// ===== MÉTODOS =====
+const transformActivityData = (activityData) => {
+  const activities = []
+  
+  if (activityData.recentSessions && activityData.recentSessions.length > 0) {
+    activityData.recentSessions.forEach(session => {
+      activities.push({
+        id: `session-${session.id}`,
+        type: 'user',
+        description: `Inicio de sesión: ${session.usuario.nombre} ${session.usuario.apellido} (${session.usuario.tipoUsuario})`,
+        timestamp: new Date(session.fechaInicio)
+      })
+    })
+  }
+  
+  if (activityData.recentRequests && activityData.recentRequests.length > 0) {
+    activityData.recentRequests.forEach(request => {
+      const userName = `${request.usuario.nombre} ${request.usuario.apellido}`
+      activities.push({
+        id: `request-${request.solicitudPrestamoId}`,
+        type: 'system',
+        description: `Nueva solicitud de préstamo por ${userName} - Estado: ${request.estadoSolicitud}`,
+        timestamp: new Date(request.fechaSolicitud)
+      })
+    })
+  }
+  
+  if (activityData.recentPayments && activityData.recentPayments.length > 0) {
+    activityData.recentPayments.forEach(payment => {
+      const solicitud = payment.prestamo?.contrato?.solicitud
+      const userName = solicitud?.usuario 
+        ? `${solicitud.usuario.nombre} ${solicitud.usuario.apellido}`
+        : 'Usuario'
+      
+      activities.push({
+        id: `payment-${payment.pagoId}`,
+        type: 'parameter',
+        description: `Pago registrado de Q${payment.montoPago.toFixed(2)} por ${userName}`,
+        timestamp: new Date(payment.fechaPago)
+      })
+    })
+  }
+  
+  activities.sort((a, b) => b.timestamp - a.timestamp)
+  
+  return activities.slice(0, 8)
+}
 
-/**
- * Cargar estadísticas del dashboard desde el backend
- */
-const loadDashboardData = async () => {
+const loadRecentActivity = async () => {
   try {
-    console.log('📊 Cargando panel de administración...')
+    loadingActivity.value = true
     
-    // Usar el composable especializado
-    const stats = await getAdminStats()
-    dashboardStats.value = stats
-    
-    console.log('✅ Panel cargado exitosamente')
+    const activityData = await getRecentActivity(15)
+    recentActivity.value = transformActivityData(activityData)
     
   } catch (err) {
-    console.error('❌ Error cargando panel:', err)
-    // El error ya se maneja en el composable
+    console.error('Error cargando actividad reciente:', err)
+    
+    recentActivity.value = [{
+      id: 'error-1',
+      type: 'system',
+      description: 'No se pudo cargar la actividad reciente. Intente refrescar.',
+      timestamp: new Date()
+    }]
+  } finally {
+    loadingActivity.value = false
   }
 }
 
-/**
- * Refrescar estadísticas automáticamente
- */
+const loadDashboardData = async () => {
+  try {
+    console.log('Cargando panel de administración...')
+    
+    const stats = await getAdminStats()
+    dashboardStats.value = stats
+    
+    await loadRecentActivity()
+    
+    console.log('Panel cargado exitosamente')
+    
+  } catch (err) {
+    console.error('Error cargando panel:', err)
+  }
+}
+
 const startAutoRefresh = () => {
-  // Refrescar cada 5 minutos
   refreshInterval.value = setInterval(() => {
-    console.log('🔄 Actualizando estadísticas...')
+    console.log('Actualizando estadísticas...')
     loadDashboardData()
   }, 5 * 60 * 1000)
 }
 
-/**
- * Detener auto-refresh
- */
 const stopAutoRefresh = () => {
   if (refreshInterval.value) {
     clearInterval(refreshInterval.value)
@@ -503,7 +523,6 @@ const getUserInitials = () => {
 }
 
 const navigateToModule = (path) => {
-  // Por ahora mostrar en consola, luego implementar las rutas específicas
   console.log(`Navegando a: ${path}`)
   navigateTo(path)
 }
@@ -520,7 +539,6 @@ const formatTimeAgo = (timestamp) => {
   return timestamp.toLocaleDateString('es-GT')
 }
 
-// ===== LIFECYCLE =====
 onMounted(() => {
   loadDashboardData()
   startAutoRefresh()
@@ -537,7 +555,6 @@ onUnmounted(() => {
   background: #F5F5F5;
 }
 
-/* ===== LOADING Y ERROR STATES ===== */
 .loading-overlay {
   position: fixed;
   top: 0;
@@ -625,7 +642,6 @@ onUnmounted(() => {
   transform: translateY(-2px);
 }
 
-/* Header del admin panel */
 .admin-header {
   background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
   color: white;
@@ -724,7 +740,6 @@ onUnmounted(() => {
   color: white;
 }
 
-/* Main content */
 .admin-main {
   padding: 2rem 0;
 }
@@ -735,7 +750,6 @@ onUnmounted(() => {
   padding: 0 2rem;
 }
 
-/* Secciones */
 .section-header {
   margin-bottom: 2rem;
 }
@@ -752,7 +766,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-/* Dashboard Overview */
 .dashboard-overview {
   margin-bottom: 3rem;
 }
@@ -843,7 +856,6 @@ onUnmounted(() => {
   color: #95A5A6;
 }
 
-/* Módulos de administración */
 .admin-modules {
   margin-bottom: 3rem;
 }
@@ -955,7 +967,6 @@ onUnmounted(() => {
   transform: translateX(4px);
 }
 
-/* Actividad reciente */
 .recent-activity .section-header {
   display: flex;
   justify-content: space-between;
@@ -976,6 +987,11 @@ onUnmounted(() => {
 .btn-secondary:hover {
   background: #e9ecef;
   color: #2C3E50;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .activity-list {
@@ -1043,7 +1059,6 @@ onUnmounted(() => {
   font-size: 0.8rem;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .container {
     padding: 0 1rem;

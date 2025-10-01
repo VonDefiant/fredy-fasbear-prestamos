@@ -1,6 +1,5 @@
 <template>
   <div class="auth-page">
-    <!-- Background decorativo -->
     <div class="auth-background">
       <div class="floating-shape shape-1">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
@@ -21,7 +20,6 @@
     </div>
 
     <div class="auth-container">
-      <!-- Header con logo -->
       <div class="auth-header">
         <NuxtLink to="/" class="logo-link">
           <div class="logo">
@@ -32,7 +30,6 @@
         <p class="auth-subtitle">Accede a tu cuenta o únete a nuestra familia</p>
       </div>
 
-      <!-- Selector de tabs -->
       <div class="tab-selector">
         <button 
           class="tab-btn" 
@@ -58,15 +55,12 @@
         </button>
       </div>
 
-      <!-- Formularios -->
       <div class="form-container">
-        <!-- Formulario de Login -->
         <div v-if="activeTab === 'login'" class="form-content">
           <form @submit.prevent="handleLogin" class="auth-form">
             <h2>Bienvenido de vuelta</h2>
             <p class="form-description">Ingresa tus credenciales para acceder a tu cuenta</p>
 
-            <!-- Alert de error/success -->
             <div v-if="loginMessage.text" class="alert" :class="loginMessage.type">
               <svg v-if="loginMessage.type === 'error'" width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -154,13 +148,11 @@
           </form>
         </div>
 
-        <!-- Formulario de Registro -->
         <div v-if="activeTab === 'register'" class="form-content">
           <form @submit.prevent="handleRegister" class="auth-form">
             <h2>Únete a nosotros</h2>
             <p class="form-description">Crea tu cuenta y empieza a disfrutar nuestros servicios</p>
 
-            <!-- Alert de error/success -->
             <div v-if="registerMessage.text" class="alert" :class="registerMessage.type">
               <svg v-if="registerMessage.type === 'error'" width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
@@ -230,6 +222,26 @@
               </div>
             </div>
 
+            <div class="form-group">
+              <label for="register-birthdate">Fecha de Nacimiento</label>
+              <div class="input-wrapper">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" stroke-width="2"/>
+                  <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" stroke-width="2"/>
+                  <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <input
+                  id="register-birthdate"
+                  v-model="registerForm.fechaNacimiento"
+                  type="date"
+                  required
+                  :max="maxDate"
+                  :disabled="registerLoading"
+                />
+              </div>
+            </div>
+
             <div class="form-row">
               <div class="form-group">
                 <label for="register-phone">Teléfono</label>
@@ -240,12 +252,16 @@
                   <input
                     id="register-phone"
                     v-model="registerForm.telefono"
-                    type="tel"
-                    placeholder="+502 1234-5678"
+                    type="text"
+                    placeholder="12345678"
                     required
+                    maxlength="8"
+                    pattern="[0-9]{8}"
+                    @input="validateNumericInput($event, 'telefono')"
                     :disabled="registerLoading"
                   />
                 </div>
+                <small class="input-hint">Solo 8 dígitos numéricos</small>
               </div>
 
               <div class="form-group">
@@ -263,9 +279,14 @@
                     type="text"
                     placeholder="1234567890123"
                     required
+                    maxlength="13"
+                    minlength="13"
+                    pattern="[0-9]{13}"
+                    @input="validateNumericInput($event, 'cedula')"
                     :disabled="registerLoading"
                   />
                 </div>
+                <small class="input-hint">Exactamente 13 dígitos</small>
               </div>
             </div>
 
@@ -378,7 +399,6 @@
         </div>
       </div>
 
-      <!-- Footer -->
       <div class="auth-footer">
         <p>¿Problemas para acceder? <NuxtLink to="/contact">Contáctanos</NuxtLink></p>
         <NuxtLink to="/" class="back-home">
@@ -393,7 +413,6 @@
 </template>
 
 <script setup>
-// Meta tags
 useHead({
   title: 'Iniciar Sesión',
   meta: [
@@ -401,11 +420,9 @@ useHead({
   ]
 })
 
-// ===== COMPOSABLES =====
 const { login, getAuthMessage, getDebugInfo } = useAuth()
 const { api } = useApi()
 
-// ===== ESTADO REACTIVO =====
 const activeTab = ref('login')
 const loginLoading = ref(false)
 const registerLoading = ref(false)
@@ -413,11 +430,9 @@ const showLoginPassword = ref(false)
 const showRegisterPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-// Mensajes
 const loginMessage = ref({ text: '', type: '' })
 const registerMessage = ref({ text: '', type: '' })
 
-// Formularios
 const loginForm = ref({
   email: '',
   password: '',
@@ -428,6 +443,7 @@ const registerForm = ref({
   nombre: '',
   apellido: '',
   email: '',
+  fechaNacimiento: '',
   telefono: '',
   cedula: '',
   direccion: '',
@@ -436,20 +452,31 @@ const registerForm = ref({
   acceptTerms: false
 })
 
-// ===== COMPUTED PROPERTIES =====
+const maxDate = computed(() => {
+  const today = new Date()
+  const eighteenYearsAgo = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
+  return eighteenYearsAgo.toISOString().split('T')[0]
+})
+
 const isRegisterFormValid = computed(() => {
   return registerForm.value.nombre.trim() &&
          registerForm.value.apellido.trim() &&
          registerForm.value.email.trim() &&
-         registerForm.value.telefono.trim() &&
-         registerForm.value.cedula.trim() &&
+         registerForm.value.fechaNacimiento &&
+         registerForm.value.telefono.length === 8 &&
+         registerForm.value.cedula.length === 13 &&
          registerForm.value.direccion.trim() &&
          registerForm.value.password === registerForm.value.confirmPassword &&
          registerForm.value.password.length >= 8 &&
          registerForm.value.acceptTerms
 })
 
-// ===== MÉTODOS AUXILIARES =====
+const validateNumericInput = (event, field) => {
+  const value = event.target.value
+  const numericValue = value.replace(/[^0-9]/g, '')
+  registerForm.value[field] = numericValue
+}
+
 const setActiveTab = (tab) => {
   activeTab.value = tab
   clearMessages()
@@ -460,24 +487,12 @@ const clearMessages = () => {
   registerMessage.value = { text: '', type: '' }
 }
 
-// ===== FUNCIÓN DE REDIRECCIÓN POR ROLES =====
 const redirectAfterLogin = (userData) => {
-  console.log('[LOGIN] 🎯 Iniciando redirección para usuario:', {
-    nombre: userData.nombre,
-    email: userData.email,
-    tipoUsuario: userData.tipoUsuario
-  })
-  
-  // Verificar si hay una URL de destino guardada
   const redirectUrl = process.client ? sessionStorage.getItem('redirect_after_login') : null
   
   if (redirectUrl) {
-    console.log('[LOGIN] 📍 URL de destino guardada encontrada:', redirectUrl)
-    
-    // Limpiar la URL guardada
     sessionStorage.removeItem('redirect_after_login')
     
-    // Verificar si la URL guardada coincide con el rol del usuario
     const isAdminRoute = redirectUrl.startsWith('/admin')
     const isEvaluatorRoute = redirectUrl.startsWith('/evaluator')
     const isCollectorRoute = redirectUrl.startsWith('/collector')
@@ -485,7 +500,6 @@ const redirectAfterLogin = (userData) => {
     const isEvaluatorUser = userData.tipoUsuario === 'Evaluador'
     const isCollectorUser = userData.tipoUsuario === 'Cobrador'
     
-    // Verificar si el rol coincide con la ruta solicitada
     const roleRouteMatch = (
       (isAdminRoute && isAdminUser) ||
       (isEvaluatorRoute && isEvaluatorUser) ||
@@ -494,64 +508,40 @@ const redirectAfterLogin = (userData) => {
     )
     
     if (!roleRouteMatch) {
-      // Rol no coincide con la ruta solicitada, redirigir según rol
       let targetRoute = '/dashboard'
       if (isAdminUser) targetRoute = '/admin'
       else if (isEvaluatorUser) targetRoute = '/evaluator'
       else if (isCollectorUser) targetRoute = '/collector'
       
-      console.log('[LOGIN] ⚠️ Rol no coincide con ruta solicitada, redirigiendo a:', targetRoute)
       return navigateTo(targetRoute)
     }
     
-    // Rol coincide, redirigir a la URL original solicitada
-    console.log('[LOGIN] ✅ Redirigiendo a URL guardada:', redirectUrl)
     return navigateTo(redirectUrl)
   }
   
-  // No hay URL guardada, redirigir según rol del usuario
-  console.log('[LOGIN] 🔄 Evaluando rol para redirección...')
-  
   switch (userData.tipoUsuario) {
     case 'Administrador':
-      console.log('[LOGIN] 👑 Usuario es Administrador, redirigiendo a /admin')
       return navigateTo('/admin')
-      
     case 'Cliente':
-      console.log('[LOGIN] 👤 Usuario es Cliente, redirigiendo a /dashboard')
       return navigateTo('/dashboard')
-      
     case 'Evaluador':
-      console.log('[LOGIN] 🔍 Usuario es Evaluador, redirigiendo a /evaluator')
       return navigateTo('/evaluator')
-      
     case 'Cobrador':
-      console.log('[LOGIN] 💰 Usuario es Cobrador, redirigiendo a /collector')
       return navigateTo('/collector')
-      
     default:
-      console.log('[LOGIN] ⚠️ Rol no reconocido:', userData.tipoUsuario, 'redirigiendo al dashboard por defecto')
       return navigateTo('/dashboard')
   }
 }
 
-// ===== FUNCIÓN DE LOGIN CORREGIDA =====
 const handleLogin = async () => {
   clearMessages()
   loginLoading.value = true
 
   try {
-    // Validaciones básicas
     if (!loginForm.value.email || !loginForm.value.password) {
       throw new Error('Por favor completa todos los campos')
     }
 
-    console.log('[LOGIN] 🔐 Iniciando proceso de login...', {
-      email: loginForm.value.email,
-      remember: loginForm.value.remember
-    })
-
-    // Llamada a la API
     const response = await api('/auth/login', {
       method: 'POST',
       body: {
@@ -560,26 +550,13 @@ const handleLogin = async () => {
         remember: loginForm.value.remember
       }
     })
-    
-    console.log('[LOGIN] 📨 Respuesta del backend:', {
-      success: response.success,
-      hasToken: !!response.data?.token,
-      hasUser: !!response.data?.user,
-      userType: response.data?.user?.tipoUsuario
-    })
 
     if (response.success && response.data?.token && response.data?.user) {
-      console.log('[LOGIN] 💾 Guardando datos de autenticación...')
-      
       login(response.data.user, response.data.token, loginForm.value.remember)
       
-      // Verificar que se guardó correctamente después de un pequeño delay
       setTimeout(() => {
         const debugInfo = getDebugInfo()
-        console.log('[LOGIN] 🔍 Estado después del login:', debugInfo)
-        
         if (!debugInfo.isLoggedIn) {
-          console.error('[LOGIN] ❌ ERROR: Los datos no se guardaron correctamente')
           loginMessage.value = {
             text: 'Error guardando datos de sesión. Intenta de nuevo.',
             type: 'error'
@@ -588,7 +565,6 @@ const handleLogin = async () => {
         }
       }, 100)
       
-      // Mensaje de éxito con personalización por rol
       const roleConfig = {
         'Administrador': { name: 'Administrador', icon: '👑' },
         'Evaluador': { name: 'Evaluador', icon: '🔍' },
@@ -603,25 +579,18 @@ const handleLogin = async () => {
         type: 'success'
       }
 
-      // Redirección con delay para mostrar el mensaje
       setTimeout(() => {
         redirectAfterLogin(response.data.user)
       }, 1500)
       
     } else {
-      // Error en la respuesta
       const errorMsg = response.message || 'Error en la respuesta del servidor'
-      console.error('[LOGIN] ❌ Error en respuesta:', errorMsg)
       throw new Error(errorMsg)
     }
 
   } catch (error) {
-    console.error('[LOGIN] ❌ Error en login:', error)
-    
-    // Manejar diferentes tipos de errores
     let errorMessage = 'Error al iniciar sesión. Verifica tus credenciales.'
     
-    // Errores específicos del backend
     if (error.data?.message) {
       errorMessage = error.data.message
     } else if (error.message?.includes('fetch')) {
@@ -639,13 +608,11 @@ const handleLogin = async () => {
   }
 }
 
-// ===== FUNCIÓN DE REGISTRO =====
 const handleRegister = async () => {
   clearMessages()
   registerLoading.value = true
 
   try {
-    // Validaciones
     if (!isRegisterFormValid.value) {
       throw new Error('Por favor completa todos los campos correctamente')
     }
@@ -658,23 +625,25 @@ const handleRegister = async () => {
       throw new Error('La contraseña debe tener al menos 8 caracteres')
     }
 
+    if (registerForm.value.telefono.length !== 8) {
+      throw new Error('El teléfono debe tener exactamente 8 dígitos')
+    }
+
+    if (registerForm.value.cedula.length !== 13) {
+      throw new Error('El DPI debe tener exactamente 13 dígitos')
+    }
+
     if (!registerForm.value.acceptTerms) {
       throw new Error('Debes aceptar los términos y condiciones')
     }
 
-    console.log('[REGISTER] 👤 Creando cuenta...', {
-      nombre: registerForm.value.nombre,
-      apellido: registerForm.value.apellido,
-      email: registerForm.value.email
-    })
-
-    // Llamada a la API
     const response = await api('/auth/register', {
       method: 'POST',
       body: {
         nombre: registerForm.value.nombre.trim(),
         apellido: registerForm.value.apellido.trim(),
         email: registerForm.value.email.toLowerCase().trim(),
+        fechaNacimiento: registerForm.value.fechaNacimiento,
         telefono: registerForm.value.telefono.trim(),
         cedula: registerForm.value.cedula.trim(),
         direccion: registerForm.value.direccion.trim(),
@@ -682,8 +651,6 @@ const handleRegister = async () => {
         tipoUsuario: 'Cliente'
       }
     })
-    
-    console.log('[REGISTER] ✅ Usuario registrado:', response.success)
 
     if (response.success) {
       registerMessage.value = {
@@ -691,11 +658,11 @@ const handleRegister = async () => {
         type: 'success'
       }
       
-      // Limpiar el formulario
       registerForm.value = {
         nombre: '',
         apellido: '',
         email: '',
+        fechaNacimiento: '',
         telefono: '',
         cedula: '',
         direccion: '',
@@ -704,10 +671,8 @@ const handleRegister = async () => {
         acceptTerms: false
       }
       
-      // Cambiar a tab de login después de 2 segundos
       setTimeout(() => {
         setActiveTab('login')
-        // Pre-llenar email en el login
         loginForm.value.email = response.data?.user?.email || ''
       }, 2000)
     } else {
@@ -715,9 +680,6 @@ const handleRegister = async () => {
     }
 
   } catch (error) {
-    console.error('[REGISTER] ❌ Error en registro:', error)
-    
-    // Manejar diferentes tipos de errores
     let errorMessage = 'Error al crear la cuenta. Inténtalo de nuevo.'
     
     if (error.data?.message) {
@@ -737,8 +699,6 @@ const handleRegister = async () => {
   }
 }
 
-// ===== WATCHERS =====
-// Limpiar mensajes cuando el usuario empiece a escribir
 watch([() => loginForm.value.email, () => loginForm.value.password], () => {
   if (loginMessage.value.text) {
     clearMessages()
@@ -751,9 +711,7 @@ watch([() => registerForm.value.email, () => registerForm.value.password], () =>
   }
 })
 
-// ===== INICIALIZACIÓN =====
 onMounted(() => {
-  // Verificar si hay un mensaje de autenticación guardado
   const savedMessage = getAuthMessage()
   
   if (savedMessage) {
@@ -763,9 +721,8 @@ onMounted(() => {
     }
   }
   
-  // Debug inicial
   if (process.client) {
-    console.log('[LOGIN] 🔧 Estado inicial de autenticación:', getDebugInfo())
+    console.log('[LOGIN] Estado inicial de autenticación:', getDebugInfo())
   }
 })
 </script>
@@ -782,7 +739,6 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* Background decorativo */
 .auth-background {
   position: absolute;
   top: 0;
@@ -822,7 +778,6 @@ onMounted(() => {
   50% { transform: translateY(-30px) rotate(180deg); }
 }
 
-/* Container principal */
 .auth-container {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
@@ -835,7 +790,6 @@ onMounted(() => {
   z-index: 10;
 }
 
-/* Header */
 .auth-header {
   background: linear-gradient(135deg, #2C3E50, #1A1A1A);
   color: white;
@@ -875,7 +829,6 @@ onMounted(() => {
   font-size: 0.95rem;
 }
 
-/* Tab selector */
 .tab-selector {
   display: flex;
   background: #f8f9fa;
@@ -908,7 +861,6 @@ onMounted(() => {
   background: #f1f3f4;
 }
 
-/* Form container */
 .form-container {
   padding: 2.5rem;
 }
@@ -940,7 +892,6 @@ onMounted(() => {
   font-size: 0.9rem;
 }
 
-/* Form groups */
 .form-group {
   margin-bottom: 1.5rem;
 }
@@ -982,6 +933,10 @@ onMounted(() => {
   background: #fafbfc;
 }
 
+.input-wrapper input[type="date"] {
+  color-scheme: light;
+}
+
 .input-wrapper input:focus {
   outline: none;
   border-color: #D4AF37;
@@ -993,6 +948,13 @@ onMounted(() => {
   background-color: #f8f9fa;
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.input-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #6c757d;
 }
 
 .password-toggle {
@@ -1011,7 +973,6 @@ onMounted(() => {
   color: #D4AF37;
 }
 
-/* Form options */
 .form-options {
   display: flex;
   justify-content: space-between;
@@ -1045,7 +1006,6 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* Buttons */
 .btn {
   width: 100%;
   padding: 0.875rem 1.5rem;
@@ -1079,7 +1039,6 @@ onMounted(() => {
   transform: none;
 }
 
-/* Alerts */
 .alert {
   padding: 0.875rem;
   border-radius: 10px;
@@ -1109,7 +1068,6 @@ onMounted(() => {
   color: #155724;
 }
 
-/* Loading spinner */
 .loading-spinner {
   animation: spin 1s linear infinite;
 }
@@ -1118,7 +1076,6 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* Footer */
 .auth-footer {
   background: #f8f9fa;
   padding: 1.5rem 2rem;
@@ -1155,7 +1112,6 @@ onMounted(() => {
   color: #2C3E50 !important;
 }
 
-/* Responsive */
 @media (max-width: 640px) {
   .auth-page {
     padding: 1rem 0.5rem;
