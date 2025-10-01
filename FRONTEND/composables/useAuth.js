@@ -1,14 +1,48 @@
 // FRONTEND/composables/useAuth.js
-export const useAuth = () => {
-  // Estado reactivo del usuario
-  const user = useState('auth.user', () => null)
+// VERSIÓN FINAL - Con inicialización correcta
 
+export const useAuth = () => {
   // ===== CONFIGURACIÓN DE TOKENS =====
   const TOKEN_KEY = 'token'
   const USER_DATA_KEY = 'user_data'
 
-  // ===== FUNCIONES AUXILIARES =====
+  // ===== FUNCIONES AUXILIARES (declaradas primero) =====
   
+  const findExistingToken = () => {
+    if (!process.client) return null
+    
+    const possibleTokenKeys = ['token', 'auth_token', 'auth-token', 'authToken']
+    
+    for (const key of possibleTokenKeys) {
+      const token = localStorage.getItem(key) || sessionStorage.getItem(key)
+      if (token) {
+        console.log(`[AUTH] ✓ Token encontrado con clave: ${key}`)
+        return token
+      }
+    }
+    return null
+  }
+
+  const findExistingUserData = () => {
+    if (!process.client) return null
+    
+    const possibleUserKeys = ['user_data', 'user-data', 'userData']
+    
+    for (const key of possibleUserKeys) {
+      const userDataStr = localStorage.getItem(key) || sessionStorage.getItem(key)
+      if (userDataStr) {
+        try {
+          const userData = JSON.parse(userDataStr)
+          console.log(`[AUTH] ✓ Datos de usuario encontrados con clave: ${key}`, userData.email)
+          return userData
+        } catch (error) {
+          console.error(`[AUTH] ✗ Error parseando datos de usuario de ${key}:`, error)
+        }
+      }
+    }
+    return null
+  }
+
   // Limpiar todos los tokens antiguos con diferentes nombres
   const clearAllTokens = () => {
     if (!process.client) return
@@ -27,42 +61,26 @@ export const useAuth = () => {
     })
   }
 
-  // Buscar token existente con cualquier nombre
-  const findExistingToken = () => {
+  // ===== INICIALIZACIÓN DEL ESTADO =====
+  const getInitialUser = () => {
     if (!process.client) return null
     
-    const possibleTokenKeys = ['token', 'auth_token', 'auth-token', 'authToken']
+    console.log('[AUTH INIT] 🔍 Buscando usuario en storage...')
     
-    for (const key of possibleTokenKeys) {
-      const token = localStorage.getItem(key) || sessionStorage.getItem(key)
-      if (token) {
-        console.log(`[AUTH] Token encontrado con clave: ${key}`)
-        return token
-      }
+    const token = findExistingToken()
+    const userData = findExistingUserData()
+    
+    if (token && userData) {
+      console.log('[AUTH INIT] ✅ Usuario encontrado:', userData.email)
+      return userData
     }
+    
+    console.log('[AUTH INIT] ℹ️ No hay sesión guardada')
     return null
   }
 
-  // Buscar datos de usuario existentes con cualquier nombre
-  const findExistingUserData = () => {
-    if (!process.client) return null
-    
-    const possibleUserKeys = ['user_data', 'user-data', 'userData']
-    
-    for (const key of possibleUserKeys) {
-      const userDataStr = localStorage.getItem(key) || sessionStorage.getItem(key)
-      if (userDataStr) {
-        try {
-          const userData = JSON.parse(userDataStr)
-          console.log(`[AUTH] Datos de usuario encontrados con clave: ${key}`)
-          return userData
-        } catch (error) {
-          console.error(`[AUTH] Error parseando datos de usuario de ${key}:`, error)
-        }
-      }
-    }
-    return null
-  }
+  // Estado reactivo del usuario
+  const user = useState('auth.user', () => getInitialUser())
 
   // ===== FUNCIONES PRINCIPALES =====
   
@@ -70,58 +88,73 @@ export const useAuth = () => {
   const checkAuth = () => {
     if (!process.client) return false
     
-    console.log('[AUTH] 🔍 Verificando autenticación...')
+    console.log('[AUTH CHECK] 🔍 Verificando autenticación...')
+    console.log('[AUTH CHECK] Estado actual:', user.value ? user.value.email : 'null')
     
     const token = findExistingToken()
     const userData = findExistingUserData()
     
     if (token && userData) {
-      user.value = userData
-      console.log('[AUTH] ✅ Usuario autenticado restaurado:', {
-        nombre: userData.nombre,
-        email: userData.email,
-        tipoUsuario: userData.tipoUsuario
-      })
+      // Si ya tenemos el usuario en el estado, no hace falta actualizarlo
+      if (!user.value || user.value.email !== userData.email) {
+        console.log('[AUTH CHECK] 🔄 Actualizando estado del usuario')
+        user.value = { ...userData }
+      }
+      
+      console.log('[AUTH CHECK] ✅ Autenticado:', userData.email)
       return true
-    } else {
-      console.log('[AUTH] ❌ No se encontraron datos de autenticación válidos')
-      user.value = null
-      return false
     }
+    
+    console.log('[AUTH CHECK] ❌ No autenticado')
+    user.value = null
+    return false
   }
 
-  // Iniciar sesión
+  // Iniciar sesión - SIEMPRE USA LOCALSTORAGE
   const login = (userData, token, remember = false) => {
     if (!process.client) return
     
-    console.log('[AUTH] 🔐 Iniciando sesión para:', userData.nombre, userData.email)
+    console.log('[AUTH LOGIN] 🔐 Iniciando sesión...')
+    console.log('[AUTH LOGIN] Usuario:', userData.email, userData.nombre)
     
-    // Limpiar tokens antiguos primero
+    // 1. Limpiar cualquier sesión anterior
     clearAllTokens()
+    console.log('[AUTH LOGIN] ✓ Sesiones anteriores limpiadas')
     
-    // Guardar datos del usuario en el estado
-    user.value = userData
+    // 2. Guardar en localStorage PRIMERO
+    localStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData))
+    console.log('[AUTH LOGIN] ✓ Datos guardados en localStorage')
     
-    // Guardar en storage (usar localStorage si remember=true, sino sessionStorage)
-    const storage = remember ? localStorage : sessionStorage
+    // 3. Actualizar el estado reactivo
+    user.value = { ...userData }
+    console.log('[AUTH LOGIN] ✓ Estado reactivo actualizado')
     
-    storage.setItem(TOKEN_KEY, token)
-    storage.setItem(USER_DATA_KEY, JSON.stringify(userData))
+    // 4. Verificar que se guardó correctamente
+    setTimeout(() => {
+      const savedToken = localStorage.getItem(TOKEN_KEY)
+      const savedData = localStorage.getItem(USER_DATA_KEY)
+      
+      console.log('[AUTH LOGIN] 📋 Verificación post-login:', {
+        tokenGuardado: !!savedToken,
+        datosGuardados: !!savedData,
+        estadoUsuario: !!user.value,
+        tokenLength: savedToken ? savedToken.length : 0
+      })
+      
+      if (!savedToken || !savedData) {
+        console.error('[AUTH LOGIN] ⚠️ ADVERTENCIA: Los datos NO se guardaron correctamente en localStorage')
+      }
+    }, 100)
     
-    console.log('[AUTH] ✅ Datos guardados en:', remember ? 'localStorage' : 'sessionStorage')
-    console.log('[AUTH] ✅ Usuario autenticado:', {
-      nombre: userData.nombre,
-      email: userData.email,
-      tipoUsuario: userData.tipoUsuario,
-      isLoggedIn: true
-    })
+    console.log('[AUTH LOGIN] ✅ Login completado')
   }
 
   // Cerrar sesión
   const logout = () => {
     if (!process.client) return
     
-    console.log('[AUTH] 🚪 Cerrando sesión...')
+    console.log('[AUTH LOGOUT] 🚪 Cerrando sesión...')
     
     // Limpiar estado
     user.value = null
@@ -129,17 +162,15 @@ export const useAuth = () => {
     // Limpiar todos los tokens posibles
     clearAllTokens()
     
-    console.log('[AUTH] ✅ Sesión cerrada completamente')
+    console.log('[AUTH LOGOUT] ✅ Sesión cerrada')
   }
 
   // Obtener token actual
   const getToken = () => {
     if (!process.client) return null
     
-    // Primero buscar con el nombre estándar
     let token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)
     
-    // Si no se encuentra, buscar con nombres alternativos
     if (!token) {
       token = findExistingToken()
     }
@@ -149,35 +180,11 @@ export const useAuth = () => {
 
   // ===== COMPUTED PROPERTIES =====
   
-  const isLoggedIn = computed(() => {
-    const result = !!user.value
-    console.log('[AUTH] isLoggedIn computed:', result, 'user:', user.value?.nombre || 'null')
-    return result
-  })
-
-  const isClient = computed(() => {
-    const result = user.value && user.value.tipoUsuario === 'Cliente'
-    console.log('[AUTH] isClient computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
-    return result
-  })
-
-  const isAdmin = computed(() => {
-    const result = user.value && user.value.tipoUsuario === 'Administrador'
-    console.log('[AUTH] isAdmin computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
-    return result
-  })
-
-  const isEvaluator = computed(() => {
-    const result = user.value && user.value.tipoUsuario === 'Evaluador'
-    console.log('[AUTH] isEvaluator computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
-    return result
-  })
-
-  const isCollector = computed(() => {
-    const result = user.value && user.value.tipoUsuario === 'Cobrador'
-    console.log('[AUTH] isCollector computed:', result, 'tipoUsuario:', user.value?.tipoUsuario)
-    return result
-  })
+  const isLoggedIn = computed(() => !!user.value)
+  const isClient = computed(() => user.value && user.value.tipoUsuario === 'Cliente')
+  const isAdmin = computed(() => user.value && user.value.tipoUsuario === 'Administrador')
+  const isEvaluator = computed(() => user.value && user.value.tipoUsuario === 'Evaluador')
+  const isCollector = computed(() => user.value && user.value.tipoUsuario === 'Cobrador')
 
   // ===== UTILIDADES =====
   
