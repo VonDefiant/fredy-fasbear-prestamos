@@ -161,54 +161,54 @@
               <h4>No hay solicitudes pendientes</h4>
               <p>Todas las solicitudes han sido evaluadas</p>
             </div>
+            
+<div v-else class="solicitudes-list">
+  <div 
+    v-for="solicitud in solicitudesPendientes" 
+    :key="solicitud.id" 
+    class="solicitud-card"
+    @click="verDetalleSolicitud(solicitud.id)"
+  >
+    <div class="solicitud-header">
+      <div class="solicitud-info">
+        <h4>Solicitud #{{ solicitud.id }}</h4>
+        <p class="cliente-nombre">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2"/>
+            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          {{ solicitud.usuario.nombre }} {{ solicitud.usuario.apellido }}
+        </p>
+      </div>
+      <span class="estado-badge pendiente">{{ solicitud.estado }}</span>
+    </div>
 
-            <div v-else class="solicitudes-list">
-              <div 
-                v-for="solicitud in solicitudesPendientes" 
-                :key="solicitud.id" 
-                class="solicitud-card"
-                @click="verDetalleSolicitud(solicitud.id)"
-              >
-                <div class="solicitud-header">
-                  <div class="solicitud-info">
-                    <h4>Solicitud #{{ solicitud.id }}</h4>
-                    <p class="cliente-nombre">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                      {{ solicitud.usuario.nombre }} {{ solicitud.usuario.apellido }}
-                    </p>
-                  </div>
-                  <span class="estado-badge pendiente">{{ solicitud.estado }}</span>
-                </div>
+    <div class="solicitud-details">
+      <div class="detail-item">
+        <span class="label">Artículo:</span>
+        <span class="value">{{ solicitud.articulos?.[0]?.tipoArticulo?.nombre || 'N/A' }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="label">Valor estimado:</span>
+        <span class="value">Q{{ formatCurrency(solicitud.articulos?.[0]?.valorEstimadoCliente || 0) }}</span>
+      </div>
+      <div class="detail-item">
+        <span class="label">Fecha solicitud:</span>
+        <span class="value">{{ formatDate(solicitud.fechaSolicitud) }}</span>
+      </div>
+    </div>
 
-                <div class="solicitud-details">
-                  <div class="detail-item">
-                    <span class="label">Artículo:</span>
-                    <span class="value">{{ solicitud.Articulo[0]?.tipoArticulo?.nombre || 'N/A' }}</span>
-                  </div>
-                  <div class="detail-item">
-                    <span class="label">Valor estimado:</span>
-                    <span class="value">Q{{ formatCurrency(solicitud.Articulo[0]?.valorEstimadoCliente || 0) }}</span>
-                  </div>
-                  <div class="detail-item">
-                    <span class="label">Fecha solicitud:</span>
-                    <span class="value">{{ formatDate(solicitud.fechaSolicitud) }}</span>
-                  </div>
-                </div>
-
-                <div class="solicitud-actions">
-                  <button class="btn-evaluar">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                      <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" stroke-width="2"/>
-                      <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    Evaluar Solicitud
-                  </button>
-                </div>
-              </div>
-            </div>
+    <div class="solicitud-actions">
+      <button class="btn-evaluar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" stroke-width="2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        Evaluar Solicitud
+      </button>
+    </div>
+  </div>
+</div>
           </section>
 
           <section class="actividad-reciente">
