@@ -5,6 +5,29 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Función para reintentar operaciones de base de datos en caso de error de conexión
+async function executeWithRetry(fn, maxRetries = 3, delay = 1000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isConnectionError = 
+        error.code === 'P1001' || 
+        error.code === 'P1008' ||
+        error.code === 'P1017' ||
+        error.message?.includes("Can't reach database") ||
+        error.message?.includes("terminating connection");
+
+      if (isConnectionError && attempt < maxRetries) {
+        console.log(`⚠️ Intento ${attempt}/${maxRetries} falló, reintentando en ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 // Middleware para logging
 router.use((req, res, next) => {
   console.log(`🔑 Admin API: ${req.method} ${req.path}`);
@@ -23,6 +46,70 @@ router.get('/stats', async (req, res) => {
   try {
     console.log('[ADMIN] Obteniendo estadísticas del dashboard...');
 
+    // Envolver todas las consultas en executeWithRetry
+    const stats = await executeWithRetry(async () => {
+      return await Promise.all([
+        // Total de usuarios
+        prisma.usuario.count(),
+        
+        // Total de clientes
+        prisma.usuario.count({
+          where: { tipoUsuario: 'Cliente' }
+        }),
+        
+        // Total de evaluadores
+        prisma.usuario.count({
+          where: { tipoUsuario: 'Evaluador' }
+        }),
+        
+        // Total de cobradores
+        prisma.usuario.count({
+          where: { tipoUsuario: 'Cobrador' }
+        }),
+        
+        // Total de parámetros del sistema
+        prisma.parametrosSistema.count({
+          where: {
+            nombreParametro: {
+              not: {
+                startsWith: 'ECOMMERCE_'
+              }
+            }
+          }
+        }),
+        
+        // Total de tipos de artículos
+        prisma.tipoArticulo.count({
+          where: { estado: 'Activo' }
+        }),
+        
+        // Total de productos en tienda
+        prisma.productoTienda.count({
+          where: { estado: 'Disponible' }
+        }),
+        
+        // Sesiones activas recientes (últimas 24 horas)
+        prisma.sesionUsuario.count({
+          where: {
+            fechaInicio: {
+              gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+            }
+          }
+        }),
+        
+        // Solicitudes pendientes
+        prisma.solicitudPrestamo.count({
+          where: { estado: 'Pendiente' }
+        }),
+        
+        // Préstamos vencidos
+        prisma.prestamo.count({
+          where: { estado: 'Vencido' }
+        })
+      ]);
+    });
+
+    // Desestructurar después de obtener los resultados
     const [
       totalUsers,
       clientsCount,
@@ -34,67 +121,9 @@ router.get('/stats', async (req, res) => {
       activeSessions,
       pendingRequests,
       overdueLoans
-    ] = await Promise.all([
-      // Total de usuarios
-      prisma.usuario.count(),
-      
-      // Total de clientes
-      prisma.usuario.count({
-        where: { tipoUsuario: 'Cliente' }
-      }),
-      
-      // Total de evaluadores
-      prisma.usuario.count({
-        where: { tipoUsuario: 'Evaluador' }
-      }),
-      
-      // Total de cobradores
-      prisma.usuario.count({
-        where: { tipoUsuario: 'Cobrador' }
-      }),
-      
-      // Total de parámetros del sistema
-      prisma.parametrosSistema.count({
-        where: {
-          nombreParametro: {
-            not: {
-              startsWith: 'ECOMMERCE_'
-            }
-          }
-        }
-      }),
-      
-      // Total de tipos de artículos
-      prisma.tipoArticulo.count({
-        where: { estado: 'Activo' }
-      }),
-      
-      // Total de productos en tienda
-      prisma.productoTienda.count({
-        where: { estado: 'Disponible' }
-      }),
-      
-      // Sesiones activas recientes (últimas 24 horas)
-      prisma.sesionUsuario.count({
-        where: {
-          fechaInicio: {
-            gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
-          }
-        }
-      }),
-      
-      // Solicitudes pendientes
-      prisma.solicitudPrestamo.count({
-        where: { estado: 'Pendiente' }
-      }),
-      
-      // Préstamos vencidos
-      prisma.prestamo.count({
-        where: { estado: 'Vencido' }
-      })
-    ]);
+    ] = stats;
 
-    const stats = {
+    const statsData = {
       totalUsers,
       clientsCount,
       activeStaff: evaluatorsCount + collectorsCount,
@@ -110,11 +139,11 @@ router.get('/stats', async (req, res) => {
       currentRate: 0 // TODO: Obtener de parámetros
     };
 
-    console.log('✅ Estadísticas obtenidas:', stats);
+    console.log('✅ Estadísticas obtenidas:', statsData);
 
     res.status(200).json({
       success: true,
-      data: stats
+      data: statsData
     });
 
   } catch (error) {
@@ -135,52 +164,54 @@ router.get('/recent-activity', async (req, res) => {
     const { limit = 10 } = req.query;
     console.log(`[ADMIN] Obteniendo actividad reciente (límite: ${limit})...`);
 
-    const [recentSessions, recentRequests, recentPayments] = await Promise.all([
-      // Sesiones recientes
-      prisma.sesionUsuario.findMany({
-        take: parseInt(limit),
-        orderBy: { fechaInicio: 'desc' },
-        include: {
-          usuario: {
-            select: {
-              nombre: true,
-              apellido: true,
-              email: true,
-              tipoUsuario: true
+    const activity = await executeWithRetry(async () => {
+      return await Promise.all([
+        // Sesiones recientes
+        prisma.sesionUsuario.findMany({
+          take: parseInt(limit),
+          orderBy: { fechaInicio: 'desc' },
+          include: {
+            usuario: {
+              select: {
+                nombre: true,
+                apellido: true,
+                email: true,
+                tipoUsuario: true
+              }
             }
           }
-        }
-      }),
+        }),
 
-      // Solicitudes recientes
-      prisma.solicitudPrestamo.findMany({
-        take: parseInt(limit),
-        orderBy: { fechaSolicitud: 'desc' },
-        include: {
-          usuario: {
-            select: {
-              nombre: true,
-              apellido: true
+        // Solicitudes recientes
+        prisma.solicitudPrestamo.findMany({
+          take: parseInt(limit),
+          orderBy: { fechaSolicitud: 'desc' },
+          include: {
+            usuario: {
+              select: {
+                nombre: true,
+                apellido: true
+              }
             }
           }
-        }
-      }),
+        }),
 
-      // Pagos recientes
-      prisma.pago.findMany({
-        take: parseInt(limit),
-        orderBy: { fechaPago: 'desc' },
-        include: {
-          prestamo: {
-            include: {
-              contrato: {
-                include: {
-                  solicitud: {
-                    include: {
-                      usuario: {
-                        select: {
-                          nombre: true,
-                          apellido: true
+        // Pagos recientes
+        prisma.pago.findMany({
+          take: parseInt(limit),
+          orderBy: { fechaPago: 'desc' },
+          include: {
+            prestamo: {
+              include: {
+                contrato: {
+                  include: {
+                    solicitud: {
+                      include: {
+                        usuario: {
+                          select: {
+                            nombre: true,
+                            apellido: true
+                          }
                         }
                       }
                     }
@@ -189,9 +220,11 @@ router.get('/recent-activity', async (req, res) => {
               }
             }
           }
-        }
-      })
-    ]);
+        })
+      ]);
+    });
+
+    const [recentSessions, recentRequests, recentPayments] = activity;
 
     res.status(200).json({
       success: true,
@@ -221,17 +254,19 @@ router.get('/system-parameters', async (req, res) => {
   try {
     console.log('[ADMIN] Obteniendo parámetros del sistema...');
 
-    const parameters = await prisma.parametrosSistema.findMany({
-      include: {
-        usuarioModifico: {
-          select: {
-            nombre: true,
-            apellido: true,
-            email: true
+    const parameters = await executeWithRetry(async () => {
+      return await prisma.parametrosSistema.findMany({
+        include: {
+          usuarioModifico: {
+            select: {
+              nombre: true,
+              apellido: true,
+              email: true
+            }
           }
-        }
-      },
-      orderBy: { nombreParametro: 'asc' }
+        },
+        orderBy: { nombreParametro: 'asc' }
+      });
     });
 
     console.log(`✅ ${parameters.length} parámetros encontrados`);
@@ -270,50 +305,49 @@ router.put('/system-parameters/:id', async (req, res) => {
       });
     }
 
-    // Verificar que el parámetro existe
-    const parametroExistente = await prisma.parametrosSistema.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!parametroExistente) {
-      return res.status(404).json({
-        success: false,
-        message: 'Parámetro no encontrado'
+    const result = await executeWithRetry(async () => {
+      // Verificar que el parámetro existe
+      const parametroExistente = await prisma.parametrosSistema.findUnique({
+        where: { id: parseInt(id) }
       });
-    }
 
-    // Actualizar parámetro
-    const updatedParameter = await prisma.parametrosSistema.update({
-      where: { id: parseInt(id) },
-      data: {
-        valorParametro: valorParametro.toString(),
-        descripcion: descripcion || parametroExistente.descripcion,
-        usuarioModificoId: userId,
-        fechaModificacion: new Date()
-      },
-      include: {
-        usuarioModifico: {
-          select: {
-            nombre: true,
-            apellido: true,
-            email: true
+      if (!parametroExistente) {
+        throw new Error('PARAMETER_NOT_FOUND');
+      }
+
+      // Actualizar parámetro
+      return await prisma.parametrosSistema.update({
+        where: { id: parseInt(id) },
+        data: {
+          valorParametro: valorParametro.toString(),
+          descripcion: descripcion || parametroExistente.descripcion,
+          usuarioModificoId: userId,
+          fechaModificacion: new Date()
+        },
+        include: {
+          usuarioModifico: {
+            select: {
+              nombre: true,
+              apellido: true,
+              email: true
+            }
           }
         }
-      }
+      });
     });
 
-    console.log('✅ Parámetro actualizado:', updatedParameter.nombreParametro);
+    console.log('✅ Parámetro actualizado:', result.nombreParametro);
 
     res.status(200).json({
       success: true,
       message: 'Parámetro actualizado exitosamente',
-      data: { parameter: updatedParameter }
+      data: { parameter: result }
     });
 
   } catch (error) {
     console.error('[ERROR] Error actualizando parámetro:', error);
     
-    if (error.code === 'P2025') {
+    if (error.message === 'PARAMETER_NOT_FOUND' || error.code === 'P2025') {
       return res.status(404).json({
         success: false,
         message: 'Parámetro no encontrado'
@@ -346,37 +380,36 @@ router.post('/system-parameters', async (req, res) => {
       });
     }
 
-    // Verificar que no existe un parámetro con el mismo nombre
-    const parametroExistente = await prisma.parametrosSistema.findUnique({
-      where: { nombreParametro }
-    });
-
-    if (parametroExistente) {
-      return res.status(409).json({
-        success: false,
-        message: 'Ya existe un parámetro con ese nombre'
+    const nuevoParametro = await executeWithRetry(async () => {
+      // Verificar que no existe un parámetro con el mismo nombre
+      const parametroExistente = await prisma.parametrosSistema.findUnique({
+        where: { nombreParametro }
       });
-    }
 
-    // Crear nuevo parámetro
-    const nuevoParametro = await prisma.parametrosSistema.create({
-      data: {
-        nombreParametro,
-        valorParametro: valorParametro.toString(),
-        descripcion: descripcion || null,
-        tipoDato,
-        usuarioModificoId: userId,
-        fechaModificacion: new Date()
-      },
-      include: {
-        usuarioModifico: {
-          select: {
-            nombre: true,
-            apellido: true,
-            email: true
+      if (parametroExistente) {
+        throw new Error('PARAMETER_EXISTS');
+      }
+
+      // Crear nuevo parámetro
+      return await prisma.parametrosSistema.create({
+        data: {
+          nombreParametro,
+          valorParametro: valorParametro.toString(),
+          descripcion: descripcion || null,
+          tipoDato,
+          usuarioModificoId: userId,
+          fechaModificacion: new Date()
+        },
+        include: {
+          usuarioModifico: {
+            select: {
+              nombre: true,
+              apellido: true,
+              email: true
+            }
           }
         }
-      }
+      });
     });
 
     console.log('✅ Nuevo parámetro creado:', nuevoParametro.nombreParametro);
@@ -390,7 +423,7 @@ router.post('/system-parameters', async (req, res) => {
   } catch (error) {
     console.error('[ERROR] Error creando parámetro:', error);
     
-    if (error.code === 'P2002') {
+    if (error.message === 'PARAMETER_EXISTS' || error.code === 'P2002') {
       return res.status(409).json({
         success: false,
         message: 'Ya existe un parámetro con ese nombre'
@@ -414,24 +447,25 @@ router.delete('/system-parameters/:id', async (req, res) => {
 
     console.log(`[ADMIN] Eliminando parámetro ${id}...`);
 
-    // Verificar que el parámetro existe
-    const parametroExistente = await prisma.parametrosSistema.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!parametroExistente) {
-      return res.status(404).json({
-        success: false,
-        message: 'Parámetro no encontrado'
+    const parametroEliminado = await executeWithRetry(async () => {
+      // Verificar que el parámetro existe
+      const parametroExistente = await prisma.parametrosSistema.findUnique({
+        where: { id: parseInt(id) }
       });
-    }
 
-    // Eliminar parámetro
-    await prisma.parametrosSistema.delete({
-      where: { id: parseInt(id) }
+      if (!parametroExistente) {
+        throw new Error('PARAMETER_NOT_FOUND');
+      }
+
+      // Eliminar parámetro
+      await prisma.parametrosSistema.delete({
+        where: { id: parseInt(id) }
+      });
+
+      return parametroExistente;
     });
 
-    console.log('✅ Parámetro eliminado:', parametroExistente.nombreParametro);
+    console.log('✅ Parámetro eliminado:', parametroEliminado.nombreParametro);
 
     res.status(200).json({
       success: true,
@@ -441,7 +475,7 @@ router.delete('/system-parameters/:id', async (req, res) => {
   } catch (error) {
     console.error('[ERROR] Error eliminando parámetro:', error);
     
-    if (error.code === 'P2025') {
+    if (error.message === 'PARAMETER_NOT_FOUND' || error.code === 'P2025') {
       return res.status(404).json({
         success: false,
         message: 'Parámetro no encontrado'
@@ -465,11 +499,13 @@ router.get('/article-types', async (req, res) => {
   try {
     console.log('[ADMIN] Obteniendo tipos de artículos...');
 
-    const articleTypes = await prisma.tipoArticulo.findMany({
-      orderBy: [
-        { estado: 'desc' }, // Activos primero
-        { nombre: 'asc' }   // Luego alfabético
-      ]
+    const articleTypes = await executeWithRetry(async () => {
+      return await prisma.tipoArticulo.findMany({
+        orderBy: [
+          { estado: 'desc' }, // Activos primero
+          { nombre: 'asc' }   // Luego alfabético
+        ]
+      });
     });
 
     console.log(`✅ ${articleTypes.length} tipos de artículos encontrados`);
@@ -539,32 +575,31 @@ router.post('/article-types', async (req, res) => {
       });
     }
 
-    // Verificar que no existe un tipo con el mismo nombre
-    const tipoExistente = await prisma.tipoArticulo.findFirst({
-      where: { 
-        nombre: {
-          equals: nombre.trim(),
-          mode: 'insensitive'
+    const nuevoTipo = await executeWithRetry(async () => {
+      // Verificar que no existe un tipo con el mismo nombre
+      const tipoExistente = await prisma.tipoArticulo.findFirst({
+        where: { 
+          nombre: {
+            equals: nombre.trim(),
+            mode: 'insensitive'
+          }
         }
-      }
-    });
-
-    if (tipoExistente) {
-      return res.status(409).json({
-        success: false,
-        message: 'Ya existe un tipo de artículo con ese nombre'
       });
-    }
 
-    // Crear nuevo tipo de artículo
-    const nuevoTipo = await prisma.tipoArticulo.create({
-      data: {
-        nombre: nombre.trim(),
-        porcentajeMinAvaluo: parseFloat(porcentajeMinAvaluo),
-        porcentajeMaxAvaluo: parseFloat(porcentajeMaxAvaluo),
-        requiereElectronico: Boolean(requiereElectronico),
-        estado: 'Activo'
+      if (tipoExistente) {
+        throw new Error('ARTICLE_TYPE_EXISTS');
       }
+
+      // Crear nuevo tipo de artículo
+      return await prisma.tipoArticulo.create({
+        data: {
+          nombre: nombre.trim(),
+          porcentajeMinAvaluo: parseFloat(porcentajeMinAvaluo),
+          porcentajeMaxAvaluo: parseFloat(porcentajeMaxAvaluo),
+          requiereElectronico: Boolean(requiereElectronico),
+          estado: 'Activo'
+        }
+      });
     });
 
     console.log('✅ Nuevo tipo de artículo creado:', nuevoTipo.nombre);
@@ -590,7 +625,7 @@ router.post('/article-types', async (req, res) => {
   } catch (error) {
     console.error('[ERROR] Error creando tipo de artículo:', error);
     
-    if (error.code === 'P2002') {
+    if (error.message === 'ARTICLE_TYPE_EXISTS' || error.code === 'P2002') {
       return res.status(409).json({
         success: false,
         message: 'Ya existe un tipo de artículo con ese nombre'
@@ -644,47 +679,43 @@ router.put('/article-types/:id', async (req, res) => {
       });
     }
 
-    // Verificar que el tipo existe
-    const tipoExistente = await prisma.tipoArticulo.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!tipoExistente) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tipo de artículo no encontrado'
+    const tipoActualizado = await executeWithRetry(async () => {
+      // Verificar que el tipo existe
+      const tipoExistente = await prisma.tipoArticulo.findUnique({
+        where: { id: parseInt(id) }
       });
-    }
 
-    // Verificar que no existe otro tipo con el mismo nombre
-    const tipoConMismoNombre = await prisma.tipoArticulo.findFirst({
-      where: { 
-        nombre: {
-          equals: nombre.trim(),
-          mode: 'insensitive'
-        },
-        id: {
-          not: parseInt(id)
+      if (!tipoExistente) {
+        throw new Error('ARTICLE_TYPE_NOT_FOUND');
+      }
+
+      // Verificar que no existe otro tipo con el mismo nombre
+      const tipoConMismoNombre = await prisma.tipoArticulo.findFirst({
+        where: { 
+          nombre: {
+            equals: nombre.trim(),
+            mode: 'insensitive'
+          },
+          id: {
+            not: parseInt(id)
+          }
         }
-      }
-    });
-
-    if (tipoConMismoNombre) {
-      return res.status(409).json({
-        success: false,
-        message: 'Ya existe otro tipo de artículo con ese nombre'
       });
-    }
 
-    // Actualizar tipo de artículo
-    const tipoActualizado = await prisma.tipoArticulo.update({
-      where: { id: parseInt(id) },
-      data: {
-        nombre: nombre.trim(),
-        porcentajeMinAvaluo: parseFloat(porcentajeMinAvaluo),
-        porcentajeMaxAvaluo: parseFloat(porcentajeMaxAvaluo),
-        requiereElectronico: Boolean(requiereElectronico)
+      if (tipoConMismoNombre) {
+        throw new Error('ARTICLE_TYPE_EXISTS');
       }
+
+      // Actualizar tipo de artículo
+      return await prisma.tipoArticulo.update({
+        where: { id: parseInt(id) },
+        data: {
+          nombre: nombre.trim(),
+          porcentajeMinAvaluo: parseFloat(porcentajeMinAvaluo),
+          porcentajeMaxAvaluo: parseFloat(porcentajeMaxAvaluo),
+          requiereElectronico: Boolean(requiereElectronico)
+        }
+      });
     });
 
     console.log('✅ Tipo de artículo actualizado:', tipoActualizado.nombre);
@@ -710,14 +741,14 @@ router.put('/article-types/:id', async (req, res) => {
   } catch (error) {
     console.error('[ERROR] Error actualizando tipo de artículo:', error);
     
-    if (error.code === 'P2025') {
+    if (error.message === 'ARTICLE_TYPE_NOT_FOUND' || error.code === 'P2025') {
       return res.status(404).json({
         success: false,
         message: 'Tipo de artículo no encontrado'
       });
     }
 
-    if (error.code === 'P2002') {
+    if (error.message === 'ARTICLE_TYPE_EXISTS' || error.code === 'P2002') {
       return res.status(409).json({
         success: false,
         message: 'Ya existe un tipo de artículo con ese nombre'
@@ -741,27 +772,26 @@ router.put('/article-types/:id/toggle-status', async (req, res) => {
 
     console.log(`[ADMIN] Cambiando estado del tipo de artículo ${id}...`);
 
-    // Verificar que el tipo existe
-    const tipoExistente = await prisma.tipoArticulo.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!tipoExistente) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tipo de artículo no encontrado'
+    const tipoActualizado = await executeWithRetry(async () => {
+      // Verificar que el tipo existe
+      const tipoExistente = await prisma.tipoArticulo.findUnique({
+        where: { id: parseInt(id) }
       });
-    }
 
-    // Cambiar estado
-    const nuevoEstado = tipoExistente.estado === 'Activo' ? 'Inactivo' : 'Activo';
-    
-    const tipoActualizado = await prisma.tipoArticulo.update({
-      where: { id: parseInt(id) },
-      data: { estado: nuevoEstado }
+      if (!tipoExistente) {
+        throw new Error('ARTICLE_TYPE_NOT_FOUND');
+      }
+
+      // Cambiar estado
+      const nuevoEstado = tipoExistente.estado === 'Activo' ? 'Inactivo' : 'Activo';
+      
+      return await prisma.tipoArticulo.update({
+        where: { id: parseInt(id) },
+        data: { estado: nuevoEstado }
+      });
     });
 
-    console.log(`✅ Estado cambiado a: ${nuevoEstado} para tipo: ${tipoActualizado.nombre}`);
+    console.log(`✅ Estado cambiado a: ${tipoActualizado.estado} para tipo: ${tipoActualizado.nombre}`);
 
     // Transformar para el frontend
     const tipoTransformado = {
@@ -777,14 +807,14 @@ router.put('/article-types/:id/toggle-status', async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Tipo de artículo ${nuevoEstado.toLowerCase()} exitosamente`,
+      message: `Tipo de artículo ${tipoActualizado.estado.toLowerCase()} exitosamente`,
       data: { articleType: tipoTransformado }
     });
 
   } catch (error) {
     console.error('[ERROR] Error cambiando estado del tipo de artículo:', error);
     
-    if (error.code === 'P2025') {
+    if (error.message === 'ARTICLE_TYPE_NOT_FOUND' || error.code === 'P2025') {
       return res.status(404).json({
         success: false,
         message: 'Tipo de artículo no encontrado'
@@ -808,37 +838,34 @@ router.delete('/article-types/:id', async (req, res) => {
 
     console.log(`[ADMIN] Eliminando tipo de artículo ${id}...`);
 
-    // Verificar que el tipo existe
-    const tipoExistente = await prisma.tipoArticulo.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!tipoExistente) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tipo de artículo no encontrado'
+    const result = await executeWithRetry(async () => {
+      // Verificar que el tipo existe
+      const tipoExistente = await prisma.tipoArticulo.findUnique({
+        where: { id: parseInt(id) }
       });
-    }
 
-    // Verificar si existen artículos asociados a este tipo
-    const articulosAsociados = await prisma.articulo.count({
-      where: { tipoArticuloId: parseInt(id) }
-    });
+      if (!tipoExistente) {
+        throw new Error('ARTICLE_TYPE_NOT_FOUND');
+      }
 
-    if (articulosAsociados > 0) {
-      return res.status(409).json({
-        success: false,
-        message: `No se puede eliminar el tipo porque tiene ${articulosAsociados} artículo(s) asociado(s). Desactívalo en su lugar.`,
-        data: { associatedArticles: articulosAsociados }
+      // Verificar si existen artículos asociados a este tipo
+      const articulosAsociados = await prisma.articulo.count({
+        where: { tipoArticuloId: parseInt(id) }
       });
-    }
 
-    // Eliminar tipo de artículo
-    await prisma.tipoArticulo.delete({
-      where: { id: parseInt(id) }
+      if (articulosAsociados > 0) {
+        throw new Error(`HAS_ARTICLES:${articulosAsociados}`);
+      }
+
+      // Eliminar tipo de artículo
+      await prisma.tipoArticulo.delete({
+        where: { id: parseInt(id) }
+      });
+
+      return tipoExistente;
     });
 
-    console.log('✅ Tipo de artículo eliminado:', tipoExistente.nombre);
+    console.log('✅ Tipo de artículo eliminado:', result.nombre);
 
     res.status(200).json({
       success: true,
@@ -848,17 +875,19 @@ router.delete('/article-types/:id', async (req, res) => {
   } catch (error) {
     console.error('[ERROR] Error eliminando tipo de artículo:', error);
     
-    if (error.code === 'P2025') {
+    if (error.message === 'ARTICLE_TYPE_NOT_FOUND' || error.code === 'P2025') {
       return res.status(404).json({
         success: false,
         message: 'Tipo de artículo no encontrado'
       });
     }
 
-    if (error.code === 'P2003') {
+    if (error.message?.startsWith('HAS_ARTICLES:') || error.code === 'P2003') {
+      const count = error.message?.split(':')[1] || 'varios';
       return res.status(409).json({
         success: false,
-        message: 'No se puede eliminar el tipo porque tiene artículos asociados'
+        message: `No se puede eliminar el tipo porque tiene ${count} artículo(s) asociado(s). Desactívalo en su lugar.`,
+        data: { associatedArticles: parseInt(count) || 0 }
       });
     }
 
@@ -880,56 +909,57 @@ router.get('/article-types/:id/articles', async (req, res) => {
 
     console.log(`[ADMIN] Obteniendo artículos del tipo ${id}...`);
 
-    // Verificar que el tipo existe
-    const tipoExistente = await prisma.tipoArticulo.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!tipoExistente) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tipo de artículo no encontrado'
+    const result = await executeWithRetry(async () => {
+      // Verificar que el tipo existe
+      const tipoExistente = await prisma.tipoArticulo.findUnique({
+        where: { id: parseInt(id) }
       });
-    }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+      if (!tipoExistente) {
+        throw new Error('ARTICLE_TYPE_NOT_FOUND');
+      }
 
-    const [articulos, totalArticulos] = await Promise.all([
-      prisma.articulo.findMany({
-        where: { tipoArticuloId: parseInt(id) },
-        include: {
-          solicitud: {
-            include: {
-              usuario: {
-                select: {
-                  nombre: true,
-                  apellido: true,
-                  email: true
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+
+      const [articulos, totalArticulos] = await Promise.all([
+        prisma.articulo.findMany({
+          where: { tipoArticuloId: parseInt(id) },
+          include: {
+            solicitud: {
+              include: {
+                usuario: {
+                  select: {
+                    nombre: true,
+                    apellido: true,
+                    email: true
+                  }
                 }
               }
             }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: parseInt(limit)
-      }),
-      prisma.articulo.count({
-        where: { tipoArticuloId: parseInt(id) }
-      })
-    ]);
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: parseInt(limit)
+        }),
+        prisma.articulo.count({
+          where: { tipoArticuloId: parseInt(id) }
+        })
+      ]);
 
-    console.log(`✅ ${articulos.length} artículos encontrados para el tipo: ${tipoExistente.nombre}`);
+      return { tipoExistente, articulos, totalArticulos };
+    });
+
+    console.log(`✅ ${result.articulos.length} artículos encontrados para el tipo: ${result.tipoExistente.nombre}`);
 
     res.status(200).json({
       success: true,
       data: {
-        articleType: tipoExistente,
-        articles: articulos,
+        articleType: result.tipoExistente,
+        articles: result.articulos,
         pagination: {
           currentPage: parseInt(page),
-          totalPages: Math.ceil(totalArticulos / parseInt(limit)),
-          totalItems: totalArticulos,
+          totalPages: Math.ceil(result.totalArticulos / parseInt(limit)),
+          totalItems: result.totalArticulos,
           itemsPerPage: parseInt(limit)
         }
       }
@@ -937,6 +967,14 @@ router.get('/article-types/:id/articles', async (req, res) => {
 
   } catch (error) {
     console.error('[ERROR] Error obteniendo artículos del tipo:', error);
+    
+    if (error.message === 'ARTICLE_TYPE_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        message: 'Tipo de artículo no encontrado'
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error obteniendo artículos del tipo'
@@ -994,18 +1032,26 @@ router.get('/system-health', async (req, res) => {
     };
 
     try {
-      // Verificar conexión a base de datos
-      await prisma.$connect();
-      healthCheck.database = 'connected';
-      
-      // Obtener métricas básicas
-      healthCheck.totalUsers = await prisma.usuario.count();
-      healthCheck.activeConnections = await prisma.sesionUsuario.count({
-        where: {
-          fechaFin: null
-        }
+      // Verificar conexión a base de datos con reintentos
+      const dbCheck = await executeWithRetry(async () => {
+        await prisma.$connect();
+        
+        // Obtener métricas básicas
+        const [totalUsers, activeConnections] = await Promise.all([
+          prisma.usuario.count(),
+          prisma.sesionUsuario.count({
+            where: {
+              fechaFin: null
+            }
+          })
+        ]);
+
+        return { totalUsers, activeConnections };
       });
-      
+
+      healthCheck.database = 'connected';
+      healthCheck.totalUsers = dbCheck.totalUsers;
+      healthCheck.activeConnections = dbCheck.activeConnections;
       healthCheck.systemStatus = 'healthy';
       
     } catch (dbError) {

@@ -26,16 +26,16 @@
             <p>Administra los respaldos de tu sistema y base de datos</p>
           </div>
           <div class="header-actions">
-            <button @click="crearRespaldo" :disabled="loading" class="btn-primary">
+            <button @click="mostrarModalCrear = true" :disabled="loading" class="btn-primary">
               <svg v-if="!loading" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                 <polyline points="17 21 17 13 7 13 7 21"/>
                 <polyline points="7 3 7 8 15 8"/>
               </svg>
-              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
                 <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
               </svg>
-              {{ loading ? 'Creando...' : 'Crear Respaldo' }}
+              {{ loading ? 'Procesando...' : 'Crear Respaldo' }}
             </button>
           </div>
         </div>
@@ -49,7 +49,7 @@
               </svg>
             </div>
             <div class="stat-info">
-              <h3>{{ estadisticas.total }}</h3>
+              <h3>{{ estadisticas.total || 0 }}</h3>
               <p>Respaldos Totales</p>
             </div>
           </div>
@@ -60,7 +60,7 @@
               </svg>
             </div>
             <div class="stat-info">
-              <h3>{{ estadisticas.ultimo }}</h3>
+              <h3>{{ estadisticas.ultimo || 'N/A' }}</h3>
               <p>Último Respaldo</p>
             </div>
           </div>
@@ -72,7 +72,7 @@
               </svg>
             </div>
             <div class="stat-info">
-              <h3>{{ estadisticas.tamanoTotal }}</h3>
+              <h3>{{ estadisticas.tamanoTotal || '0 MB' }}</h3>
               <p>Espacio Utilizado</p>
             </div>
           </div>
@@ -107,7 +107,7 @@
               <option value="files">Archivos</option>
               <option value="full">Completo</option>
             </select>
-            <button @click="cargarRespaldos" class="btn-refresh">
+            <button @click="cargarRespaldos" class="btn-refresh" :disabled="cargando">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"/>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -118,7 +118,7 @@
         </div>
 
         <div v-if="cargando" class="loading-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spinning">
             <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
           </svg>
           <p>Cargando respaldos...</p>
@@ -137,7 +137,7 @@
         <table v-else class="backups-tabla">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Nombre</th>
               <th>Tipo</th>
               <th>Fecha de Creación</th>
               <th>Tamaño</th>
@@ -149,7 +149,7 @@
           <tbody>
             <tr v-for="backup in respaldosFiltrados" :key="backup.id" class="backup-row">
               <td>
-                <span class="backup-id">#{{ backup.id }}</span>
+                <span class="backup-id">{{ backup.nombre }}</span>
               </td>
               <td>
                 <span :class="['badge-tipo', backup.tipo]">
@@ -188,7 +188,7 @@
                       <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
                   </button>
-                  <button @click="verDetalles(backup.id)" class="btn-accion ver" title="Ver detalles">
+                  <button @click="verDetalles(backup)" class="btn-accion ver" title="Ver detalles">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                       <circle cx="12" cy="12" r="3"/>
@@ -206,6 +206,115 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Modal de creación de respaldo -->
+      <transition name="modal">
+        <div v-if="mostrarModalCrear" class="modal-overlay" @click="cerrarModalCrear">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <h3>Crear Nuevo Respaldo</h3>
+              <button @click="cerrarModalCrear" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+              <p>Selecciona el tipo de respaldo que deseas crear:</p>
+              <div class="tipo-respaldo-opciones">
+                <label class="tipo-opcion">
+                  <input type="radio" v-model="tipoRespaldo" value="database" />
+                  <div class="opcion-contenido">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    </svg>
+                    <h4>Base de Datos</h4>
+                    <p>Respaldo completo de PostgreSQL</p>
+                  </div>
+                </label>
+                <label class="tipo-opcion">
+                  <input type="radio" v-model="tipoRespaldo" value="files" />
+                  <div class="opcion-contenido">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+                    </svg>
+                    <h4>Archivos</h4>
+                    <p>Respaldo de uploads y archivos del sistema</p>
+                  </div>
+                </label>
+                <label class="tipo-opcion">
+                  <input type="radio" v-model="tipoRespaldo" value="full" />
+                  <div class="opcion-contenido">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    <h4>Completo</h4>
+                    <p>Base de datos + Archivos (Recomendado)</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button @click="cerrarModalCrear" class="btn-secondary">Cancelar</button>
+              <button @click="crearRespaldo" :disabled="!tipoRespaldo || loading" class="btn-primary">
+                {{ loading ? 'Creando...' : 'Crear Respaldo' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <!-- Modal de detalles -->
+      <transition name="modal">
+        <div v-if="modalDetalles.mostrar" class="modal-overlay" @click="cerrarModalDetalles">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <h3>Detalles del Respaldo</h3>
+              <button @click="cerrarModalDetalles" class="btn-close">×</button>
+            </div>
+            <div class="modal-body detalles-body">
+              <div class="detalle-row">
+                <strong>ID:</strong>
+                <span>{{ modalDetalles.backup?.id }}</span>
+              </div>
+              <div class="detalle-row">
+                <strong>Nombre:</strong>
+                <span>{{ modalDetalles.backup?.nombre }}</span>
+              </div>
+              <div class="detalle-row">
+                <strong>Tipo:</strong>
+                <span :class="['badge-tipo', modalDetalles.backup?.tipo]">
+                  {{ modalDetalles.backup?.tipoLabel }}
+                </span>
+              </div>
+              <div class="detalle-row">
+                <strong>Tamaño:</strong>
+                <span>{{ modalDetalles.backup?.tamano }}</span>
+              </div>
+              <div class="detalle-row">
+                <strong>Fecha:</strong>
+                <span>{{ formatearFecha(modalDetalles.backup?.fecha) }} {{ formatearHora(modalDetalles.backup?.fecha) }}</span>
+              </div>
+              <div class="detalle-row">
+                <strong>Estado:</strong>
+                <span :class="['badge-estado', modalDetalles.backup?.estado]">
+                  {{ modalDetalles.backup?.estadoLabel }}
+                </span>
+              </div>
+              <div class="detalle-row">
+                <strong>Usuario:</strong>
+                <span>{{ modalDetalles.backup?.usuario }}</span>
+              </div>
+              <div v-if="modalDetalles.backup?.checksum" class="detalle-row">
+                <strong>Checksum:</strong>
+                <span class="checksum">{{ modalDetalles.backup?.checksum }}</span>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button @click="cerrarModalDetalles" class="btn-secondary">Cerrar</button>
+              <button @click="descargarRespaldo(modalDetalles.backup?.id)" class="btn-primary">
+                Descargar
+              </button>
+            </div>
+          </div>
+        </div>
+      </transition>
 
       <!-- Modal de confirmación de eliminación -->
       <transition name="modal">
@@ -228,7 +337,9 @@
             </div>
             <div class="modal-footer">
               <button @click="cerrarModal" class="btn-secondary">Cancelar</button>
-              <button @click="eliminarRespaldo" class="btn-danger">Eliminar Respaldo</button>
+              <button @click="eliminarRespaldo" :disabled="loading" class="btn-danger">
+                {{ loading ? 'Eliminando...' : 'Eliminar Respaldo' }}
+              </button>
             </div>
           </div>
         </div>
@@ -240,11 +351,28 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 
+// Middleware y meta
+definePageMeta({
+  middleware: 'admin'
+})
+
+useHead({
+  title: 'Gestión de Respaldos - Admin',
+  meta: [
+    { name: 'description', content: 'Administra los respaldos del sistema' }
+  ]
+})
+
+// Composables
+const { api } = useApi()
+
 // Estado
 const respaldos = ref([])
 const cargando = ref(false)
 const loading = ref(false)
 const filtroTipo = ref('todos')
+const tipoRespaldo = ref('full')
+const mostrarModalCrear = ref(false)
 const alerta = ref({
   mostrar: false,
   tipo: 'success',
@@ -254,17 +382,39 @@ const modalEliminar = ref({
   mostrar: false,
   backupId: null
 })
+const modalDetalles = ref({
+  mostrar: false,
+  backup: null
+})
 
 // Estadísticas
 const estadisticas = computed(() => {
   const total = respaldos.value.length
-  const ultimo = total > 0 ? 'Hace 2 horas' : 'N/A'
-  const tamano = total > 0 ? calcularTamanoTotal() : '0 MB'
+  let ultimo = 'N/A'
+  
+  if (total > 0) {
+    const ultimoBackup = respaldos.value[0]
+    const fechaUltimo = new Date(ultimoBackup.fecha)
+    const ahora = new Date()
+    const diffMs = ahora - fechaUltimo
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffHours / 24)
+    
+    if (diffDays > 0) {
+      ultimo = `Hace ${diffDays} día${diffDays > 1 ? 's' : ''}`
+    } else if (diffHours > 0) {
+      ultimo = `Hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`
+    } else {
+      ultimo = 'Hace menos de 1 hora'
+    }
+  }
+  
+  const tamanoTotal = calcularTamanoTotal()
   
   return {
     total,
     ultimo,
-    tamanoTotal: tamano
+    tamanoTotal
   }
 })
 
@@ -276,78 +426,132 @@ const respaldosFiltrados = computed(() => {
   return respaldos.value.filter(b => b.tipo === filtroTipo.value)
 })
 
-// Funciones
+// Funciones principales
 const cargarRespaldos = async () => {
   cargando.value = true
   try {
-    // Aquí harías la llamada al backend
-    // const response = await $fetch('/api/admin/backups')
+    console.log('📋 Cargando respaldos desde el backend...')
     
-    // Datos de ejemplo
-    respaldos.value = [
-      {
-        id: 1,
-        tipo: 'full',
-        tipoLabel: 'Completo',
-        fecha: new Date().toISOString(),
-        tamano: '245 MB',
-        estado: 'completado',
-        estadoLabel: 'Completado',
-        usuario: 'Admin Principal'
-      },
-      {
-        id: 2,
-        tipo: 'database',
-        tipoLabel: 'Base de Datos',
-        fecha: new Date(Date.now() - 86400000).toISOString(),
-        tamano: '180 MB',
-        estado: 'completado',
-        estadoLabel: 'Completado',
-        usuario: 'Admin Principal'
-      },
-      {
-        id: 3,
-        tipo: 'files',
-        tipoLabel: 'Archivos',
-        fecha: new Date(Date.now() - 172800000).toISOString(),
-        tamano: '65 MB',
-        estado: 'completado',
-        estadoLabel: 'Completado',
-        usuario: 'Admin Secundario'
-      }
-    ]
+    const response = await api('/admin/backups', {
+      method: 'GET'
+    })
+    
+    if (response.success) {
+      respaldos.value = response.data.backups
+      console.log(`✅ ${respaldos.value.length} respaldos cargados`)
+    } else {
+      throw new Error(response.message || 'Error cargando respaldos')
+    }
   } catch (error) {
-    mostrarAlerta('error', 'Error al cargar los respaldos')
+    console.error('❌ Error al cargar respaldos:', error)
+    mostrarAlerta('error', 'Error al cargar los respaldos: ' + (error.message || 'Error desconocido'))
   } finally {
     cargando.value = false
   }
 }
 
 const crearRespaldo = async () => {
+  if (!tipoRespaldo.value) {
+    mostrarAlerta('error', 'Por favor selecciona un tipo de respaldo')
+    return
+  }
+  
   loading.value = true
   try {
-    // Aquí harías la llamada al backend
-    // const response = await $fetch('/api/admin/backups', { method: 'POST' })
+    console.log('🔄 Creando respaldo tipo:', tipoRespaldo.value)
     
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    const response = await api('/admin/backups', {
+      method: 'POST',
+      body: JSON.stringify({
+        tipo: tipoRespaldo.value
+      })
+    })
     
-    mostrarAlerta('success', 'Respaldo creado exitosamente')
-    await cargarRespaldos()
+    if (response.success) {
+      mostrarAlerta('success', 'Respaldo creado exitosamente')
+      cerrarModalCrear()
+      await cargarRespaldos()
+    } else {
+      throw new Error(response.message || 'Error creando respaldo')
+    }
   } catch (error) {
-    mostrarAlerta('error', 'Error al crear el respaldo')
+    console.error('❌ Error al crear respaldo:', error)
+    mostrarAlerta('error', 'Error al crear el respaldo: ' + (error.message || 'Error desconocido'))
   } finally {
     loading.value = false
   }
 }
 
-const descargarRespaldo = (id) => {
-  mostrarAlerta('success', `Descargando respaldo #${id}...`)
-  // Aquí implementarías la descarga real
+const descargarRespaldo = async (id) => {
+  try {
+    console.log('⬇️ Descargando respaldo:', id)
+    
+    const config = useRuntimeConfig()
+    const baseURL = config.public.apiBase || 'http://localhost:3001/api'
+    const { getToken } = useAuth()
+    const token = getToken()
+    
+    // Crear enlace de descarga
+    const url = `${baseURL}/admin/backups/${id}/download`
+    
+    // Abrir en nueva ventana con token en header (si el navegador lo soporta)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = id
+    
+    // Si tenemos token, intentar hacer fetch y descargar
+    if (token) {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        const blobUrl = window.URL.createObjectURL(blob)
+        link.href = blobUrl
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+        
+        mostrarAlerta('success', 'Descarga iniciada')
+      } else {
+        throw new Error('Error al descargar el archivo')
+      }
+    } else {
+      // Sin token, intentar descarga directa
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  } catch (error) {
+    console.error('❌ Error al descargar respaldo:', error)
+    mostrarAlerta('error', 'Error al descargar el respaldo: ' + (error.message || 'Error desconocido'))
+  }
 }
 
-const verDetalles = (id) => {
-  mostrarAlerta('success', `Ver detalles del respaldo #${id}`)
-  // Aquí mostrarías un modal con los detalles
+const verDetalles = async (backup) => {
+  try {
+    console.log('👁️ Obteniendo detalles del respaldo:', backup.id)
+    
+    const response = await api(`/admin/backups/${backup.id}`, {
+      method: 'GET'
+    })
+    
+    if (response.success) {
+      modalDetalles.value = {
+        mostrar: true,
+        backup: response.data.backup
+      }
+    } else {
+      throw new Error(response.message || 'Error obteniendo detalles')
+    }
+  } catch (error) {
+    console.error('❌ Error al obtener detalles:', error)
+    mostrarAlerta('error', 'Error al obtener detalles del respaldo')
+  }
 }
 
 const confirmarEliminar = (id) => {
@@ -358,16 +562,27 @@ const confirmarEliminar = (id) => {
 }
 
 const eliminarRespaldo = async () => {
+  loading.value = true
   try {
     const id = modalEliminar.value.backupId
-    // Aquí harías la llamada al backend
-    // await $fetch(`/api/admin/backups/${id}`, { method: 'DELETE' })
+    console.log('🗑️ Eliminando respaldo:', id)
     
-    respaldos.value = respaldos.value.filter(b => b.id !== id)
-    mostrarAlerta('success', 'Respaldo eliminado exitosamente')
-    cerrarModal()
+    const response = await api(`/admin/backups/${id}`, {
+      method: 'DELETE'
+    })
+    
+    if (response.success) {
+      mostrarAlerta('success', 'Respaldo eliminado exitosamente')
+      cerrarModal()
+      await cargarRespaldos()
+    } else {
+      throw new Error(response.message || 'Error eliminando respaldo')
+    }
   } catch (error) {
-    mostrarAlerta('error', 'Error al eliminar el respaldo')
+    console.error('❌ Error al eliminar respaldo:', error)
+    mostrarAlerta('error', 'Error al eliminar el respaldo: ' + (error.message || 'Error desconocido'))
+  } finally {
+    loading.value = false
   }
 }
 
@@ -375,6 +590,18 @@ const cerrarModal = () => {
   modalEliminar.value = {
     mostrar: false,
     backupId: null
+  }
+}
+
+const cerrarModalCrear = () => {
+  mostrarModalCrear.value = false
+  tipoRespaldo.value = 'full'
+}
+
+const cerrarModalDetalles = () => {
+  modalDetalles.value = {
+    mostrar: false,
+    backup: null
   }
 }
 
@@ -395,6 +622,7 @@ const cerrarAlerta = () => {
 
 // Utilidades
 const formatearFecha = (fecha) => {
+  if (!fecha) return 'N/A'
   return new Date(fecha).toLocaleDateString('es-GT', {
     year: 'numeric',
     month: 'long',
@@ -403,6 +631,7 @@ const formatearFecha = (fecha) => {
 }
 
 const formatearHora = (fecha) => {
+  if (!fecha) return ''
   return new Date(fecha).toLocaleTimeString('es-GT', {
     hour: '2-digit',
     minute: '2-digit'
@@ -410,6 +639,7 @@ const formatearHora = (fecha) => {
 }
 
 const obtenerIniciales = (nombre) => {
+  if (!nombre) return 'U'
   return nombre
     .split(' ')
     .map(n => n[0])
@@ -419,15 +649,20 @@ const obtenerIniciales = (nombre) => {
 }
 
 const calcularTamanoTotal = () => {
-  const totalMB = respaldos.value.reduce((acc, b) => {
-    const mb = parseFloat(b.tamano.replace(' MB', ''))
-    return acc + mb
+  if (respaldos.value.length === 0) return '0 MB'
+  
+  const totalBytes = respaldos.value.reduce((acc, b) => {
+    return acc + (b.tamanoBytes || 0)
   }, 0)
   
-  if (totalMB >= 1024) {
-    return `${(totalMB / 1024).toFixed(2)} GB`
+  if (totalBytes >= 1024 * 1024 * 1024) {
+    return `${(totalBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  } else if (totalBytes >= 1024 * 1024) {
+    return `${(totalBytes / (1024 * 1024)).toFixed(0)} MB`
+  } else if (totalBytes >= 1024) {
+    return `${(totalBytes / 1024).toFixed(0)} KB`
   }
-  return `${totalMB.toFixed(0)} MB`
+  return `${totalBytes} Bytes`
 }
 
 // Lifecycle
@@ -534,7 +769,7 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.btn-primary svg {
+.spinning {
   animation: spin 1s linear infinite;
 }
 
@@ -675,6 +910,11 @@ onMounted(() => {
   background: rgba(212, 175, 55, 0.2);
 }
 
+.btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Estados de carga */
 .loading-state,
 .empty-state {
@@ -687,7 +927,6 @@ onMounted(() => {
 }
 
 .loading-state svg {
-  animation: spin 1s linear infinite;
   color: #D4AF37;
   margin-bottom: 1rem;
 }
@@ -732,7 +971,8 @@ onMounted(() => {
 
 .backup-id {
   font-weight: 600;
-  color: #D4AF37;
+  color: #2C3E50;
+  font-size: 0.85rem;
 }
 
 /* Badges */
@@ -868,14 +1108,17 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 1rem;
 }
 
 .modal-content {
   background: white;
   border-radius: 12px;
-  max-width: 500px;
-  width: 90%;
+  max-width: 600px;
+  width: 100%;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .modal-header {
@@ -907,11 +1150,89 @@ onMounted(() => {
 
 .modal-body {
   padding: 2rem;
+}
+
+.tipo-respaldo-opciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.tipo-opcion {
+  cursor: pointer;
+}
+
+.tipo-opcion input[type="radio"] {
+  display: none;
+}
+
+.opcion-contenido {
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
   text-align: center;
+  transition: all 0.3s ease;
+}
+
+.tipo-opcion input[type="radio"]:checked + .opcion-contenido {
+  border-color: #D4AF37;
+  background: rgba(212, 175, 55, 0.05);
+}
+
+.opcion-contenido:hover {
+  border-color: #D4AF37;
+  transform: translateY(-2px);
+}
+
+.opcion-contenido svg {
+  color: #D4AF37;
+  margin-bottom: 0.75rem;
+}
+
+.opcion-contenido h4 {
+  margin: 0.5rem 0;
+  color: #2C3E50;
+  font-size: 1rem;
+}
+
+.opcion-contenido p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+.detalles-body {
+  padding: 1.5rem;
+}
+
+.detalle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.detalle-row:last-child {
+  border-bottom: none;
+}
+
+.detalle-row strong {
+  color: #2C3E50;
+  font-weight: 600;
+}
+
+.checksum {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #6c757d;
+  word-break: break-all;
 }
 
 .warning-icon {
   margin-bottom: 1rem;
+  text-align: center;
 }
 
 .warning-icon svg {
@@ -921,6 +1242,7 @@ onMounted(() => {
 .modal-body p {
   margin: 0.5rem 0;
   color: #2C3E50;
+  text-align: center;
 }
 
 .warning-text {
@@ -944,6 +1266,7 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
+  font-weight: 500;
 }
 
 .btn-secondary:hover {
@@ -958,10 +1281,16 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
+  font-weight: 600;
 }
 
-.btn-danger:hover {
+.btn-danger:hover:not(:disabled) {
   background: #C0392B;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* Transiciones */
@@ -993,5 +1322,41 @@ onMounted(() => {
 .modal-enter-from .modal-content,
 .modal-leave-to .modal-content {
   transform: scale(0.9);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .backups-container {
+    padding: 0 1rem;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .table-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  
+  .backups-tabla {
+    font-size: 0.85rem;
+  }
+  
+  .backups-tabla td,
+  .backups-tabla th {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .tipo-respaldo-opciones {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

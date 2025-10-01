@@ -4,11 +4,12 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import archiver from 'archiver';
-import prisma from '../config/database.js';
-import uploadService from '../services/upload.service.js';
+import prisma from '../config/prisma.js';
+import { fileURLToPath } from 'url';
 
 const router = express.Router();
 const execAsync = promisify(exec);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Directorio base para almacenar respaldos
 const BACKUP_DIR = path.join(process.cwd(), 'backups');
@@ -45,16 +46,11 @@ router.get('/', async (req, res) => {
     // Procesar información de cada respaldo
     const backups = await Promise.all(
       files
-        .filter(file => file.endsWith('.zip') || file.endsWith('.sql'))
+        .filter(file => file.endsWith('.zip') || file.endsWith('.json'))
         .map(async (file) => {
           try {
             const filePath = path.join(BACKUP_DIR, file);
             const stats = await fs.stat(filePath);
-            
-            // Extraer información del nombre del archivo
-            // Formato esperado: backup_TIPO_YYYYMMDD_HHMMSS.ext
-            const nameParts = file.split('_');
-            const tipo = nameParts[1] || 'unknown';
             
             return {
               id: file,
@@ -66,7 +62,7 @@ router.get('/', async (req, res) => {
               tamanoBytes: stats.size,
               estado: 'completado',
               estadoLabel: 'Completado',
-              usuario: 'Sistema', 
+              usuario: 'Sistema',
               ruta: filePath
             };
           } catch (error) {
@@ -84,7 +80,7 @@ router.get('/', async (req, res) => {
     // Calcular estadísticas
     const estadisticas = {
       total: backupsValidos.length,
-      tamanoTotal: backupsValidos.reduce((acc, b) => acc + b.tamanoBytes, 0),
+      tamanoTotal: formatearTamano(backupsValidos.reduce((acc, b) => acc + b.tamanoBytes, 0)),
       ultimo: backupsValidos.length > 0 ? backupsValidos[0].fecha : null,
       porTipo: {
         database: backupsValidos.filter(b => b.tipo === 'database').length,
@@ -128,7 +124,6 @@ router.post('/', async (req, res) => {
     await ensureBackupDir();
     
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    let backupPath = '';
     let backupInfo = {};
     
     switch (tipo) {
@@ -145,8 +140,9 @@ router.post('/', async (req, res) => {
         const filesBackup = await crearRespaldoArchivos(timestamp);
         backupInfo = {
           tipo: 'full',
-          archivos: [dbBackup.ruta, filesBackup.ruta],
-          tamano: dbBackup.tamanoBytes + filesBackup.tamanoBytes
+          archivos: [dbBackup.nombre, filesBackup.nombre],
+          tamano: formatearTamano(dbBackup.tamanoBytes + filesBackup.tamanoBytes),
+          tamanoBytes: dbBackup.tamanoBytes + filesBackup.tamanoBytes
         };
         break;
         
@@ -301,7 +297,7 @@ router.delete('/:id', async (req, res) => {
     // Eliminar archivo
     await fs.unlink(backupPath);
     
-    console.log('✅ Respaldo eliminado exitosamente');
+    console.log('✅ Respaldo eliminado');
     
     res.status(200).json({
       success: true,
@@ -326,85 +322,65 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-/**
- * POST /api/admin/backups/cleanup
- * Limpia respaldos antiguos según política de retención
- * Body: { diasRetencion: 30 }
- */
-router.post('/cleanup', async (req, res) => {
-  try {
-    const { diasRetencion = 30 } = req.body;
-    
-    console.log(`[BACKUPS] Limpiando respaldos con más de ${diasRetencion} días`);
-    
-    await ensureBackupDir();
-    const files = await fs.readdir(BACKUP_DIR);
-    
-    const now = Date.now();
-    const maxAge = diasRetencion * 24 * 60 * 60 * 1000; // días a milisegundos
-    
-    let eliminados = 0;
-    
-    for (const file of files) {
-      const filePath = path.join(BACKUP_DIR, file);
-      const stats = await fs.stat(filePath);
-      
-      const edad = now - stats.mtime.getTime();
-      
-      if (edad > maxAge) {
-        await fs.unlink(filePath);
-        eliminados++;
-        console.log(`🗑️ Eliminado respaldo antiguo: ${file}`);
-      }
-    }
-    
-    console.log(`✅ ${eliminados} respaldos eliminados`);
-    
-    res.status(200).json({
-      success: true,
-      message: `${eliminados} respaldos antiguos eliminados`,
-      data: { eliminados }
-    });
-    
-  } catch (error) {
-    console.error('[ERROR] Error en limpieza de respaldos:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error en limpieza de respaldos',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
 // ===== FUNCIONES AUXILIARES =====
 
 /**
- * Crea un respaldo de la base de datos
+ * Crea un respaldo de la base de datos usando PRISMA (sin pg_dump)
+ * Exporta todos los datos en formato JSON
  */
 async function crearRespaldoDB(timestamp) {
   try {
-    const fileName = `backup_database_${timestamp}.sql`;
+    const fileName = `backup_database_${timestamp}.json`;
     const filePath = path.join(BACKUP_DIR, fileName);
     
-    // Variables de entorno de la base de datos
-    const {
-      DATABASE_URL,
-      DB_HOST = 'localhost',
-      DB_PORT = '5432',
-      DB_NAME,
-      DB_USER,
-      DB_PASSWORD
-    } = process.env;
+    console.log('📊 Creando respaldo de base de datos con Prisma...');
     
-    // Comando para PostgreSQL
-    const command = `PGPASSWORD="${DB_PASSWORD}" pg_dump -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -F c -b -v -f "${filePath}"`;
+    // Obtener todos los modelos de Prisma
+    const backup = {
+      version: '1.0',
+      timestamp: new Date().toISOString(),
+      database: 'fredy_fasbear_prestamos',
+      data: {}
+    };
     
-    console.log('📊 Creando respaldo de base de datos...');
-    await execAsync(command);
+    // Lista de tablas/modelos a exportar
+    const modelos = [
+      'usuario',
+      'tipoArticulo',
+      'solicitudPrestamo',
+      'prestamo',
+      'cuota',
+      'pago',
+      'productoTienda',
+      'pedido',
+      'itemPedido',
+      'auditLog',
+      'configuracionEcommerce',
+      'parametrosSistema'
+    ];
+    
+    console.log('📦 Exportando datos de las tablas...');
+    
+    for (const modelo of modelos) {
+      try {
+        if (prisma[modelo]) {
+          const datos = await prisma[modelo].findMany();
+          backup.data[modelo] = datos;
+          console.log(`  ✓ ${modelo}: ${datos.length} registros`);
+        }
+      } catch (error) {
+        console.warn(`  ⚠ Error exportando ${modelo}:`, error.message);
+        backup.data[modelo] = [];
+      }
+    }
+    
+    // Guardar como JSON
+    const jsonContent = JSON.stringify(backup, null, 2);
+    await fs.writeFile(filePath, jsonContent, 'utf-8');
     
     const stats = await fs.stat(filePath);
     
-    console.log('✅ Respaldo de base de datos creado');
+    console.log('✅ Respaldo de base de datos creado:', formatearTamano(stats.size));
     
     return {
       tipo: 'database',
@@ -412,11 +388,12 @@ async function crearRespaldoDB(timestamp) {
       ruta: filePath,
       tamano: formatearTamano(stats.size),
       tamanoBytes: stats.size,
-      fecha: new Date()
+      fecha: new Date(),
+      registros: Object.values(backup.data).reduce((acc, arr) => acc + arr.length, 0)
     };
     
   } catch (error) {
-    console.error('Error creando respaldo de DB:', error);
+    console.error('❌ Error creando respaldo de DB:', error);
     throw new Error('Error al crear respaldo de base de datos: ' + error.message);
   }
 }
@@ -434,7 +411,7 @@ async function crearRespaldoArchivos(timestamp) {
     // Directorios a respaldar
     const dirsToBackup = [
       path.join(process.cwd(), 'uploads'),
-      path.join(process.cwd(), 'public/uploads')
+      path.join(process.cwd(), 'public', 'uploads')
     ];
     
     // Crear archivo ZIP
@@ -443,21 +420,31 @@ async function crearRespaldoArchivos(timestamp) {
     
     archive.pipe(output.createWriteStream());
     
+    let archivosAgregados = 0;
+    
     // Agregar directorios al archivo
     for (const dir of dirsToBackup) {
       try {
         await fs.access(dir);
         archive.directory(dir, path.basename(dir));
+        archivosAgregados++;
+        console.log(`  ✓ Agregado: ${path.basename(dir)}`);
       } catch {
-        console.warn(`Directorio no existe: ${dir}`);
+        console.warn(`  ⚠ Directorio no existe: ${path.basename(dir)}`);
       }
+    }
+    
+    if (archivosAgregados === 0) {
+      console.warn('⚠ No se encontraron directorios para respaldar, creando ZIP vacío');
+      // Agregar un archivo de texto indicando que no hay archivos
+      archive.append('No hay archivos para respaldar en este momento', { name: 'README.txt' });
     }
     
     await archive.finalize();
     
     const stats = await fs.stat(filePath);
     
-    console.log('✅ Respaldo de archivos creado');
+    console.log('✅ Respaldo de archivos creado:', formatearTamano(stats.size));
     
     return {
       tipo: 'files',
@@ -469,7 +456,7 @@ async function crearRespaldoArchivos(timestamp) {
     };
     
   } catch (error) {
-    console.error('Error creando respaldo de archivos:', error);
+    console.error('❌ Error creando respaldo de archivos:', error);
     throw new Error('Error al crear respaldo de archivos: ' + error.message);
   }
 }
