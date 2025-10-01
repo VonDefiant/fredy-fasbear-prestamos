@@ -206,13 +206,36 @@ const toggleMobileMenu = () => {
   mobileMenuOpen.value = !mobileMenuOpen.value
 }
 
+// Función para obtener la ruta según el tipo de usuario
+const getRoleBasedRoute = () => {
+  if (!isLoggedIn.value || !user.value) {
+    return null
+  }
+
+  switch (user.value.tipoUsuario) {
+    case 'Administrador':
+      return '/admin'
+    case 'Cliente':
+      return '/dashboard'
+    case 'Evaluador':
+      return '/evaluator'
+    case 'Cobrador':
+      return '/collector'
+    default:
+      return '/dashboard'
+  }
+}
+
 // Auth-protected navigation handlers
 const handleEmpenoClick = () => {
   closeMobileMenu()
   
   if (isLoggedIn.value) {
-    // Si está logueado, ir a la página de empeño
-    navigateTo('/empeno')
+    // Si está logueado, redirigir al panel correspondiente
+    const roleRoute = getRoleBasedRoute()
+    if (roleRoute) {
+      navigateTo(roleRoute)
+    }
   } else {
     // Si no está logueado, redirigir al login con mensaje
     requireAuthWithMessage('Para acceder al servicio de empeño, debes iniciar sesión primero')
@@ -223,8 +246,11 @@ const handleCuentaClick = () => {
   closeMobileMenu()
   
   if (isLoggedIn.value) {
-    // Si está logueado, ir al dashboard
-    navigateTo('/dashboard')
+    // Si está logueado, redirigir al panel correspondiente
+    const roleRoute = getRoleBasedRoute()
+    if (roleRoute) {
+      navigateTo(roleRoute)
+    }
   } else {
     // Si no está logueado, ir al login
     navigateTo('/login')
@@ -234,7 +260,6 @@ const handleCuentaClick = () => {
 const handleTiendaClick = () => {
   closeMobileMenu()
   
-
   if (isLoggedIn.value) {
     navigateTo('/tienda?logged=true')
   } else {
