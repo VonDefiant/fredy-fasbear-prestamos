@@ -1,12 +1,10 @@
 // FRONTEND/composables/useAuth.js
-// VERSIÓN FINAL - Con inicialización correcta
-
 export const useAuth = () => {
   // ===== CONFIGURACIÓN DE TOKENS =====
   const TOKEN_KEY = 'token'
   const USER_DATA_KEY = 'user_data'
 
-  // ===== FUNCIONES AUXILIARES (declaradas primero) =====
+  // ===== FUNCIONES AUXILIARES =====
   
   const findExistingToken = () => {
     if (!process.client) return null
@@ -15,10 +13,7 @@ export const useAuth = () => {
     
     for (const key of possibleTokenKeys) {
       const token = localStorage.getItem(key) || sessionStorage.getItem(key)
-      if (token) {
-        console.log(`[AUTH] ✓ Token encontrado con clave: ${key}`)
-        return token
-      }
+      if (token) return token
     }
     return null
   }
@@ -32,18 +27,15 @@ export const useAuth = () => {
       const userDataStr = localStorage.getItem(key) || sessionStorage.getItem(key)
       if (userDataStr) {
         try {
-          const userData = JSON.parse(userDataStr)
-          console.log(`[AUTH] ✓ Datos de usuario encontrados con clave: ${key}`, userData.email)
-          return userData
+          return JSON.parse(userDataStr)
         } catch (error) {
-          console.error(`[AUTH] ✗ Error parseando datos de usuario de ${key}:`, error)
+          console.error(`[AUTH] ✗ Error parseando datos:`, error)
         }
       }
     }
     return null
   }
 
-  // Limpiar todos los tokens antiguos con diferentes nombres
   const clearAllTokens = () => {
     if (!process.client) return
     
@@ -61,26 +53,24 @@ export const useAuth = () => {
     })
   }
 
-  // ===== INICIALIZACIÓN DEL ESTADO =====
-  const getInitialUser = () => {
+  // ===== INICIALIZACIÓN AUTOMÁTICA DEL ESTADO =====
+  // CLAVE: Esta función se ejecuta SÍNCRONAMENTE cuando se accede al composable
+  const initializeUserState = () => {
     if (!process.client) return null
     
-    console.log('[AUTH INIT] 🔍 Buscando usuario en storage...')
-    
+    // Buscar en localStorage sin logs para no saturar
     const token = findExistingToken()
     const userData = findExistingUserData()
     
     if (token && userData) {
-      console.log('[AUTH INIT] ✅ Usuario encontrado:', userData.email)
       return userData
     }
     
-    console.log('[AUTH INIT] ℹ️ No hay sesión guardada')
     return null
   }
 
-  // Estado reactivo del usuario
-  const user = useState('auth.user', () => getInitialUser())
+  // Estado reactivo con inicialización automática
+  const user = useState('auth.user', () => initializeUserState())
 
   // ===== FUNCIONES PRINCIPALES =====
   
@@ -88,64 +78,36 @@ export const useAuth = () => {
   const checkAuth = () => {
     if (!process.client) return false
     
-    console.log('[AUTH CHECK] 🔍 Verificando autenticación...')
-    console.log('[AUTH CHECK] Estado actual:', user.value ? user.value.email : 'null')
-    
     const token = findExistingToken()
     const userData = findExistingUserData()
     
     if (token && userData) {
-      // Si ya tenemos el usuario en el estado, no hace falta actualizarlo
+      // Actualizar solo si es necesario
       if (!user.value || user.value.email !== userData.email) {
-        console.log('[AUTH CHECK] 🔄 Actualizando estado del usuario')
         user.value = { ...userData }
       }
-      
-      console.log('[AUTH CHECK] ✅ Autenticado:', userData.email)
       return true
     }
     
-    console.log('[AUTH CHECK] ❌ No autenticado')
     user.value = null
     return false
   }
 
-  // Iniciar sesión - SIEMPRE USA LOCALSTORAGE
+  // Iniciar sesión
   const login = (userData, token, remember = false) => {
     if (!process.client) return
     
-    console.log('[AUTH LOGIN] 🔐 Iniciando sesión...')
-    console.log('[AUTH LOGIN] Usuario:', userData.email, userData.nombre)
+    console.log('[AUTH LOGIN] 🔐 Iniciando sesión:', userData.email)
     
-    // 1. Limpiar cualquier sesión anterior
+    // Limpiar sesiones anteriores
     clearAllTokens()
-    console.log('[AUTH LOGIN] ✓ Sesiones anteriores limpiadas')
     
-    // 2. Guardar en localStorage PRIMERO
+    // Guardar en localStorage
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData))
-    console.log('[AUTH LOGIN] ✓ Datos guardados en localStorage')
     
-    // 3. Actualizar el estado reactivo
+    // Actualizar estado
     user.value = { ...userData }
-    console.log('[AUTH LOGIN] ✓ Estado reactivo actualizado')
-    
-    // 4. Verificar que se guardó correctamente
-    setTimeout(() => {
-      const savedToken = localStorage.getItem(TOKEN_KEY)
-      const savedData = localStorage.getItem(USER_DATA_KEY)
-      
-      console.log('[AUTH LOGIN] 📋 Verificación post-login:', {
-        tokenGuardado: !!savedToken,
-        datosGuardados: !!savedData,
-        estadoUsuario: !!user.value,
-        tokenLength: savedToken ? savedToken.length : 0
-      })
-      
-      if (!savedToken || !savedData) {
-        console.error('[AUTH LOGIN] ⚠️ ADVERTENCIA: Los datos NO se guardaron correctamente en localStorage')
-      }
-    }, 100)
     
     console.log('[AUTH LOGIN] ✅ Login completado')
   }
@@ -154,12 +116,9 @@ export const useAuth = () => {
   const logout = () => {
     if (!process.client) return
     
-    console.log('[AUTH LOGOUT] 🚪 Cerrando sesión...')
+    console.log('[AUTH LOGOUT] 🚪 Cerrando sesión')
     
-    // Limpiar estado
     user.value = null
-    
-    // Limpiar todos los tokens posibles
     clearAllTokens()
     
     console.log('[AUTH LOGOUT] ✅ Sesión cerrada')
@@ -168,14 +127,7 @@ export const useAuth = () => {
   // Obtener token actual
   const getToken = () => {
     if (!process.client) return null
-    
-    let token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)
-    
-    if (!token) {
-      token = findExistingToken()
-    }
-    
-    return token
+    return findExistingToken()
   }
 
   // ===== COMPUTED PROPERTIES =====
@@ -196,7 +148,7 @@ export const useAuth = () => {
     return true
   }
 
-  const requireAuthWithMessage = (message = 'Debes iniciar sesión para acceder', redirectTo = '/login') => {
+  const requireAuthWithMessage = (message = 'Debes iniciar sesión', redirectTo = '/login') => {
     if (!isLoggedIn.value) {
       if (process.client) {
         sessionStorage.setItem('auth_message', message)
@@ -220,7 +172,6 @@ export const useAuth = () => {
 
   const initAuth = () => {
     if (process.client) {
-      console.log('[AUTH] 🚀 Inicializando autenticación...')
       return checkAuth()
     }
     return false
@@ -238,8 +189,10 @@ export const useAuth = () => {
       isClient: isClient.value,
       token: getToken() ? 'Present' : 'Missing',
       tokensInStorage: {
-        localStorage: Object.keys(localStorage).filter(key => key.includes('token') || key.includes('user')),
-        sessionStorage: Object.keys(sessionStorage).filter(key => key.includes('token') || key.includes('user'))
+        localStorage: Object.keys(localStorage).filter(key => 
+          key.includes('token') || key.includes('user')),
+        sessionStorage: Object.keys(sessionStorage).filter(key => 
+          key.includes('token') || key.includes('user'))
       }
     }
   }

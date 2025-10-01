@@ -420,7 +420,7 @@ useHead({
   ]
 })
 
-const { login, getAuthMessage, getDebugInfo } = useAuth()
+const { login, getAuthMessage, getDebugInfo, isLoggedIn, user } = useAuth()
 const { api } = useApi()
 
 const activeTab = ref('login')
@@ -712,6 +712,25 @@ watch([() => registerForm.value.email, () => registerForm.value.password], () =>
 })
 
 onMounted(() => {
+  // NUEVO: Verificar si ya hay sesión activa y redirigir
+  if (isLoggedIn.value && user.value) {
+    console.log('[LOGIN] ✅ Usuario ya autenticado, redirigiendo...', user.value.email)
+    
+    // Verificar si hay una URL de redirección guardada
+    const redirectUrl = process.client ? sessionStorage.getItem('redirect_after_login') : null
+    
+    if (redirectUrl) {
+      sessionStorage.removeItem('redirect_after_login')
+      console.log('[LOGIN] 🔄 Redirigiendo a:', redirectUrl)
+      return navigateTo(redirectUrl)
+    }
+    
+    // Si no hay URL guardada, redirigir según el rol
+    console.log('[LOGIN] 🔄 Redirigiendo según rol:', user.value.tipoUsuario)
+    redirectAfterLogin(user.value)
+    return
+  }
+  
   const savedMessage = getAuthMessage()
   
   if (savedMessage) {
