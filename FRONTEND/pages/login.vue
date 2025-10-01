@@ -494,7 +494,7 @@ const redirectAfterLogin = (userData) => {
     sessionStorage.removeItem('redirect_after_login')
     
     const isAdminRoute = redirectUrl.startsWith('/admin')
-    const isEvaluatorRoute = redirectUrl.startsWith('/evaluator')
+    ('/evaluador')
     const isCollectorRoute = redirectUrl.startsWith('/collector')
     const isAdminUser = userData.tipoUsuario === 'Administrador'
     const isEvaluatorUser = userData.tipoUsuario === 'Evaluador'
@@ -510,7 +510,7 @@ const redirectAfterLogin = (userData) => {
     if (!roleRouteMatch) {
       let targetRoute = '/dashboard'
       if (isAdminUser) targetRoute = '/admin'
-      else if (isEvaluatorUser) targetRoute = '/evaluator'
+      else if (isEvaluatorUser) targetRoute = '/evaluador'
       else if (isCollectorUser) targetRoute = '/collector'
       
       return navigateTo(targetRoute)
@@ -525,7 +525,7 @@ const redirectAfterLogin = (userData) => {
     case 'Cliente':
       return navigateTo('/dashboard')
     case 'Evaluador':
-      return navigateTo('/evaluator')
+      return navigateTo('/evaluador')
     case 'Cobrador':
       return navigateTo('/collector')
     default:

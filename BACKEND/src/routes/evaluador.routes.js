@@ -1,3 +1,4 @@
+// BACKEND/src/routes/evaluador.routes.js
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireEvaluador } from '../middleware/auth.js';
@@ -5,132 +6,96 @@ import { authenticateToken, requireEvaluador } from '../middleware/auth.js';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Middleware para logging específico de evaluador
 router.use((req, res, next) => {
   console.log(`🔍 Evaluador API: ${req.method} ${req.path}`);
   next();
 });
 
-// Middleware para proteger todas las rutas
 router.use(authenticateToken);
 router.use(requireEvaluador);
 
-/**
- * GET /api/evaluador/stats
- * Obtiene estadísticas del evaluador
- */
 router.get('/stats', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo estadísticas del evaluador...');
     const evaluadorId = req.user.userId;
 
+    const avaluosDelEvaluador = await prisma.avaluo.findMany({
+      where: {
+        evaluadorId: evaluadorId
+      },
+      include: {
+        articulo: {
+          include: {
+            solicitud: true
+          }
+        }
+      }
+    });
+
+    const totalAvaluos = avaluosDelEvaluador.length;
+    const valorTotalAvaluado = avaluosDelEvaluador.reduce(
+      (sum, avaluo) => sum + Number(avaluo.valorComercial), 
+      0
+    );
+    const valorPromedioAvaluo = totalAvaluos > 0 ? valorTotalAvaluado / totalAvaluos : 0;
+
+    const solicitudesEvaluadasIds = avaluosDelEvaluador.map(
+      avaluo => avaluo.articulo.solicitudId
+    );
+
     const [
-      totalSolicitudes,
-      solicitudesPendientes,
       solicitudesAprobadas,
       solicitudesRechazadas,
-      solicitudesHoy,
-      avaluosRealizados,
-      valorTotalAvaluado,
-      valorPromedioAvaluo
+      solicitudesPendientes,
+      solicitudesHoy
     ] = await Promise.all([
-      // Total de solicitudes asignadas
       prisma.solicitudPrestamo.count({
         where: {
-          Avaluo: {
-            some: {
-              evaluadorId: evaluadorId
-            }
-          }
+          id: { in: solicitudesEvaluadasIds },
+          estado: 'Aprobada'
         }
       }),
       
-      // Solicitudes pendientes de evaluación
       prisma.solicitudPrestamo.count({
         where: {
-          estado: 'Pendiente',
-          Avaluo: {
-            none: {}
-          }
+          id: { in: solicitudesEvaluadasIds },
+          estado: 'Rechazada'
         }
       }),
       
-      // Solicitudes aprobadas por este evaluador
       prisma.solicitudPrestamo.count({
         where: {
-          estado: 'Aprobada',
-          Avaluo: {
-            some: {
-              evaluadorId: evaluadorId
-            }
-          }
+          estado: 'Pendiente'
         }
       }),
       
-      // Solicitudes rechazadas por este evaluador
-      prisma.solicitudPrestamo.count({
-        where: {
-          estado: 'Rechazada',
-          Avaluo: {
-            some: {
-              evaluadorId: evaluadorId
-            }
-          }
-        }
-      }),
-      
-      // Solicitudes nuevas hoy
       prisma.solicitudPrestamo.count({
         where: {
           fechaSolicitud: {
             gte: new Date(new Date().setHours(0, 0, 0, 0))
           }
         }
-      }),
-      
-      // Avalúos realizados por este evaluador
-      prisma.avaluo.count({
-        where: {
-          evaluadorId: evaluadorId
-        }
-      }),
-      
-      // Valor total avaluado
-      prisma.avaluo.aggregate({
-        where: {
-          evaluadorId: evaluadorId
-        },
-        _sum: {
-          valorComercial: true
-        }
-      }),
-      
-      // Valor promedio de avalúos
-      prisma.avaluo.aggregate({
-        where: {
-          evaluadorId: evaluadorId
-        },
-        _avg: {
-          valorComercial: true
-        }
       })
     ]);
 
+    const totalEvaluadas = solicitudesAprobadas + solicitudesRechazadas;
+    const tasaAprobacion = totalEvaluadas > 0 
+      ? ((solicitudesAprobadas / totalEvaluadas) * 100).toFixed(2)
+      : 0;
+
     const stats = {
-      totalSolicitudes,
       solicitudesPendientes,
       solicitudesAprobadas,
       solicitudesRechazadas,
+      avaluosRealizados: totalAvaluos,
+      valorTotalAvaluado: valorTotalAvaluado.toFixed(2),
+      valorPromedioAvaluo: valorPromedioAvaluo.toFixed(2),
+      tasaAprobacion: parseFloat(tasaAprobacion),
       solicitudesHoy,
-      avaluosRealizados,
-      valorTotalAvaluado: valorTotalAvaluado._sum.valorComercial || 0,
-      valorPromedioAvaluo: valorPromedioAvaluo._avg.valorComercial || 0,
-      tasaAprobacion: totalSolicitudes > 0 
-        ? ((solicitudesAprobadas / totalSolicitudes) * 100).toFixed(1)
-        : 0
+      totalSolicitudesEvaluadas: totalEvaluadas
     };
 
-    console.log('[EVALUADOR] Estadísticas obtenidas:', stats);
+    console.log('[EVALUADOR] Estadísticas calculadas:', stats);
 
     res.status(200).json({
       success: true,
@@ -141,30 +106,23 @@ router.get('/stats', async (req, res) => {
     console.error('[EVALUADOR] Error obteniendo estadísticas:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener estadísticas',
+      message: 'Error al obtener estadísticas del evaluador',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-/**
- * GET /api/evaluador/solicitudes
- * Obtiene todas las solicitudes pendientes de evaluación
- */
 router.get('/solicitudes', async (req, res) => {
   try {
-    console.log('[EVALUADOR] Obteniendo solicitudes pendientes...');
-    
-    const { estado, limite = 20, pagina = 1 } = req.query;
+    console.log('[EVALUADOR] Obteniendo solicitudes...');
+    const { estado = 'Pendiente', limite = 20, pagina = 1 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limite);
-
-    const where = {
-      ...(estado && estado !== 'todas' && { estado: estado })
-    };
 
     const [solicitudes, total] = await Promise.all([
       prisma.solicitudPrestamo.findMany({
-        where,
+        where: {
+          estado: estado
+        },
         include: {
           usuario: {
             select: {
@@ -174,19 +132,10 @@ router.get('/solicitudes', async (req, res) => {
               telefono: true
             }
           },
-          Articulo: {
+          articulos: {
             include: {
-              tipoArticulo: true
-            }
-          },
-          Avaluo: {
-            include: {
-              evaluador: {
-                select: {
-                  nombre: true,
-                  apellido: true
-                }
-              }
+              tipoArticulo: true,
+              avaluo: true
             }
           }
         },
@@ -197,10 +146,12 @@ router.get('/solicitudes', async (req, res) => {
         take: parseInt(limite)
       }),
       
-      prisma.solicitudPrestamo.count({ where })
+      prisma.solicitudPrestamo.count({
+        where: {
+          estado: estado
+        }
+      })
     ]);
-
-    console.log(`[EVALUADOR] ${solicitudes.length} solicitudes obtenidas`);
 
     res.status(200).json({
       success: true,
@@ -223,20 +174,19 @@ router.get('/solicitudes', async (req, res) => {
   }
 });
 
-/**
- * GET /api/evaluador/solicitudes/:id
- * Obtiene el detalle completo de una solicitud
- */
 router.get('/solicitudes/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`[EVALUADOR] Obteniendo detalle de solicitud #${id}...`);
+    console.log('[EVALUADOR] Obteniendo detalle de solicitud:', id);
 
     const solicitud = await prisma.solicitudPrestamo.findUnique({
-      where: { id: parseInt(id) },
+      where: {
+        id: parseInt(id)
+      },
       include: {
         usuario: {
           select: {
+            id: true,
             nombre: true,
             apellido: true,
             email: true,
@@ -245,10 +195,10 @@ router.get('/solicitudes/:id', async (req, res) => {
             cedula: true
           }
         },
-        Articulo: {
+        articulos: {
           include: {
             tipoArticulo: true,
-            Avaluo: {
+            avaluo: {
               include: {
                 evaluador: {
                   select: {
@@ -259,8 +209,7 @@ router.get('/solicitudes/:id', async (req, res) => {
               }
             }
           }
-        },
-        Contrato: true
+        }
       }
     });
 
@@ -271,68 +220,55 @@ router.get('/solicitudes/:id', async (req, res) => {
       });
     }
 
-    console.log('[EVALUADOR] Solicitud encontrada');
-
     res.status(200).json({
       success: true,
       data: solicitud
     });
 
   } catch (error) {
-    console.error('[EVALUADOR] Error obteniendo solicitud:', error);
+    console.error('[EVALUADOR] Error obteniendo detalle:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al obtener solicitud',
+      message: 'Error al obtener detalle de solicitud',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
 
-/**
- * POST /api/evaluador/solicitudes/:id/evaluar
- * Evalúa una solicitud y crea el avalúo
- */
 router.post('/solicitudes/:id/evaluar', async (req, res) => {
   try {
     const { id } = req.params;
     const evaluadorId = req.user.userId;
-    const { 
-      valorComercial, 
-      porcentajeAplicado, 
-      observaciones,
-      estado // 'Aprobada' o 'Rechazada'
-    } = req.body;
+    const { valorComercial, porcentajeAplicado, observaciones, decision } = req.body;
 
-    console.log(`[EVALUADOR] Evaluando solicitud #${id}...`);
+    console.log('[EVALUADOR] Evaluando solicitud:', id, decision);
 
-    // Validaciones
-    if (!valorComercial || valorComercial <= 0) {
+    if (!decision || !['Aprobada', 'Rechazada'].includes(decision)) {
       return res.status(400).json({
         success: false,
-        message: 'El valor comercial debe ser mayor a 0'
+        message: 'Decisión inválida. Debe ser "Aprobada" o "Rechazada"'
       });
     }
 
-    if (!porcentajeAplicado || porcentajeAplicado <= 0 || porcentajeAplicado > 100) {
-      return res.status(400).json({
-        success: false,
-        message: 'El porcentaje debe estar entre 0 y 100'
-      });
+    if (decision === 'Aprobada') {
+      if (!valorComercial || valorComercial <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'El valor comercial es requerido para aprobar'
+        });
+      }
+
+      if (!porcentajeAplicado || porcentajeAplicado <= 0 || porcentajeAplicado > 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'El porcentaje debe estar entre 0 y 100'
+        });
+      }
     }
 
-    if (!estado || !['Aprobada', 'Rechazada'].includes(estado)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Estado inválido. Debe ser Aprobada o Rechazada'
-      });
-    }
-
-    // Verificar que la solicitud existe y está pendiente
     const solicitud = await prisma.solicitudPrestamo.findUnique({
       where: { id: parseInt(id) },
-      include: {
-        Articulo: true
-      }
+      include: { articulos: true }
     });
 
     if (!solicitud) {
@@ -345,75 +281,44 @@ router.post('/solicitudes/:id/evaluar', async (req, res) => {
     if (solicitud.estado !== 'Pendiente') {
       return res.status(400).json({
         success: false,
-        message: `La solicitud ya fue evaluada (${solicitud.estado})`
+        message: `Esta solicitud ya fue ${solicitud.estado.toLowerCase()}`
       });
     }
 
-    // Calcular monto del préstamo
-    const montoPrestamo = (parseFloat(valorComercial) * parseFloat(porcentajeAplicado)) / 100;
-
-    // Crear avalúo y actualizar solicitud en una transacción
-    const resultado = await prisma.$transaction(async (tx) => {
-      // Crear avalúo para el primer artículo
-      const articuloId = solicitud.Articulo[0]?.id;
-      
-      if (!articuloId) {
-        throw new Error('No hay artículos en la solicitud');
-      }
-
-      const avaluo = await tx.avaluo.create({
+    const resultado = await prisma.$transaction(async (prisma) => {
+      const solicitudActualizada = await prisma.solicitudPrestamo.update({
+        where: { id: parseInt(id) },
         data: {
-          articuloId,
-          evaluadorId,
-          valorComercial: parseFloat(valorComercial),
-          porcentajeAplicado: parseFloat(porcentajeAplicado),
-          montoPrestamo: parseFloat(montoPrestamo),
+          estado: decision,
+          fechaEvaluacion: new Date(),
           observaciones: observaciones || null
         }
       });
 
-      // Actualizar estado de la solicitud
-      const solicitudActualizada = await tx.solicitudPrestamo.update({
-        where: { id: parseInt(id) },
-        data: {
-          estado,
-          fechaEvaluacion: new Date(),
-          observaciones: estado === 'Rechazada' ? observaciones : null
-        },
-        include: {
-          usuario: {
-            select: {
-              nombre: true,
-              apellido: true,
-              email: true
-            }
-          },
-          Articulo: {
-            include: {
-              tipoArticulo: true,
-              Avaluo: {
-                include: {
-                  evaluador: {
-                    select: {
-                      nombre: true,
-                      apellido: true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
+      if (decision === 'Aprobada' && solicitud.articulos.length > 0) {
+        const articulo = solicitud.articulos[0];
+        const montoPrestamo = (parseFloat(valorComercial) * parseFloat(porcentajeAplicado)) / 100;
 
-      return { avaluo, solicitud: solicitudActualizada };
+        await prisma.avaluo.create({
+          data: {
+            articuloId: articulo.id,
+            evaluadorId: evaluadorId,
+            valorComercial: parseFloat(valorComercial),
+            porcentajeAplicado: parseFloat(porcentajeAplicado),
+            montoPrestamo: montoPrestamo,
+            observaciones: observaciones || null
+          }
+        });
+      }
+
+      return solicitudActualizada;
     });
 
-    console.log(`[EVALUADOR] Solicitud #${id} evaluada exitosamente como ${estado}`);
+    console.log('[EVALUADOR] Solicitud evaluada exitosamente:', resultado.id);
 
     res.status(200).json({
       success: true,
-      message: `Solicitud ${estado.toLowerCase()} exitosamente`,
+      message: `Solicitud ${decision.toLowerCase()} exitosamente`,
       data: resultado
     });
 
@@ -427,71 +332,6 @@ router.post('/solicitudes/:id/evaluar', async (req, res) => {
   }
 });
 
-/**
- * GET /api/evaluador/recent-activity
- * Obtiene la actividad reciente del evaluador
- */
-router.get('/recent-activity', async (req, res) => {
-  try {
-    console.log('[EVALUADOR] Obteniendo actividad reciente...');
-    const evaluadorId = req.user.userId;
-
-    const actividadReciente = await prisma.avaluo.findMany({
-      where: {
-        evaluadorId: evaluadorId
-      },
-      include: {
-        articulo: {
-          include: {
-            solicitud: {
-              include: {
-                usuario: {
-                  select: {
-                    nombre: true,
-                    apellido: true
-                  }
-                }
-              }
-            },
-            tipoArticulo: true
-          }
-        }
-      },
-      orderBy: {
-        fechaAvaluo: 'desc'
-      },
-      take: 10
-    });
-
-    const actividad = actividadReciente.map(avaluo => ({
-      id: avaluo.id,
-      tipo: 'avaluo',
-      descripcion: `Avalúo de ${avaluo.articulo.tipoArticulo.nombre} - ${avaluo.articulo.descripcion}`,
-      cliente: `${avaluo.articulo.solicitud.usuario.nombre} ${avaluo.articulo.solicitud.usuario.apellido}`,
-      monto: avaluo.montoPrestamo,
-      fecha: avaluo.fechaAvaluo,
-      estado: avaluo.articulo.solicitud.estado
-    }));
-
-    res.status(200).json({
-      success: true,
-      data: actividad
-    });
-
-  } catch (error) {
-    console.error('[EVALUADOR] Error obteniendo actividad reciente:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener actividad reciente',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
-/**
- * GET /api/evaluador/mis-avaluos
- * Obtiene el historial de avalúos realizados por el evaluador
- */
 router.get('/mis-avaluos', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo historial de avalúos...');
@@ -557,7 +397,64 @@ router.get('/mis-avaluos', async (req, res) => {
   }
 });
 
-// Middleware de manejo de errores
+router.get('/recent-activity', async (req, res) => {
+  try {
+    console.log('[EVALUADOR] Obteniendo actividad reciente...');
+    const evaluadorId = req.user.userId;
+    const { limite = 10 } = req.query;
+
+    const actividad = await prisma.avaluo.findMany({
+      where: {
+        evaluadorId: evaluadorId
+      },
+      include: {
+        articulo: {
+          include: {
+            solicitud: {
+              include: {
+                usuario: {
+                  select: {
+                    nombre: true,
+                    apellido: true
+                  }
+                }
+              }
+            },
+            tipoArticulo: true
+          }
+        }
+      },
+      orderBy: {
+        fechaAvaluo: 'desc'
+      },
+      take: parseInt(limite)
+    });
+
+    const actividadFormateada = actividad.map(avaluo => ({
+      id: avaluo.id,
+      tipo: 'avaluo',
+      descripcion: avaluo.articulo.descripcion,
+      cliente: `${avaluo.articulo.solicitud.usuario.nombre} ${avaluo.articulo.solicitud.usuario.apellido}`,
+      monto: avaluo.montoPrestamo,
+      fecha: avaluo.fechaAvaluo,
+      estado: avaluo.articulo.solicitud.estado
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: actividadFormateada
+    });
+
+  } catch (error) {
+    console.error('[EVALUADOR] Error obteniendo actividad:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener actividad reciente',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 router.use((error, req, res, next) => {
   console.error('❌ Error en rutas de evaluador:', error);
   

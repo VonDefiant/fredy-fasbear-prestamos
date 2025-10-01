@@ -21,7 +21,7 @@ export default defineNuxtRouteMiddleware((to, from) => {
       case 'Administrador':
         return navigateTo('/admin')
       case 'Evaluador':
-        return navigateTo('/evaluator')
+        return navigateTo('/evaluador')
       case 'Cobrador':
         return navigateTo('/collector')
       case 'Cliente':

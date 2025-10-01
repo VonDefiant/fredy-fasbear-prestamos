@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 
+
+const { getToken } = useAuth()
 export const useEvaluador = () => {
   const loading = ref(false)
   const error = ref(null)
@@ -9,7 +11,8 @@ export const useEvaluador = () => {
    */
   const api = async (endpoint, options = {}) => {
     const config = useRuntimeConfig()
-    const token = useCookie('authToken').value
+  const { getToken } = useAuth()
+  const token = getToken()
 
     if (!token) {
       throw new Error('No hay sesión activa')

@@ -218,7 +218,7 @@ const getRoleBasedRoute = () => {
     case 'Cliente':
       return '/dashboard'
     case 'Evaluador':
-      return '/evaluator'
+      return '/evaluador'
     case 'Cobrador':
       return '/collector'
     default:
