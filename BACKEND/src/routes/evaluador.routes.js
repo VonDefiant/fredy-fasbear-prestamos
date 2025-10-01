@@ -2,23 +2,31 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireEvaluador } from '../middleware/auth.js';
+import calculadoraService from '../services/calculadora.service.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
+// Middleware para logging específico del evaluador
 router.use((req, res, next) => {
   console.log(`🔍 Evaluador API: ${req.method} ${req.path}`);
   next();
 });
 
+// Aplicar middleware de autenticación y verificación de rol
 router.use(authenticateToken);
 router.use(requireEvaluador);
 
+/**
+ * GET /api/evaluador/stats
+ * Obtiene las estadísticas del evaluador
+ */
 router.get('/stats', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo estadísticas del evaluador...');
     const evaluadorId = req.user.userId;
 
+    // Obtener todos los avalúos del evaluador
     const avaluosDelEvaluador = await prisma.avaluo.findMany({
       where: {
         evaluadorId: evaluadorId
@@ -39,10 +47,12 @@ router.get('/stats', async (req, res) => {
     );
     const valorPromedioAvaluo = totalAvaluos > 0 ? valorTotalAvaluado / totalAvaluos : 0;
 
+    // Obtener IDs de solicitudes evaluadas
     const solicitudesEvaluadasIds = avaluosDelEvaluador.map(
       avaluo => avaluo.articulo.solicitudId
     );
 
+    // Contar solicitudes por estado
     const [
       solicitudesAprobadas,
       solicitudesRechazadas,
@@ -112,6 +122,10 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/evaluador/solicitudes
+ * Obtiene las solicitudes pendientes de evaluación
+ */
 router.get('/solicitudes', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo solicitudes...');
@@ -174,6 +188,10 @@ router.get('/solicitudes', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/evaluador/solicitudes/:id
+ * Obtiene el detalle completo de una solicitud específica
+ */
 router.get('/solicitudes/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -220,9 +238,83 @@ router.get('/solicitudes/:id', async (req, res) => {
       });
     }
 
+    // Calcular plan de pagos si hay datos de préstamo
+    let planPagos = null;
+    let resumenFinanciero = null;
+
+    if (solicitud.montoSolicitado && solicitud.plazoMeses) {
+      try {
+        const calculosPrestamo = await calculadoraService.calcularPrestamo(
+          parseFloat(solicitud.montoSolicitado),
+          solicitud.plazoMeses,
+          solicitud.modalidadPago || 'mensual'
+        );
+        
+        planPagos = calculosPrestamo.planPagos;
+        resumenFinanciero = {
+          montoSolicitado: parseFloat(solicitud.montoSolicitado),
+          totalAPagar: parseFloat(solicitud.totalAPagar || calculosPrestamo.totalAPagar),
+          interesTotal: calculosPrestamo.interesTotal,
+          montoPorPago: calculosPrestamo.montoPorPago,
+          tasaInteres: parseFloat(solicitud.tasaInteres || calculosPrestamo.tasaInteres),
+          numeroPagos: calculosPrestamo.numeroPagos,
+          comisionApertura: calculosPrestamo.comisionApertura
+        };
+      } catch (calcError) {
+        console.warn('Error calculando plan de pagos:', calcError.message);
+      }
+    }
+
+    // Formatear respuesta completa con información financiera
+    const solicitudDetallada = {
+      id: solicitud.id,
+      numero: `SOL-2025-${String(solicitud.id).padStart(6, '0')}`,
+      estado: solicitud.estado,
+      fechaSolicitud: solicitud.fechaSolicitud,
+      fechaEvaluacion: solicitud.fechaEvaluacion,
+      observaciones: solicitud.observaciones,
+      
+      usuario: {
+        id: solicitud.usuario.id,
+        nombre: `${solicitud.usuario.nombre} ${solicitud.usuario.apellido}`,
+        email: solicitud.usuario.email,
+        telefono: solicitud.usuario.telefono,
+        direccion: solicitud.usuario.direccion,
+        cedula: solicitud.usuario.cedula
+      },
+      
+      // Información completa del préstamo solicitado
+      prestamo: {
+        montoSolicitado: solicitud.montoSolicitado ? parseFloat(solicitud.montoSolicitado) : null,
+        plazoMeses: solicitud.plazoMeses,
+        modalidadPago: solicitud.modalidadPago,
+        tasaInteres: solicitud.tasaInteres ? parseFloat(solicitud.tasaInteres) : null,
+        totalAPagar: solicitud.totalAPagar ? parseFloat(solicitud.totalAPagar) : null,
+        montoPorPago: resumenFinanciero?.montoPorPago || null,
+        interesTotal: resumenFinanciero?.interesTotal || null,
+        numeroPagos: resumenFinanciero?.numeroPagos || null,
+        comisionApertura: resumenFinanciero?.comisionApertura || null,
+        planPagos: planPagos || [],
+        resumenFinanciero: resumenFinanciero
+      },
+      
+      // Artículos
+      articulos: solicitud.articulos.map(articulo => ({
+        id: articulo.id,
+        descripcion: articulo.descripcion,
+        marca: articulo.marca,
+        modelo: articulo.modelo,
+        estadoFisico: articulo.estadoFisico,
+        valorEstimadoCliente: articulo.valorEstimadoCliente ? parseFloat(articulo.valorEstimadoCliente) : null,
+        especificacionesTecnicas: articulo.especificacionesTecnicas,
+        tipoArticulo: articulo.tipoArticulo?.nombre,
+        avaluo: articulo.avaluo
+      }))
+    };
+
     res.status(200).json({
       success: true,
-      data: solicitud
+      data: solicitudDetallada
     });
 
   } catch (error) {
@@ -235,37 +327,122 @@ router.get('/solicitudes/:id', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/evaluador/solicitudes/:id/archivos
+ * NUEVO: Obtiene los archivos adjuntos de una solicitud
+ */
+router.get('/solicitudes/:id/archivos', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('[EVALUADOR] Obteniendo archivos de solicitud:', id);
+
+    // Verificar que la solicitud existe
+    const solicitud = await prisma.solicitudPrestamo.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({
+        success: false,
+        message: 'Solicitud no encontrada'
+      });
+    }
+
+    // Obtener documentos asociados a la solicitud
+    const documentos = await prisma.documento.findMany({
+      where: {
+        idRelacionado: parseInt(id),
+        tipoRelacion: 'Solicitud'
+      },
+      orderBy: [
+        { tipoDocumento: 'asc' },
+        { fechaSubida: 'asc' }
+      ]
+    });
+
+    const archivosFormateados = documentos.map(doc => ({
+      id: doc.id,
+      tipo: doc.tipoDocumento,
+      nombreArchivo: doc.nombreArchivo,
+      rutaArchivo: doc.rutaArchivo,
+      fechaSubida: doc.fechaSubida,
+      tamanoArchivo: doc.tamanoArchivo ? parseInt(doc.tamanoArchivo) : null,
+      tipoMime: doc.tipoMime,
+      urlDescarga: `/api/evaluador/solicitudes/${id}/archivo/${doc.id}`
+    }));
+
+    // Agrupar archivos por tipo
+    const archivosPorTipo = archivosFormateados.reduce((acc, archivo) => {
+      const tipo = archivo.tipo === 'Foto_Prenda' ? 'fotos' : 
+                   archivo.tipo === 'Especificaciones' ? 'documentos' : 'otros';
+      
+      if (!acc[tipo]) acc[tipo] = [];
+      acc[tipo].push(archivo);
+      
+      return acc;
+    }, {});
+
+    console.log('[EVALUADOR] Archivos encontrados:', {
+      fotos: archivosPorTipo.fotos?.length || 0,
+      documentos: archivosPorTipo.documentos?.length || 0,
+      total: archivosFormateados.length
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        solicitudId: parseInt(id),
+        archivos: archivosPorTipo,
+        resumen: {
+          totalArchivos: archivosFormateados.length,
+          fotos: archivosPorTipo.fotos?.length || 0,
+          documentos: archivosPorTipo.documentos?.length || 0,
+          otros: archivosPorTipo.otros?.length || 0
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[EVALUADOR] Error obteniendo archivos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener archivos adjuntos',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * POST /api/evaluador/solicitudes/:id/evaluar
+ * Evalúa una solicitud (aprobar o rechazar)
+ */
 router.post('/solicitudes/:id/evaluar', async (req, res) => {
   try {
     const { id } = req.params;
     const evaluadorId = req.user.userId;
-    const { valorComercial, porcentajeAplicado, observaciones, decision } = req.body;
+    const { estado, montoAutorizado, observaciones } = req.body;
 
-    console.log('[EVALUADOR] Evaluando solicitud:', id, decision);
+    console.log('[EVALUADOR] Evaluando solicitud:', id, estado);
 
-    if (!decision || !['Aprobada', 'Rechazada'].includes(decision)) {
+    // Validaciones
+    if (!estado || !['Aprobada', 'Rechazada'].includes(estado)) {
       return res.status(400).json({
         success: false,
-        message: 'Decisión inválida. Debe ser "Aprobada" o "Rechazada"'
+        message: 'Estado inválido. Debe ser "Aprobada" o "Rechazada"'
       });
     }
 
-    if (decision === 'Aprobada') {
-      if (!valorComercial || valorComercial <= 0) {
+    if (estado === 'Aprobada') {
+      if (!montoAutorizado || montoAutorizado <= 0) {
         return res.status(400).json({
           success: false,
-          message: 'El valor comercial es requerido para aprobar'
-        });
-      }
-
-      if (!porcentajeAplicado || porcentajeAplicado <= 0 || porcentajeAplicado > 100) {
-        return res.status(400).json({
-          success: false,
-          message: 'El porcentaje debe estar entre 0 y 100'
+          message: 'El monto autorizado es requerido para aprobar'
         });
       }
     }
 
+    // Verificar que la solicitud existe
     const solicitud = await prisma.solicitudPrestamo.findUnique({
       where: { id: parseInt(id) },
       include: { articulos: true }
@@ -285,27 +462,33 @@ router.post('/solicitudes/:id/evaluar', async (req, res) => {
       });
     }
 
+    // Realizar la evaluación en una transacción
     const resultado = await prisma.$transaction(async (prisma) => {
+      // Actualizar el estado de la solicitud
       const solicitudActualizada = await prisma.solicitudPrestamo.update({
         where: { id: parseInt(id) },
         data: {
-          estado: decision,
+          estado: estado,
           fechaEvaluacion: new Date(),
           observaciones: observaciones || null
         }
       });
 
-      if (decision === 'Aprobada' && solicitud.articulos.length > 0) {
+      // Si fue aprobada, crear el avalúo
+      if (estado === 'Aprobada' && solicitud.articulos.length > 0) {
         const articulo = solicitud.articulos[0];
-        const montoPrestamo = (parseFloat(valorComercial) * parseFloat(porcentajeAplicado)) / 100;
+        const valorComercial = solicitud.montoSolicitado || articulo.valorEstimadoCliente;
+        
+        // Calcular porcentaje aplicado
+        const porcentajeAplicado = (parseFloat(montoAutorizado) / parseFloat(valorComercial)) * 100;
 
         await prisma.avaluo.create({
           data: {
             articuloId: articulo.id,
             evaluadorId: evaluadorId,
             valorComercial: parseFloat(valorComercial),
-            porcentajeAplicado: parseFloat(porcentajeAplicado),
-            montoPrestamo: montoPrestamo,
+            porcentajeAplicado: porcentajeAplicado,
+            montoPrestamo: parseFloat(montoAutorizado),
             observaciones: observaciones || null
           }
         });
@@ -318,7 +501,7 @@ router.post('/solicitudes/:id/evaluar', async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Solicitud ${decision.toLowerCase()} exitosamente`,
+      message: `Solicitud ${estado.toLowerCase()} exitosamente`,
       data: resultado
     });
 
@@ -332,6 +515,72 @@ router.post('/solicitudes/:id/evaluar', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/evaluador/recent-activity
+ * Obtiene la actividad reciente del evaluador
+ */
+router.get('/recent-activity', async (req, res) => {
+  try {
+    console.log('[EVALUADOR] Obteniendo actividad reciente...');
+    const evaluadorId = req.user.userId;
+    const { limite = 10 } = req.query;
+
+    const actividad = await prisma.avaluo.findMany({
+      where: {
+        evaluadorId: evaluadorId
+      },
+      include: {
+        articulo: {
+          include: {
+            solicitud: {
+              include: {
+                usuario: {
+                  select: {
+                    nombre: true,
+                    apellido: true
+                  }
+                }
+              }
+            },
+            tipoArticulo: true
+          }
+        }
+      },
+      orderBy: {
+        fechaAvaluo: 'desc'
+      },
+      take: parseInt(limite)
+    });
+
+    const actividadFormateada = actividad.map(avaluo => ({
+      id: avaluo.id,
+      tipo: 'avaluo',
+      descripcion: avaluo.articulo.descripcion,
+      cliente: `${avaluo.articulo.solicitud.usuario.nombre} ${avaluo.articulo.solicitud.usuario.apellido}`,
+      monto: avaluo.montoPrestamo,
+      fecha: avaluo.fechaAvaluo,
+      estado: avaluo.articulo.solicitud.estado
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: actividadFormateada
+    });
+
+  } catch (error) {
+    console.error('[EVALUADOR] Error obteniendo actividad:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener actividad reciente',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * GET /api/evaluador/mis-avaluos
+ * Obtiene el historial completo de avalúos del evaluador
+ */
 router.get('/mis-avaluos', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo historial de avalúos...');
@@ -397,64 +646,7 @@ router.get('/mis-avaluos', async (req, res) => {
   }
 });
 
-router.get('/recent-activity', async (req, res) => {
-  try {
-    console.log('[EVALUADOR] Obteniendo actividad reciente...');
-    const evaluadorId = req.user.userId;
-    const { limite = 10 } = req.query;
-
-    const actividad = await prisma.avaluo.findMany({
-      where: {
-        evaluadorId: evaluadorId
-      },
-      include: {
-        articulo: {
-          include: {
-            solicitud: {
-              include: {
-                usuario: {
-                  select: {
-                    nombre: true,
-                    apellido: true
-                  }
-                }
-              }
-            },
-            tipoArticulo: true
-          }
-        }
-      },
-      orderBy: {
-        fechaAvaluo: 'desc'
-      },
-      take: parseInt(limite)
-    });
-
-    const actividadFormateada = actividad.map(avaluo => ({
-      id: avaluo.id,
-      tipo: 'avaluo',
-      descripcion: avaluo.articulo.descripcion,
-      cliente: `${avaluo.articulo.solicitud.usuario.nombre} ${avaluo.articulo.solicitud.usuario.apellido}`,
-      monto: avaluo.montoPrestamo,
-      fecha: avaluo.fechaAvaluo,
-      estado: avaluo.articulo.solicitud.estado
-    }));
-
-    res.status(200).json({
-      success: true,
-      data: actividadFormateada
-    });
-
-  } catch (error) {
-    console.error('[EVALUADOR] Error obteniendo actividad:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error al obtener actividad reciente',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
+// Middleware de manejo de errores específico para el evaluador
 router.use((error, req, res, next) => {
   console.error('❌ Error en rutas de evaluador:', error);
   
