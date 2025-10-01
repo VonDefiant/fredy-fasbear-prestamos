@@ -1,6 +1,5 @@
 <template>
   <div class="profile-page">
-    <!-- Header del perfil -->
     <header class="profile-header">
       <div class="header-container">
         <div class="header-left">
@@ -29,10 +28,8 @@
       </div>
     </header>
 
-    <!-- Contenido principal -->
     <main class="profile-main">
       <div class="container">
-        <!-- Información del perfil -->
         <section class="profile-info">
           <div class="profile-avatar">
             <div class="avatar-circle">
@@ -46,9 +43,7 @@
           </div>
         </section>
 
-        <!-- Formularios de edición -->
         <div class="forms-grid">
-          <!-- Formulario de información personal -->
           <section class="form-section">
             <div class="section-header">
               <div class="section-icon">
@@ -60,7 +55,6 @@
               <h3>Información Personal</h3>
             </div>
 
-            <!-- Mensaje de éxito/error para perfil -->
             <div v-if="profileMessage.text" 
                  class="message" 
                  :class="profileMessage.type">
@@ -109,11 +103,16 @@
                   <input
                     id="telefono"
                     v-model="profileForm.telefono"
-                    type="tel"
-                    placeholder="502-1234-5678"
+                    type="text"
+                    placeholder="12345678"
                     required
+                    maxlength="8"
+                    minlength="8"
+                    pattern="[0-9]{8}"
+                    @input="validateNumericInput($event, 'telefono')"
                     :disabled="profileLoading"
                   />
+                  <small class="form-hint">Exactamente 8 dígitos numéricos</small>
                 </div>
 
                 <div class="form-group">
@@ -122,11 +121,15 @@
                     id="cedula"
                     v-model="profileForm.cedula"
                     type="text"
-                    placeholder="Número de DPI"
-                    readonly
-                    disabled
-                    title="El DPI no se puede modificar"
+                    placeholder="1234567890123"
+                    required
+                    maxlength="13"
+                    minlength="13"
+                    pattern="[0-9]{13}"
+                    @input="validateNumericInput($event, 'cedula')"
+                    :disabled="profileLoading"
                   />
+                  <small class="form-hint">Exactamente 13 dígitos numéricos</small>
                 </div>
               </div>
 
@@ -154,6 +157,7 @@
                     disabled
                     title="El email no se puede modificar"
                   />
+                  <small class="form-hint">El email no puede modificarse</small>
                 </div>
               </div>
 
@@ -169,7 +173,7 @@
                 ></textarea>
               </div>
 
-              <button type="submit" class="btn btn-primary" :disabled="profileLoading">
+              <button type="submit" class="btn btn-primary" :disabled="profileLoading || !isProfileFormValid">
                 <svg v-if="profileLoading" class="loading-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                 </svg>
@@ -182,7 +186,6 @@
             </form>
           </section>
 
-          <!-- Formulario de cambio de contraseña -->
           <section class="form-section">
             <div class="section-header">
               <div class="section-icon">
@@ -195,7 +198,6 @@
               <h3>Cambiar Contraseña</h3>
             </div>
 
-            <!-- Mensaje de éxito/error para contraseña -->
             <div v-if="passwordMessage.text" 
                  class="message" 
                  :class="passwordMessage.type">
@@ -321,12 +323,10 @@
 </template>
 
 <script setup>
-// Proteger la ruta con middleware
 definePageMeta({
   middleware: 'auth'
 })
 
-// Meta tags
 useHead({
   title: 'Mi Perfil - Fredy Fasbear',
   meta: [
@@ -334,24 +334,19 @@ useHead({
   ]
 })
 
-// Auth composable
 const { user, checkAuth } = useAuth()
 const { api } = useApi()
 
-// Estado reactivo
 const profileLoading = ref(false)
 const passwordLoading = ref(false)
 
-// Visibilidad de contraseñas
 const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-// Mensajes
 const profileMessage = ref({ text: '', type: '' })
 const passwordMessage = ref({ text: '', type: '' })
 
-// Formularios
 const profileForm = ref({
   nombre: '',
   apellido: '',
@@ -368,7 +363,6 @@ const passwordForm = ref({
   confirmNewPassword: ''
 })
 
-// Computed properties
 const isPasswordFormValid = computed(() => {
   return passwordForm.value.currentPassword &&
          passwordForm.value.newPassword &&
@@ -377,14 +371,26 @@ const isPasswordFormValid = computed(() => {
          passwordForm.value.newPassword.length >= 8
 })
 
-// Fecha máxima para ser mayor de 18 años
+const isProfileFormValid = computed(() => {
+  return profileForm.value.nombre.trim() &&
+         profileForm.value.apellido.trim() &&
+         profileForm.value.telefono.length === 8 &&
+         profileForm.value.cedula.length === 13 &&
+         profileForm.value.direccion.trim()
+})
+
 const maxBirthDate = computed(() => {
   const today = new Date()
   const eighteenYearsAgo = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
   return eighteenYearsAgo.toISOString().split('T')[0]
 })
 
-// Methods
+const validateNumericInput = (event, field) => {
+  const value = event.target.value
+  const numericValue = value.replace(/[^0-9]/g, '')
+  profileForm.value[field] = numericValue
+}
+
 const getUserInitials = () => {
   if (!user.value) return 'U'
   
@@ -401,12 +407,10 @@ const formatDateForInput = (dateString) => {
   if (!dateString) return ''
   
   try {
-    // Si la fecha viene en formato ISO
     if (dateString.includes('T')) {
       return dateString.split('T')[0]
     }
     
-    // Si la fecha viene en formato DD/MM/YYYY
     if (dateString.includes('/')) {
       const parts = dateString.split('/')
       if (parts.length === 3) {
@@ -415,7 +419,6 @@ const formatDateForInput = (dateString) => {
       }
     }
     
-    // Si la fecha viene en formato YYYY-MM-DD
     if (dateString.includes('-')) {
       return dateString
     }
@@ -450,11 +453,11 @@ const loadUserProfile = async () => {
 }
 
 const validateAge = (birthDate) => {
-  if (!birthDate) return true // Opcional
+  if (!birthDate) return true
   
   const today = new Date()
   const birth = new Date(birthDate)
-  const age = today.getFullYear() - birth.getFullYear()
+  let age = today.getFullYear() - birth.getFullYear()
   const monthDiff = today.getMonth() - birth.getMonth()
   
   if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
@@ -469,25 +472,30 @@ const handleUpdateProfile = async () => {
   profileLoading.value = true
 
   try {
-    if (!profileForm.value.nombre || !profileForm.value.apellido || !profileForm.value.telefono || !profileForm.value.direccion) {
+    if (!profileForm.value.nombre || !profileForm.value.apellido || !profileForm.value.telefono || !profileForm.value.cedula || !profileForm.value.direccion) {
       throw new Error('Por favor completa todos los campos obligatorios')
     }
 
-    // Validar edad si se proporcionó fecha de nacimiento
+    if (profileForm.value.telefono.length !== 8) {
+      throw new Error('El teléfono debe tener exactamente 8 dígitos')
+    }
+
+    if (profileForm.value.cedula.length !== 13) {
+      throw new Error('El DPI debe tener exactamente 13 dígitos')
+    }
+
     if (profileForm.value.fechaNacimiento && !validateAge(profileForm.value.fechaNacimiento)) {
       throw new Error('Debes ser mayor de 18 años')
     }
-
-    console.log('🔄 Actualizando perfil:', profileForm.value)
 
     const updateData = {
       nombre: profileForm.value.nombre.trim(),
       apellido: profileForm.value.apellido.trim(),
       telefono: profileForm.value.telefono.trim(),
+      cedula: profileForm.value.cedula.trim(),
       direccion: profileForm.value.direccion.trim(),
     }
 
-    // Solo incluir fecha de nacimiento si se proporcionó
     if (profileForm.value.fechaNacimiento) {
       updateData.fechaNacimiento = profileForm.value.fechaNacimiento
     }
@@ -498,7 +506,6 @@ const handleUpdateProfile = async () => {
     })
 
     if (response.success) {
-      // Actualizar datos del usuario en el store
       const { login, getToken } = useAuth()
       const token = getToken()
       login(response.data.user, token, false)
@@ -508,9 +515,6 @@ const handleUpdateProfile = async () => {
         type: 'success'
       }
       
-      console.log('✅ Perfil actualizado correctamente')
-      
-      // Limpiar mensaje después de 3 segundos
       setTimeout(() => {
         clearProfileMessage()
       }, 3000)
@@ -519,7 +523,7 @@ const handleUpdateProfile = async () => {
     }
 
   } catch (error) {
-    console.error('❌ Error actualizando perfil:', error)
+    console.error('Error actualizando perfil:', error)
     
     let errorMessage = 'Error al actualizar el perfil'
     
@@ -569,14 +573,12 @@ const handleChangePassword = async () => {
         type: 'success'
       }
       
-      // Limpiar formulario
       passwordForm.value = {
         currentPassword: '',
         newPassword: '',
         confirmNewPassword: ''
       }
       
-      // Limpiar mensaje después de 3 segundos
       setTimeout(() => {
         clearPasswordMessage()
       }, 3000)
@@ -612,7 +614,6 @@ const clearPasswordMessage = () => {
   passwordMessage.value = { text: '', type: '' }
 }
 
-// Inicializar
 onMounted(async () => {
   checkAuth()
   
@@ -631,7 +632,6 @@ onMounted(async () => {
   background: #f8f9fa;
 }
 
-/* Header del perfil */
 .profile-header {
   background: linear-gradient(135deg, #2C3E50 0%, #1A1A1A 100%);
   color: white;
@@ -689,7 +689,6 @@ onMounted(async () => {
   margin: 0;
 }
 
-/* Main content */
 .profile-main {
   padding: 2rem 0;
 }
@@ -700,7 +699,6 @@ onMounted(async () => {
   padding: 0 2rem;
 }
 
-/* Información del perfil */
 .profile-info {
   background: white;
   padding: 2rem;
@@ -753,14 +751,12 @@ onMounted(async () => {
   font-weight: 500;
 }
 
-/* Grid de formularios */
 .forms-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
   gap: 2rem;
 }
 
-/* Secciones de formulario */
 .form-section {
   background: white;
   border-radius: 12px;
@@ -793,7 +789,6 @@ onMounted(async () => {
   font-size: 1.25rem;
 }
 
-/* Formularios */
 .profile-form,
 .password-form {
   padding: 2rem;
@@ -849,7 +844,6 @@ onMounted(async () => {
   min-height: 80px;
 }
 
-/* Estilos específicos para input de fecha */
 .form-group input[type="date"] {
   position: relative;
 }
@@ -859,17 +853,6 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.form-group input[type="date"]::-webkit-datetime-edit-text {
-  color: #2C3E50;
-}
-
-.form-group input[type="date"]::-webkit-datetime-edit-month-field,
-.form-group input[type="date"]::-webkit-datetime-edit-day-field,
-.form-group input[type="date"]::-webkit-datetime-edit-year-field {
-  color: #2C3E50;
-}
-
-/* Input wrapper para contraseñas */
 .input-wrapper {
   position: relative;
 }
@@ -896,10 +879,9 @@ onMounted(async () => {
   display: block;
   margin-top: 0.25rem;
   color: #6c757d;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
-/* Botones */
 .btn {
   display: flex;
   align-items: center;
@@ -941,7 +923,6 @@ onMounted(async () => {
   box-shadow: 0 4px 15px rgba(44, 62, 80, 0.3);
 }
 
-/* Loading spinner */
 .loading-spinner {
   animation: spin 1s linear infinite;
 }
@@ -951,7 +932,6 @@ onMounted(async () => {
   to { transform: rotate(360deg); }
 }
 
-/* Mensajes */
 .message {
   display: flex;
   align-items: center;
@@ -974,7 +954,6 @@ onMounted(async () => {
   border: 1px solid #f5c6cb;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .header-container {
     padding: 0 1rem;
