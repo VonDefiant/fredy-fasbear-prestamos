@@ -269,7 +269,7 @@
       </div>
 
       <!-- AVALÚO EXISTENTE (si ya fue evaluado) -->
-      <div v-else-if="solicitud.Articulo[0]?.Avaluo" class="info-card avaluo-info">
+      <div v-else-if="solicitud.articulos?.[0]?.avaluo" class="info-card avaluo-info">      
         <div class="card-header resultado">
           <h3>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -288,7 +288,7 @@
           <div class="avaluo-item">
             <span class="label">Evaluador:</span>
             <span class="value">
-              {{ solicitud.Articulo[0].Avaluo.evaluador?.nombre }} 
+  {{ solicitud.articulos[0]?.avaluo?.evaluador?.nombre }}
               {{ solicitud.Articulo[0].Avaluo.evaluador?.apellido }}
             </span>
           </div>
@@ -446,8 +446,8 @@ const cargarSolicitud = async () => {
     solicitud.value = response.data
     
     // Pre-cargar valores sugeridos
-    if (solicitud.value.Articulo && solicitud.value.Articulo[0]) {
-      const articulo = solicitud.value.Articulo[0]
+    if (solicitud.value.articulos && solicitud.value.articulos[0]) {
+      const articulo = solicitud.value.articulos[0]
       formEvaluacion.value.valorComercial = parseFloat(articulo.valorEstimadoCliente) || 0
       
       // Porcentaje por defecto según tipo de artículo
