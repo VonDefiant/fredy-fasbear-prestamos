@@ -24,7 +24,7 @@ router.use(requireEvaluador);
 router.get('/stats', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo estadísticas del evaluador...');
-    const evaluadorId = req.user.userId;
+    const evaluadorId = req.user.id;
 
     // Obtener todos los avalúos del evaluador
     const avaluosDelEvaluador = await prisma.avaluo.findMany({
@@ -420,7 +420,7 @@ router.get('/solicitudes/:id/archivos', async (req, res) => {
 router.post('/solicitudes/:id/evaluar', async (req, res) => {
   try {
     const { id } = req.params;
-    const evaluadorId = req.user.userId;
+    const evaluadorId = req.user.id;
     const { estado, montoAutorizado, observaciones } = req.body;
 
     console.log('[EVALUADOR] Evaluando solicitud:', id, estado);
@@ -487,7 +487,7 @@ router.post('/solicitudes/:id/evaluar', async (req, res) => {
             articuloId: articulo.id,
             evaluadorId: evaluadorId,
             valorComercial: parseFloat(valorComercial),
-            porcentajeAplicado: porcentajeAplicado,
+            porcentajeAplicado: parseFloat(porcentajeAplicado.toFixed(2)),
             montoPrestamo: parseFloat(montoAutorizado),
             observaciones: observaciones || null
           }
@@ -522,7 +522,7 @@ router.post('/solicitudes/:id/evaluar', async (req, res) => {
 router.get('/recent-activity', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo actividad reciente...');
-    const evaluadorId = req.user.userId;
+    const evaluadorId = req.user.id;
     const { limite = 10 } = req.query;
 
     const actividad = await prisma.avaluo.findMany({
@@ -584,7 +584,7 @@ router.get('/recent-activity', async (req, res) => {
 router.get('/mis-avaluos', async (req, res) => {
   try {
     console.log('[EVALUADOR] Obteniendo historial de avalúos...');
-    const evaluadorId = req.user.userId;
+    const evaluadorId = req.user.id;
     const { limite = 50, pagina = 1 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limite);
 
