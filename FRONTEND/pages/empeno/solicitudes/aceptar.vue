@@ -165,7 +165,7 @@
               </div>
 
               <div class="form-group">
-                <label for="cedula">DPI/Cédula *</label>
+                <label for="cedula">DPI*</label>
                 <input 
                   type="text" 
                   id="cedula" 
@@ -437,7 +437,14 @@ const notification = ref({
 
 const solicitudId = computed(() => {
   const id = route.query.id || route.params.id
-  return parseInt(id)
+  const parsedId = parseInt(id)
+  
+  if (isNaN(parsedId) || parsedId <= 0) {
+    console.error('⚠️ ID de solicitud inválido:', id)
+    return null
+  }
+  
+  return parsedId
 })
 
 const fechaMaxima = computed(() => {
@@ -447,15 +454,21 @@ const fechaMaxima = computed(() => {
 })
 
 const formatCurrency = (amount) => {
-  if (!amount && amount !== 0) return '0.00'
+  if (!amount && amount !== 0) return 'Q0.00'
   return new Intl.NumberFormat('es-GT', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    style: 'currency',
+    currency: 'GTQ'
   }).format(amount)
 }
 
-const cargarDatos = async () => {
+const cargarDatosSolicitud = async () => {
   try {
+    if (!solicitudId.value) {
+      error.value = 'ID de solicitud inválido. Por favor, vuelve a intentarlo.'
+      loading.value = false
+      return
+    }
+    
     loading.value = true
     error.value = null
     
@@ -464,26 +477,20 @@ const cargarDatos = async () => {
     if (response.success && response.data) {
       solicitud.value = response.data
       
-      if (solicitud.value.estado !== 'Aprobada') {
-        error.value = 'Esta solicitud no está aprobada'
-        return
-      }
-      
       if (user.value) {
-        formDatos.value = {
-          nombre: user.value.nombre || '',
-          apellido: user.value.apellido || '',
-          cedula: user.value.cedula || '',
-          telefono: user.value.telefono || '',
-          direccion: user.value.direccion || '',
-          fechaNacimiento: user.value.fechaNacimiento || ''
-        }
+        formDatos.value.nombre = user.value.nombre || ''
+        formDatos.value.apellido = user.value.apellido || ''
+        formDatos.value.telefono = user.value.telefono || ''
+        formDatos.value.cedula = user.value.cedula || ''
+        formDatos.value.direccion = user.value.direccion || ''
+        formDatos.value.fechaNacimiento = user.value.fechaNacimiento || ''
       }
     } else {
       throw new Error(response.message || 'No se pudo cargar la solicitud')
     }
   } catch (err) {
-    error.value = err.message || 'Error al cargar la información'
+    console.error('❌ Error cargando solicitud:', err)
+    error.value = err.message || 'Error al cargar los datos de la solicitud'
   } finally {
     loading.value = false
   }
@@ -492,10 +499,6 @@ const cargarDatos = async () => {
 const handleDpiFrontal = (event) => {
   const file = event.target.files[0]
   if (file) {
-    if (file.size > 5 * 1024 * 1024) {
-      mostrarNotificacion('La imagen no puede superar los 5MB', 'error')
-      return
-    }
     fotoDpiFrontal.value = file
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -508,10 +511,6 @@ const handleDpiFrontal = (event) => {
 const handleDpiReverso = (event) => {
   const file = event.target.files[0]
   if (file) {
-    if (file.size > 5 * 1024 * 1024) {
-      mostrarNotificacion('La imagen no puede superar los 5MB', 'error')
-      return
-    }
     fotoDpiReverso.value = file
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -550,7 +549,11 @@ const anteriorPaso = () => {
 }
 
 const volverAtras = () => {
-  router.push(`/empeno/solicitudes/${solicitudId.value}`)
+  if (solicitudId.value) {
+    router.push(`/empeno/solicitudes/${solicitudId.value}`)
+  } else {
+    router.push('/empeno')
+  }
 }
 
 const mostrarNotificacion = (message, type = 'success') => {
@@ -567,23 +570,33 @@ const mostrarNotificacion = (message, type = 'success') => {
 
 const enviarSolicitudPrestamo = async () => {
   try {
+    if (!solicitudId.value) {
+      mostrarNotificacion('ID de solicitud inválido', 'error')
+      return
+    }
+    
+    if (!fotoDpiFrontal.value || !fotoDpiReverso.value) {
+      mostrarNotificacion('Por favor, sube ambas fotos del DPI', 'error')
+      return
+    }
+    
+    if (!formDatos.value.nombre || !formDatos.value.apellido || !formDatos.value.cedula) {
+      mostrarNotificacion('Por favor, completa todos los datos personales', 'error')
+      return
+    }
+    
     enviando.value = true
     
     const formData = new FormData()
-    formData.append('solicitudId', solicitudId.value)
+    formData.append('solicitudId', solicitudId.value.toString())
     formData.append('nombre', formDatos.value.nombre)
     formData.append('apellido', formDatos.value.apellido)
     formData.append('cedula', formDatos.value.cedula)
     formData.append('telefono', formDatos.value.telefono)
     formData.append('direccion', formDatos.value.direccion)
     formData.append('fechaNacimiento', formDatos.value.fechaNacimiento)
-    
-    if (fotoDpiFrontal.value) {
-      formData.append('dpiFrontal', fotoDpiFrontal.value)
-    }
-    if (fotoDpiReverso.value) {
-      formData.append('dpiReverso', fotoDpiReverso.value)
-    }
+    formData.append('dpiFrontal', fotoDpiFrontal.value)
+    formData.append('dpiReverso', fotoDpiReverso.value)
     
     const response = await api('/prestamos/crear-desde-solicitud', {
       method: 'POST',
@@ -595,20 +608,33 @@ const enviarSolicitudPrestamo = async () => {
       mostrarNotificacion('¡Préstamo solicitado exitosamente!', 'success')
       
       setTimeout(() => {
-        router.push('/empeno')
+        router.push('/empeno/prestamos')
       }, 2000)
     } else {
-      throw new Error(response.message || 'Error al crear el préstamo')
+      throw new Error(response.message || 'Error al procesar la solicitud')
     }
+    
   } catch (err) {
-    mostrarNotificacion(err.message || 'Error al enviar la solicitud', 'error')
+    console.error('❌ Error enviando solicitud:', err)
+    mostrarNotificacion(
+      err.message || 'Error al procesar la solicitud',
+      'error'
+    )
   } finally {
     enviando.value = false
   }
 }
 
 onMounted(async () => {
-  await cargarDatos()
+  if (!solicitudId.value) {
+    error.value = 'ID de solicitud inválido. Redirigiendo...'
+    setTimeout(() => {
+      router.push('/empeno')
+    }, 2000)
+    return
+  }
+  
+  await cargarDatosSolicitud()
 })
 </script>
 
