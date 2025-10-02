@@ -1,6 +1,5 @@
 <template>
   <div class="detalle-solicitud-page">
-    <!-- Loading State -->
     <div class="loading-container" v-if="loading">
       <div class="loading-spinner">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" class="spinning">
@@ -10,7 +9,6 @@
       <p>Cargando detalle de solicitud...</p>
     </div>
 
-    <!-- Error State -->
     <div class="error-container" v-else-if="error">
       <div class="error-icon">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
@@ -39,10 +37,8 @@
       </div>
     </div>
 
-    <!-- Contenido Principal -->
     <div class="detalle-container" v-else-if="solicitud">
       
-      <!-- Header con navegación y estado -->
       <div class="detalle-header">
         <div class="header-navigation">
           <button @click="volverAlInicio" class="btn-back">
@@ -73,7 +69,6 @@
           </div>
         </div>
 
-        <!-- Progress Steps -->
         <div class="progress-steps">
           <div class="step" :class="{ active: true, completed: ['Evaluando', 'Aprobada', 'Rechazada'].includes(solicitud.estado) }">
             <span class="step-number">1</span>
@@ -110,7 +105,6 @@
         </div>
       </div>
 
-      <!-- Alertas según estado -->
       <div v-if="solicitud.estado === 'Rechazada'" class="rejection-alert">
         <div class="rejection-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -149,10 +143,45 @@
           <p v-if="solicitud.observaciones">
             <strong>Observaciones:</strong> {{ solicitud.observaciones }}
           </p>
+          
+          <div class="approval-actions">
+            <button 
+              @click="solicitarPrestamo" 
+              :disabled="loadingAction"
+              class="btn-solicitar-prestamo"
+            >
+              <div class="btn-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M2 10h20" stroke="currentColor" stroke-width="2"/>
+                  <circle cx="7" cy="15" r="1" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="btn-content">
+                <span class="btn-title">{{ loadingAction ? 'Procesando...' : 'Solicitar Préstamo' }}</span>
+                <span class="btn-subtitle">Continuar con la aceptación</span>
+              </div>
+              <div class="btn-arrow">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </div>
+            </button>
+            
+            <div v-if="solicitud.prestamo?.montoSolicitado" class="info-monto-aprobado">
+              <div class="info-item">
+                <span class="info-label">Monto aprobado:</span>
+                <span class="info-valor">Q{{ formatCurrency(solicitud.prestamo.montoSolicitado) }}</span>
+              </div>
+              <div class="info-item" v-if="solicitud.prestamo?.plazoMeses">
+                <span class="info-label">Plazo:</span>
+                <span class="info-valor">{{ solicitud.prestamo.plazoMeses }} meses</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Navegación de pestañas -->
       <div class="pestanas-navegacion">
         <button 
           @click="pestanaActiva = 'informacion'"
@@ -166,7 +195,6 @@
           Información General
         </button>
 
-        <!-- NUEVA PESTAÑA: Detalles Financieros -->
         <button 
           @click="pestanaActiva = 'financiero'"
           :class="['btn-pestana', { active: pestanaActiva === 'financiero' }]"
@@ -192,13 +220,10 @@
         </button>
       </div>
 
-      <!-- Contenido de pestañas -->
       <div class="pestanas-contenido">
         
-        <!-- Pestaña: Información General -->
         <div v-if="pestanaActiva === 'informacion'" class="detalle-content">
           
-          <!-- Información General -->
           <div class="info-section">
             <div class="section-header">
               <h2>
@@ -266,7 +291,6 @@
             </div>
           </div>
 
-          <!-- Artículos Incluidos - MEJORADO -->
           <div class="articulos-section">
             <div class="section-header">
               <h2>
@@ -301,12 +325,10 @@
                 </div>
 
                 <div class="articulo-content">
-                  <!-- Descripción principal -->
                   <div class="articulo-descripcion">
                     <h4>{{ articulo.descripcion || 'Sin descripción' }}</h4>
                   </div>
 
-                  <!-- Valoración estimada del cliente - NUEVO -->
                   <div v-if="articulo.valor_estimado_cliente" class="valoracion-cliente">
                     <div class="valoracion-header">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -318,7 +340,6 @@
                     <div class="valoracion-monto">{{ formatCurrency(articulo.valor_estimado_cliente) }}</div>
                   </div>
 
-                  <!-- Detalles del artículo - AMPLIADO -->
                   <div class="articulo-detalles">
                     <div class="detalles-grid">
                       <div class="detalle-item" v-if="articulo.marca">
@@ -343,7 +364,6 @@
                     </div>
                   </div>
 
-                  <!-- Especificaciones técnicas - MEJORADO -->
                   <div v-if="articulo.especificaciones_tecnicas" class="especificaciones-section">
                     <div class="specs-header">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -358,7 +378,6 @@
                     </div>
                   </div>
 
-                  <!-- Información de avalúo si existe -->
                   <div v-if="articulo.avaluo" class="avaluo-section">
                     <div class="avaluo-header">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -386,10 +405,8 @@
                     </div>
                   </div>
 
-                  <!-- Media (Fotos y Documentos) -->
                   <div class="articulo-media" v-if="articulo.documentos && articulo.documentos.length > 0">
                     
-                    <!-- Fotos -->
                     <div class="media-section" v-if="obtenerFotos(articulo.documentos).length > 0">
                       <div class="media-title">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -421,7 +438,6 @@
                       </div>
                     </div>
 
-                    <!-- Documentos -->
                     <div class="media-section" v-if="obtenerDocumentos(articulo.documentos).length > 0">
                       <div class="media-title">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -473,7 +489,6 @@
             </div>
           </div>
 
-          <!-- Acciones Disponibles -->
           <div class="actions-section">
             <div class="section-header">
               <h2>
@@ -486,7 +501,6 @@
 
             <div class="actions-grid">
               
-              <!-- Acciones para Pendiente/Evaluando -->
               <template v-if="['Pendiente', 'Evaluando'].includes(solicitud.estado)">
                 <button @click="confirmarCancelacion" class="action-button danger" :disabled="loadingAction">
                   <div class="action-icon">
@@ -503,7 +517,6 @@
                 </button>
               </template>
 
-              <!-- Acciones para Aprobada -->
               <template v-if="solicitud.estado === 'Aprobada'">
                 <button @click="aceptarOferta" class="action-button success" :disabled="loadingAction">
                   <div class="action-icon">
@@ -519,7 +532,6 @@
                 </button>
               </template>
 
-              <!-- Acción universal: Nueva solicitud -->
               <template v-if="['Rechazada', 'Completada'].includes(solicitud.estado)">
                 <button @click="crearNuevaSolicitud" class="action-button primary">
                   <div class="action-icon">
@@ -535,7 +547,6 @@
                 </button>
               </template>
 
-              <!-- Botón universal: Volver al inicio -->
               <button @click="volverAlInicio" class="action-button secondary">
                 <div class="action-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -553,10 +564,8 @@
           </div>
         </div>
 
-        <!-- NUEVA PESTAÑA: Detalles Financieros -->
         <div v-if="pestanaActiva === 'financiero'" class="detalle-content">
           
-          <!-- Resumen Financiero -->
           <div class="financiero-section">
             <div class="section-header">
               <h2>
@@ -569,7 +578,6 @@
             </div>
 
             <div class="financiero-resumen">
-              <!-- Montos principales -->
               <div class="montos-principales">
                 <div class="monto-card principal" v-if="solicitud.prestamo?.montoSolicitado">
                   <div class="monto-icono">
@@ -628,7 +636,6 @@
                 </div>
               </div>
 
-              <!-- Desglose si es en cuotas -->
               <div v-if="solicitud.prestamo?.modalidadPago !== 'contado' && planPagosCalculado.length > 0" class="plan-pagos-section">
                 <div class="plan-header">
                   <h3>Plan de Pagos</h3>
@@ -677,7 +684,6 @@
                   </div>
                 </div>
 
-                <!-- Totales del plan -->
                 <div class="plan-totales">
                   <div class="total-item">
                     <span class="total-label">Total Capital:</span>
@@ -694,7 +700,6 @@
                 </div>
               </div>
 
-              <!-- Información adicional -->
               <div class="info-adicional" v-if="solicitud.prestamo?.plazoMeses">
                 <div class="info-item">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -718,7 +723,6 @@
           </div>
         </div>
 
-        <!-- Pestaña: Archivos Adjuntos -->
         <div v-if="pestanaActiva === 'archivos'" class="archivos-pestana">
           <ArchivosAdjuntos 
             :archivos="archivos"
@@ -746,7 +750,6 @@
       </div>
     </div>
 
-    <!-- MODAL DE CONFIRMACIÓN DE CANCELACIÓN -->
     <div class="modal-overlay" v-if="mostrarConfirmacionCancelacion" @click="cerrarConfirmacionCancelacion">
       <div class="modal-container" @click.stop>
         <div class="modal-header">
@@ -810,7 +813,6 @@
       </div>
     </div>
 
-    <!-- MODAL VISUALIZADOR DE IMÁGENES -->
     <div class="modal-overlay" v-if="imagenVisualizando" @click="cerrarVisualizadorImagen">
       <div class="image-viewer" @click.stop>
         <div class="viewer-header">
@@ -878,7 +880,6 @@
       </div>
     </div>
 
-    <!-- Sistema de notificaciones -->
     <div class="notification-container" v-if="notification.show">
       <div class="notification" :class="`notification-${notification.type}`">
         <div class="notification-content">
@@ -908,17 +909,13 @@
     </div>
   </div>
 </template>
-
 <script setup>
-// Importar el componente de archivos adjuntos
 import ArchivosAdjuntos from '~/pages/empeno/solicitudes/ArchivosAdjuntos.vue'
 
-// Proteger la ruta con middleware
 definePageMeta({
   middleware: 'auth'
 })
 
-// ===== COMPOSABLES Y DEPENDENCIAS =====
 const route = useRoute()
 const { user } = useAuth()
 const { api } = useApi()
@@ -929,7 +926,6 @@ const {
 } = useSolicitudes()
 const config = useRuntimeConfig()
 
-// ===== META TAGS =====
 useHead({
   title: 'Detalle de Solicitud - Mis Empéños',
   meta: [
@@ -937,43 +933,35 @@ useHead({
   ]
 })
 
-// ===== ESTADO REACTIVO =====
 const loading = ref(true)
 const error = ref(null)
 const solicitud = ref(null)
 const loadingAction = ref(false)
 const loadingCancelacion = ref(false)
 
-// Estado para archivos adjuntos
 const archivos = ref([])
 const loadingArchivos = ref(false)
 
-// Estado para pestañas
-const pestanaActiva = ref('informacion') // 'informacion', 'financiero' o 'archivos'
+const pestanaActiva = ref('informacion')
 
-// Modal de confirmación
 const mostrarConfirmacionCancelacion = ref(false)
 const motivoCancelacion = ref('')
 
-// Visualizador de imágenes
 const imagenVisualizando = ref(null)
 const imagenesVisualizando = ref([])
 const indiceImagenActual = ref(0)
 const tituloImagenVisualizando = ref('')
 
-// Sistema de notificaciones
 const notification = ref({
   show: false,
   type: 'success',
   message: ''
 })
 
-// ===== COMPUTED PROPERTIES =====
 const solicitudId = computed(() => {
   return parseInt(route.params.id)
 })
 
-// NUEVO: Verificar si tiene información financiera
 const tieneInformacionFinanciera = computed(() => {
   return solicitud.value && solicitud.value.prestamo && (
     solicitud.value.prestamo.montoSolicitado || 
@@ -983,7 +971,6 @@ const tieneInformacionFinanciera = computed(() => {
   )
 })
 
-// NUEVO: Calcular plan de pagos
 const planPagosCalculado = computed(() => {
   if (!solicitud.value || 
       !solicitud.value.prestamo || 
@@ -992,7 +979,6 @@ const planPagosCalculado = computed(() => {
     return []
   }
 
-  // Usar el plan de pagos que viene del backend
   return solicitud.value.prestamo.planPagos.map(pago => ({
     numero: pago.numeroPago,
     fecha: new Date(pago.fechaPago),
@@ -1004,7 +990,6 @@ const planPagosCalculado = computed(() => {
   }))
 })
 
-// NUEVO: Monto por pago
 const montoPorPago = computed(() => {
   if (solicitud.value?.prestamo?.resumenFinanciero?.montoPorPago) {
     return solicitud.value.prestamo.resumenFinanciero.montoPorPago
@@ -1012,7 +997,6 @@ const montoPorPago = computed(() => {
   return 0
 })
 
-// NUEVO: Frecuencia de pago
 const frequenciaPago = computed(() => {
   if (!solicitud.value?.prestamo?.modalidadPago) return ''
   
@@ -1026,7 +1010,6 @@ const frequenciaPago = computed(() => {
   return frecuencias[solicitud.value.prestamo.modalidadPago] || ''
 })
 
-// NUEVO: Total de intereses
 const totalIntereses = computed(() => {
   if (solicitud.value?.prestamo?.resumenFinanciero?.interesTotal) {
     return solicitud.value.prestamo.resumenFinanciero.interesTotal
@@ -1034,7 +1017,6 @@ const totalIntereses = computed(() => {
   return 0
 })
 
-// NUEVO: Fecha de vencimiento calculada
 const fechaVencimientoCalculada = computed(() => {
   if (!solicitud.value?.fechaSolicitud || !solicitud.value?.prestamo?.plazoMeses) return null
   
@@ -1044,14 +1026,11 @@ const fechaVencimientoCalculada = computed(() => {
   return fechaInicio
 })
 
-// ===== FUNCIONES DE CARGA DE ARCHIVOS =====
 const cargarArchivosAdjuntos = async () => {
   try {
     loadingArchivos.value = true
-    console.log('📎 Cargando archivos adjuntos para solicitud:', solicitudId.value)
     
     if (!solicitudId.value || isNaN(solicitudId.value)) {
-      console.warn('❌ ID de solicitud inválido para archivos')
       return
     }
     
@@ -1061,7 +1040,6 @@ const cargarArchivosAdjuntos = async () => {
       const { archivos: archivosPorTipo } = response.data
       const todosLosArchivos = []
       
-      // Agregar fotos
       if (archivosPorTipo.fotos) {
         archivosPorTipo.fotos.forEach(foto => {
           todosLosArchivos.push({
@@ -1077,7 +1055,6 @@ const cargarArchivosAdjuntos = async () => {
         })
       }
       
-      // Agregar documentos
       if (archivosPorTipo.documentos) {
         archivosPorTipo.documentos.forEach(doc => {
           todosLosArchivos.push({
@@ -1093,7 +1070,6 @@ const cargarArchivosAdjuntos = async () => {
         })
       }
       
-      // Agregar otros archivos
       if (archivosPorTipo.otros) {
         archivosPorTipo.otros.forEach(otro => {
           todosLosArchivos.push({
@@ -1111,20 +1087,11 @@ const cargarArchivosAdjuntos = async () => {
       
       archivos.value = todosLosArchivos
       
-      console.log('✅ Archivos cargados:', {
-        total: todosLosArchivos.length,
-        fotos: archivosPorTipo.fotos?.length || 0,
-        documentos: archivosPorTipo.documentos?.length || 0,
-        otros: archivosPorTipo.otros?.length || 0
-      })
-      
     } else {
-      console.warn('⚠️ No se encontraron archivos:', response.message)
       archivos.value = []
     }
     
   } catch (err) {
-    console.error('❌ Error cargando archivos adjuntos:', err)
     archivos.value = []
   } finally {
     loadingArchivos.value = false
@@ -1132,11 +1099,9 @@ const cargarArchivosAdjuntos = async () => {
 }
 
 const refrescarArchivos = async () => {
-  console.log('🔄 Refrescando archivos adjuntos...')
   await cargarArchivosAdjuntos()
 }
 
-// ===== MÉTODOS DE UTILIDAD Y FORMATEO =====
 const formatCurrency = (amount) => {
   if (!amount && amount !== 0) return '0.00'
   return new Intl.NumberFormat('es-GT', {
@@ -1166,7 +1131,6 @@ const formatDateLong = (dateString) => {
   })
 }
 
-// NUEVO: Formato de fecha corta para tabla
 const formatDateShort = (dateString) => {
   if (!dateString) return 'Sin fecha'
   return new Date(dateString).toLocaleDateString('es-GT', {
@@ -1203,7 +1167,6 @@ const formatearEstadoFisico = (estado) => {
   return estados[estado] || estado || 'No especificado'
 }
 
-// NUEVO: Formatear modalidad de pago
 const formatModalidadPago = (modalidad) => {
   const modalidades = {
     'contado': 'Pago al Contado',
@@ -1214,12 +1177,10 @@ const formatModalidadPago = (modalidad) => {
   return modalidades[modalidad] || modalidad
 }
 
-// NUEVO: Obtener color hexadecimal para muestras de color
 const getColorHex = (colorName) => {
   if (!colorName) return '#CCCCCC'
   
   const colores = {
-    // Colores básicos
     'rojo': '#FF0000',
     'azul': '#0000FF',
     'verde': '#008000',
@@ -1230,13 +1191,9 @@ const getColorHex = (colorName) => {
     'rosa': '#FFC0CB',
     'morado': '#800080',
     'naranja': '#FFA500',
-    
-    // Metales
     'plata': '#C0C0C0',
     'oro': '#FFD700',
     'bronce': '#CD7F32',
-    
-    // Tonos específicos
     'azul marino': '#000080',
     'verde oscuro': '#006400',
     'rojo oscuro': '#8B0000',
@@ -1288,10 +1245,8 @@ const mostrarNotificacion = (message, type = 'success') => {
   }, 5000)
 }
 
-// ===== MÉTODOS DE GESTIÓN DE ARCHIVOS =====
 const manejarErrorImagen = (event) => {
   event.target.src = '/images/error-image.svg'
-  console.warn('Error cargando imagen:', event.target.src)
 }
 
 const obtenerFotos = (documentos) => {
@@ -1346,13 +1301,10 @@ const abrirDocumento = (documento) => {
   window.open(url, '_blank')
 }
 
-// ===== MÉTODOS DE CARGA DE DATOS =====
 const cargarDetalle = async () => {
   try {
     loading.value = true
     error.value = null
-    
-    console.log('🔍 Cargando detalle de solicitud:', solicitudId.value)
     
     if (!solicitudId.value || isNaN(solicitudId.value)) {
       throw new Error('ID de solicitud inválido')
@@ -1363,14 +1315,10 @@ const cargarDetalle = async () => {
     if (response.success && response.data) {
       solicitud.value = response.data
       
-      console.log('✅ Detalle cargado:', solicitud.value)
-      
-      // Actualizar meta tags dinámicamente
       useHead({
         title: `${solicitud.value.numero} - Detalle de Solicitud`,
       })
       
-      // Cargar archivos adjuntos después de cargar el detalle
       await cargarArchivosAdjuntos()
       
     } else {
@@ -1378,14 +1326,12 @@ const cargarDetalle = async () => {
     }
     
   } catch (err) {
-    console.error('❌ Error cargando detalle:', err)
     error.value = err.message || 'Error al cargar el detalle de la solicitud'
   } finally {
     loading.value = false
   }
 }
 
-// ===== MÉTODOS DE NAVEGACIÓN =====
 const volverAlInicio = () => {
   navigateTo('/empeno')
 }
@@ -1394,16 +1340,26 @@ const crearNuevaSolicitud = () => {
   navigateTo('/empeno?nueva=true')
 }
 
-// ===== MÉTODOS DE ACCIONES =====
+const solicitarPrestamo = async () => {
+  try {
+    loadingAction.value = true
+    
+    await navigateTo(`/empeno/solicitudes/aceptar?id=${solicitudId.value}`)
+    
+  } catch (error) {
+    mostrarNotificacion('Error al procesar la solicitud del préstamo', 'error')
+  } finally {
+    loadingAction.value = false
+  }
+}
+
 const aceptarOferta = async () => {
   try {
     loadingAction.value = true
-    console.log('✅ Redirigiendo para aceptar oferta:', solicitudId.value)
     
     navigateTo(`/empeno/solicitudes/${solicitudId.value}/aceptar`)
     
   } catch (error) {
-    console.error('❌ Error procesando aceptación:', error)
     mostrarNotificacion('Error al procesar la aceptación', 'error')
   } finally {
     loadingAction.value = false
@@ -1411,7 +1367,6 @@ const aceptarOferta = async () => {
 }
 
 const confirmarCancelacion = () => {
-  console.log('⚠️ Solicitando confirmación de cancelación')
   mostrarConfirmacionCancelacion.value = true
   motivoCancelacion.value = ''
 }
@@ -1430,12 +1385,6 @@ const ejecutarCancelacion = async () => {
   try {
     loadingCancelacion.value = true
     
-    console.log('❌ Cancelando solicitud:', {
-      id: solicitud.value.id_solicitud,
-      numero: solicitud.value.numero,
-      motivo: motivoCancelacion.value
-    })
-    
     const response = await cancelarSolicitud(
       solicitud.value.id_solicitud,
       motivoCancelacion.value || 'Cancelada por el usuario desde la página de detalle'
@@ -1449,15 +1398,11 @@ const ejecutarCancelacion = async () => {
       
       cerrarConfirmacionCancelacion()
       await cargarDetalle()
-      
-      console.log('✅ Solicitud cancelada exitosamente')
     } else {
       throw new Error(response.message || 'Error desconocido al cancelar')
     }
     
   } catch (error) {
-    console.error('❌ Error cancelando solicitud:', error)
-    
     let mensajeError = 'Error al cancelar la solicitud'
     if (error.message) {
       if (error.message.includes('estado')) {
@@ -1477,29 +1422,21 @@ const ejecutarCancelacion = async () => {
   }
 }
 
-// ===== WATCHERS =====
 watch(() => route.params.id, (newId, oldId) => {
   if (newId && newId !== oldId) {
     cargarDetalle()
   }
 })
 
-// NUEVO: Watcher para cambiar pestaña automáticamente si tiene información financiera
 watch(() => tieneInformacionFinanciera.value, (tieneInfo) => {
   if (tieneInfo && pestanaActiva.value === 'informacion') {
-    // Opcionalmente cambiar a pestaña financiera automáticamente
-    // pestanaActiva.value = 'financiero'
   }
 })
 
-// ===== LIFECYCLE =====
 onMounted(async () => {
-  console.log('🚀 Iniciando página de detalle de solicitud...')
-  console.log('📄 ID de solicitud:', solicitudId.value)
   await cargarDetalle()
 })
 
-// ===== EXPOSICIÓN DE FUNCIONES =====
 defineExpose({
   refrescarArchivos,
   cargarArchivosAdjuntos,
@@ -1508,35 +1445,27 @@ defineExpose({
 </script>
 
 <style scoped>
-/* ===== VARIABLES CSS CON PALETA CORPORATIVA ===== */
 :root {
-  /* Colores principales del logo */
   --color-negro-carbon: #1A1A1A;
   --color-blanco-perla: #F5F5F5;
   --color-gris-acero: #4A4A4A;
   --color-azul-marino: #2C3E50;
-  
-  /* Colores complementarios */
   --color-dorado-vintage: #D4AF37;
   --color-dorado-claro: #F4D03F;
   --color-rojo-granate: #8B0000;
   --color-marron-chocolate: #3E2723;
   --color-verde-bosque: #1B4332;
-
-  /* Utilidades */
   --border-radius: 12px;
   --shadow-card: 0 15px 35px rgba(26, 26, 26, 0.2);
   --transition: all 0.3s ease;
 }
 
-/* ===== ESTILOS BASE ===== */
 .detalle-solicitud-page {
   min-height: 100vh;
   background: linear-gradient(135deg, var(--color-azul-marino) 0%, var(--color-gris-acero) 50%, var(--color-negro-carbon) 100%);
   padding: 2rem 0;
 }
 
-/* ===== ESTADOS DE CARGA Y ERROR ===== */
 .loading-container,
 .error-container {
   display: flex;
@@ -1581,14 +1510,12 @@ defineExpose({
   justify-content: center;
 }
 
-/* ===== CONTAINER PRINCIPAL ===== */
 .detalle-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 2rem;
 }
 
-/* ===== HEADER ===== */
 .detalle-header {
   background: var(--color-blanco-perla);
   border-radius: 20px;
@@ -1708,7 +1635,6 @@ defineExpose({
   background: var(--color-rojo-granate);
 }
 
-/* ===== PROGRESS STEPS ===== */
 .progress-steps {
   display: flex;
   justify-content: space-between;
@@ -1801,7 +1727,6 @@ defineExpose({
   margin-top: 0.25rem;
 }
 
-/* ===== ALERTAS ===== */
 .rejection-alert,
 .approval-alert {
   display: flex;
@@ -1875,7 +1800,116 @@ defineExpose({
   font-weight: 600;
 }
 
-/* ===== PESTAÑAS ===== */
+.approval-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.btn-solicitar-prestamo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+  width: 100%;
+  text-align: left;
+}
+
+.btn-solicitar-prestamo:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+}
+
+.btn-solicitar-prestamo:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.btn-solicitar-prestamo:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.btn-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.btn-title {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.btn-subtitle {
+  font-size: 0.875rem;
+  opacity: 0.9;
+  font-weight: 400;
+}
+
+.btn-arrow {
+  display: flex;
+  align-items: center;
+  opacity: 0.8;
+  transition: transform 0.3s ease;
+}
+
+.btn-solicitar-prestamo:hover:not(:disabled) .btn-arrow {
+  transform: translateX(4px);
+}
+
+.info-monto-aprobado {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid #10b981;
+}
+
+.info-monto-aprobado .info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-monto-aprobado .info-label {
+  font-size: 0.75rem;
+  color: #047857;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.info-monto-aprobado .info-valor {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #065f46;
+}
+
 .pestanas-navegacion {
   display: flex;
   gap: 0.5rem;
@@ -1940,13 +1974,11 @@ defineExpose({
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ===== CONTENIDO PRINCIPAL ===== */
 .detalle-content {
   display: grid;
   gap: 2rem;
 }
 
-/* ===== SECCIONES ===== */
 .info-section,
 .articulos-section,
 .actions-section,
@@ -1983,7 +2015,6 @@ defineExpose({
   color: var(--color-gris-acero);
 }
 
-/* ===== INFORMACIÓN GENERAL ===== */
 .info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -2034,7 +2065,6 @@ defineExpose({
   color: var(--color-negro-carbon);
 }
 
-/* ===== ARTÍCULOS MEJORADOS ===== */
 .articulos-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
@@ -2128,7 +2158,6 @@ defineExpose({
   line-height: 1.4;
 }
 
-/* NUEVO: Valoración del cliente */
 .valoracion-cliente {
   background: linear-gradient(135deg, #fef3c7, #fde68a);
   border: 2px solid var(--color-dorado-vintage);
@@ -2157,7 +2186,6 @@ defineExpose({
   color: var(--color-dorado-vintage);
 }
 
-/* NUEVO: Detalles del artículo mejorados */
 .articulo-detalles {
   margin-bottom: 1.5rem;
 }
@@ -2188,7 +2216,6 @@ defineExpose({
   font-weight: 600;
 }
 
-/* NUEVO: Información de color */
 .color-info {
   display: flex;
   align-items: center;
@@ -2203,7 +2230,6 @@ defineExpose({
   flex-shrink: 0;
 }
 
-/* NUEVO: Especificaciones técnicas mejoradas */
 .especificaciones-section {
   margin-bottom: 1.5rem;
   background: linear-gradient(135deg, #f8fafc, #f1f5f9);
@@ -2242,7 +2268,6 @@ defineExpose({
   word-wrap: break-word;
 }
 
-/* NUEVO: Información de avalúo mejorada */
 .avaluo-section {
   background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
   border: 1px solid #0ea5e9;
@@ -2328,7 +2353,6 @@ defineExpose({
   margin: 0;
 }
 
-/* ===== NUEVA SECCIÓN FINANCIERA ===== */
 .financiero-section {
   background: var(--color-blanco-perla);
   border-radius: 20px;
@@ -2340,7 +2364,6 @@ defineExpose({
   padding: 2rem;
 }
 
-/* Montos principales */
 .montos-principales {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -2425,7 +2448,6 @@ defineExpose({
   font-size: 1.5rem;
 }
 
-/* Plan de pagos */
 .plan-pagos-section {
   background: white;
   border-radius: var(--border-radius);
@@ -2466,7 +2488,6 @@ defineExpose({
   opacity: 0.9;
 }
 
-/* Tabla de pagos */
 .tabla-pagos {
   overflow-x: auto;
 }
@@ -2561,7 +2582,6 @@ defineExpose({
   font-weight: 700;
 }
 
-/* Totales del plan */
 .plan-totales {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -2606,7 +2626,6 @@ defineExpose({
   font-size: 1.125rem;
 }
 
-/* Información adicional */
 .info-adicional {
   display: flex;
   gap: 2rem;
@@ -2617,7 +2636,7 @@ defineExpose({
   border: 1px solid #e5e7eb;
 }
 
-.info-item {
+.info-adicional .info-item {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2625,11 +2644,10 @@ defineExpose({
   color: var(--color-gris-acero);
 }
 
-.info-item svg {
+.info-adicional .info-item svg {
   color: var(--color-dorado-vintage);
 }
 
-/* ===== MEDIA (FOTOS Y DOCUMENTOS) ===== */
 .articulo-media {
   margin-top: 1rem;
 }
@@ -2656,7 +2674,6 @@ defineExpose({
   color: var(--color-dorado-vintage);
 }
 
-/* Galería de fotos */
 .fotos-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -2704,7 +2721,6 @@ defineExpose({
   opacity: 1;
 }
 
-/* Lista de documentos */
 .documentos-list {
   display: flex;
   flex-direction: column;
@@ -2767,7 +2783,6 @@ defineExpose({
   flex-shrink: 0;
 }
 
-/* ===== ESTADO VACÍO ===== */
 .empty-articulos {
   display: flex;
   flex-direction: column;
@@ -2844,7 +2859,6 @@ defineExpose({
   transform: rotate(180deg);
 }
 
-/* ===== ACCIONES ===== */
 .actions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -2954,7 +2968,6 @@ defineExpose({
   color: var(--color-gris-acero);
 }
 
-/* ===== MODAL ===== */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -3071,7 +3084,6 @@ defineExpose({
   border-top: 1px solid #e5e7eb;
 }
 
-/* ===== VISUALIZADOR DE IMÁGENES ===== */
 .image-viewer {
   background: var(--color-negro-carbon);
   border-radius: 16px;
@@ -3219,7 +3231,6 @@ defineExpose({
   object-fit: cover;
 }
 
-/* ===== BOTONES ===== */
 .btn-primary,
 .btn-secondary,
 .btn-danger {
@@ -3274,7 +3285,6 @@ defineExpose({
   transform: none;
 }
 
-/* ===== NOTIFICACIONES ===== */
 .notification-container {
   position: fixed;
   top: 2rem;
@@ -3347,7 +3357,6 @@ defineExpose({
   opacity: 1;
 }
 
-/* ===== UTILIDADES ===== */
 .spinning {
   animation: spin 1s linear infinite;
 }
@@ -3361,7 +3370,6 @@ defineExpose({
   }
 }
 
-/* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .detalle-container {
     padding: 0 1rem;
@@ -3424,8 +3432,12 @@ defineExpose({
     grid-template-columns: 1fr;
     padding: 1rem;
   }
+
+  .info-monto-aprobado {
+    flex-direction: column;
+    gap: 1rem;
+  }
   
-  /* Tabla de pagos responsive */
   .tabla-header,
   .tabla-row {
     grid-template-columns: 60px 1fr 1fr 1fr;
@@ -3502,6 +3514,23 @@ defineExpose({
   .archivos-pestana {
     margin: 0 0.5rem 1rem 0.5rem;
   }
+
+  .btn-solicitar-prestamo {
+    padding: 1rem;
+  }
+  
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .btn-title {
+    font-size: 0.9375rem;
+  }
+  
+  .btn-subtitle {
+    font-size: 0.8125rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -3563,6 +3592,24 @@ defineExpose({
   .monto-icono {
     width: 48px;
     height: 48px;
+  }
+
+  .btn-solicitar-prestamo {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+  
+  .btn-arrow {
+    transform: rotate(90deg);
+  }
+  
+  .btn-solicitar-prestamo:hover:not(:disabled) .btn-arrow {
+    transform: rotate(90deg) translateX(4px);
+  }
+
+  .approval-actions {
+    margin-top: 1rem;
   }
 }
 </style>

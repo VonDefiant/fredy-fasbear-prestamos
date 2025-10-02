@@ -8,6 +8,7 @@ import prestamosController from '../controllers/prestamos.controller.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { validarPrestamo } from '../middleware/validators.js';
 import rateLimit from 'express-rate-limit';
+import crearPrestamoRoutes from './prestamos.crear.routes.js';
 
 const router = express.Router();
 
