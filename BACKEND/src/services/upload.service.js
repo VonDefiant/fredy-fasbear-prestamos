@@ -1,6 +1,6 @@
 // ===============================================
 // Archivo: BACKEND/src/services/upload.service.js
-// Servicio para manejo de subida y gestión de archivos
+// Servicio COMPLETO para manejo de subida y gestión de archivos
 // ===============================================
 
 import path from 'path';
@@ -29,6 +29,7 @@ export class UploadService {
         `${this.uploadPath}/prestamos/contratos`,
         `${this.uploadPath}/prestamos/recibos`,
         `${this.uploadPath}/usuarios/avatars`,
+        `${this.uploadPath}/usuarios`,
         `${this.uploadPath}/temp`
       ];
 
@@ -205,13 +206,114 @@ export class UploadService {
   // Eliminar archivo por ruta
   async eliminarArchivo(rutaRelativa) {
     try {
-      const rutaCompleta = path.join(process.cwd(), rutaRelativa);
+      if (!rutaRelativa) {
+        throw new Error('Ruta de archivo no proporcionada');
+      }
+
+      // Construir ruta completa
+      // Si la ruta empieza con /uploads, removerlo para evitar duplicación
+      const rutaLimpia = rutaRelativa.startsWith('/uploads') 
+        ? rutaRelativa.substring(8) 
+        : rutaRelativa;
+      
+      const rutaCompleta = path.join(this.uploadPath, rutaLimpia);
+
+      // Verificar que el archivo existe
+      try {
+        await fs.access(rutaCompleta);
+      } catch (error) {
+        console.warn(`⚠️ Archivo no existe: ${rutaCompleta}`);
+        return true; // No es un error crítico si el archivo ya no existe
+      }
+
+      // Verificar que el archivo está dentro del directorio de uploads
+      // (Prevención de path traversal)
+      const rutaAbsoluta = path.resolve(rutaCompleta);
+      const uploadAbsoluto = path.resolve(this.uploadPath);
+      
+      if (!rutaAbsoluta.startsWith(uploadAbsoluto)) {
+        throw new Error('Intento de acceso a archivo fuera del directorio permitido');
+      }
+
+      // Eliminar el archivo
       await fs.unlink(rutaCompleta);
       console.log(`🗑️ Archivo eliminado: ${rutaRelativa}`);
+      
       return true;
+
     } catch (error) {
-      console.error(`Error eliminando archivo ${rutaRelativa}:`, error);
-      return false;
+      console.error('Error eliminando archivo:', error);
+      throw new Error(`Error eliminando archivo: ${error.message}`);
+    }
+  }
+
+  // Eliminar múltiples archivos
+  async eliminarMultiplesArchivos(rutasRelativas) {
+    if (!Array.isArray(rutasRelativas) || rutasRelativas.length === 0) {
+      return { exitosos: 0, fallidos: 0 };
+    }
+
+    let exitosos = 0;
+    let fallidos = 0;
+
+    for (const ruta of rutasRelativas) {
+      try {
+        await this.eliminarArchivo(ruta);
+        exitosos++;
+      } catch (error) {
+        console.error(`Error eliminando archivo ${ruta}:`, error);
+        fallidos++;
+      }
+    }
+
+    console.log(`🗑️ Archivos eliminados: ${exitosos} exitosos, ${fallidos} fallidos`);
+    
+    return { exitosos, fallidos };
+  }
+
+  // Mover un archivo de una ubicación a otra
+  async moverArchivo(rutaOrigen, rutaDestino) {
+    try {
+      const rutaOrigenCompleta = path.join(this.uploadPath, rutaOrigen);
+      const rutaDestinoCompleta = path.join(this.uploadPath, rutaDestino);
+
+      // Asegurar que el directorio destino existe
+      const directorioDestino = path.dirname(rutaDestinoCompleta);
+      await fs.mkdir(directorioDestino, { recursive: true });
+
+      // Mover el archivo
+      await fs.rename(rutaOrigenCompleta, rutaDestinoCompleta);
+      
+      console.log(`📦 Archivo movido: ${rutaOrigen} → ${rutaDestino}`);
+      
+      return rutaDestino;
+
+    } catch (error) {
+      console.error('Error moviendo archivo:', error);
+      throw new Error(`Error moviendo archivo: ${error.message}`);
+    }
+  }
+
+  // Copiar un archivo
+  async copiarArchivo(rutaOrigen, rutaDestino) {
+    try {
+      const rutaOrigenCompleta = path.join(this.uploadPath, rutaOrigen);
+      const rutaDestinoCompleta = path.join(this.uploadPath, rutaDestino);
+
+      // Asegurar que el directorio destino existe
+      const directorioDestino = path.dirname(rutaDestinoCompleta);
+      await fs.mkdir(directorioDestino, { recursive: true });
+
+      // Copiar el archivo
+      await fs.copyFile(rutaOrigenCompleta, rutaDestinoCompleta);
+      
+      console.log(`📋 Archivo copiado: ${rutaOrigen} → ${rutaDestino}`);
+      
+      return rutaDestino;
+
+    } catch (error) {
+      console.error('Error copiando archivo:', error);
+      throw new Error(`Error copiando archivo: ${error.message}`);
     }
   }
 
@@ -280,7 +382,7 @@ export class UploadService {
       const estadisticas = {
         directorios: {},
         totalArchivos: 0,
-        tamaññoTotal: 0
+        tamañoTotal: 0
       };
 
       const directorios = [
@@ -289,6 +391,7 @@ export class UploadService {
         'prestamos/contratos',
         'prestamos/recibos',
         'usuarios/avatars',
+        'usuarios',
         'temp'
       ];
 
@@ -313,7 +416,7 @@ export class UploadService {
           };
           
           estadisticas.totalArchivos += files.length;
-          estadisticas.tamaññoTotal += tamaño;
+          estadisticas.tamañoTotal += tamaño;
           
         } catch (error) {
           estadisticas.directorios[dir] = {
@@ -324,7 +427,7 @@ export class UploadService {
         }
       }
 
-      estadisticas.tamañoTotalFormateado = this.formatearTamaño(estadisticas.tamaññoTotal);
+      estadisticas.tamañoTotalFormateado = this.formatearTamaño(estadisticas.tamañoTotal);
       
       return estadisticas;
 
@@ -346,14 +449,14 @@ export class UploadService {
   }
 
   // Validar espacio disponible en disco
-  async validarEspacioDisponible(tamaññoRequerido) {
+  async validarEspacioDisponible(tamañoRequerido) {
     try {
       // Implementación básica - en producción podrías usar librerías como 'statvfs'
       const stats = await fs.stat(this.uploadPath);
       
       // Por ahora asumimos que hay espacio si el directorio existe
       // En producción, implementarías verificación real del espacio en disco
-      return tamaññoRequerido < 100 * 1024 * 1024; // 100MB como límite ejemplo
+      return tamañoRequerido < 100 * 1024 * 1024; // 100MB como límite ejemplo
       
     } catch (error) {
       console.error('Error validando espacio:', error);

@@ -646,6 +646,271 @@ router.get('/mis-avaluos', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/evaluador/solicitudes-aprobadas
+ * Obtiene las solicitudes aprobadas con documentos de identificación
+ */
+router.get('/solicitudes-aprobadas', async (req, res) => {
+  try {
+    const { limite = 20, pagina = 1, busqueda = '' } = req.query;
+    const skip = (parseInt(pagina) - 1) * parseInt(limite);
+
+    console.log('[EVALUADOR] Obteniendo solicitudes aprobadas con documentación');
+
+    // Construir filtros
+    const whereCondition = {
+      estado: 'Aprobada',
+      ...(busqueda && {
+        OR: [
+          { usuario: { nombre: { contains: busqueda, mode: 'insensitive' } } },
+          { usuario: { apellido: { contains: busqueda, mode: 'insensitive' } } },
+          { usuario: { cedula: { contains: busqueda, mode: 'insensitive' } } },
+          { usuario: { email: { contains: busqueda, mode: 'insensitive' } } }
+        ]
+      })
+    };
+
+    // Obtener solicitudes aprobadas
+    const [solicitudes, total] = await Promise.all([
+      prisma.solicitudPrestamo.findMany({
+        where: whereCondition,
+        skip,
+        take: parseInt(limite),
+        orderBy: { fechaEvaluacion: 'desc' },
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nombre: true,
+              apellido: true,
+              email: true,
+              telefono: true,
+              direccion: true,
+              cedula: true,
+              fechaNacimiento: true
+            }
+          },
+          articulos: {
+            include: {
+              tipoArticulo: true,
+              avaluo: {
+                include: {
+                  evaluador: {
+                    select: {
+                      nombre: true,
+                      apellido: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }),
+      prisma.solicitudPrestamo.count({ where: whereCondition })
+    ]);
+
+    // Para cada solicitud, obtener documentos de identificación
+    const solicitudesConDocumentos = await Promise.all(
+      solicitudes.map(async (solicitud) => {
+        // Buscar documentos DPI relacionados con el usuario
+        const documentosDPI = await prisma.documento.findMany({
+          where: {
+            tipoDocumento: 'Identificacion',
+            idRelacionado: solicitud.usuarioId,
+            tipoRelacion: 'Usuario'
+          },
+          orderBy: { fechaSubida: 'desc' }
+        });
+
+        // Buscar si existe contrato
+        const contrato = await prisma.contrato.findFirst({
+          where: {
+            solicitudId: solicitud.id
+          }
+        });
+
+        // Formatear respuesta
+        return {
+          id: solicitud.id,
+          numero: `SOL-2025-${String(solicitud.id).padStart(6, '0')}`,
+          estado: solicitud.estado,
+          fechaSolicitud: solicitud.fechaSolicitud,
+          fechaEvaluacion: solicitud.fechaEvaluacion,
+          observaciones: solicitud.observaciones,
+
+          usuario: {
+            id: solicitud.usuario.id,
+            nombre: `${solicitud.usuario.nombre} ${solicitud.usuario.apellido}`,
+            email: solicitud.usuario.email,
+            telefono: solicitud.usuario.telefono,
+            direccion: solicitud.usuario.direccion,
+            cedula: solicitud.usuario.cedula,
+            fechaNacimiento: solicitud.usuario.fechaNacimiento
+          },
+
+          prestamo: {
+            montoSolicitado: solicitud.montoSolicitado ? parseFloat(solicitud.montoSolicitado) : null,
+            plazoMeses: solicitud.plazoMeses,
+            modalidadPago: solicitud.modalidadPago,
+            tasaInteres: solicitud.tasaInteres ? parseFloat(solicitud.tasaInteres) : null,
+            totalAPagar: solicitud.totalAPagar ? parseFloat(solicitud.totalAPagar) : null
+          },
+
+          articulos: solicitud.articulos.map(articulo => ({
+            id: articulo.id,
+            descripcion: articulo.descripcion,
+            marca: articulo.marca,
+            modelo: articulo.modelo,
+            estadoFisico: articulo.estadoFisico,
+            valorEstimadoCliente: articulo.valorEstimadoCliente ? parseFloat(articulo.valorEstimadoCliente) : null,
+            tipoArticulo: articulo.tipoArticulo?.nombre,
+            avaluo: articulo.avaluo ? {
+              valorComercial: parseFloat(articulo.avaluo.valorComercial),
+              porcentajeAplicado: parseFloat(articulo.avaluo.porcentajeAplicado),
+              montoPrestamo: parseFloat(articulo.avaluo.montoPrestamo),
+              observaciones: articulo.avaluo.observaciones,
+              evaluador: articulo.avaluo.evaluador ? 
+                `${articulo.avaluo.evaluador.nombre} ${articulo.avaluo.evaluador.apellido}` : null
+            } : null
+          })),
+
+          documentacion: {
+            tieneDocumentos: documentosDPI.length > 0,
+            totalDocumentos: documentosDPI.length,
+            documentos: documentosDPI.map(doc => ({
+              id: doc.id,
+              nombreArchivo: doc.nombreArchivo,
+              rutaArchivo: doc.rutaArchivo,
+              fechaSubida: doc.fechaSubida,
+              tamanoArchivo: doc.tamanoArchivo ? Number(doc.tamanoArchivo) : 0,
+              tipoMime: doc.tipoMime
+            }))
+          },
+
+          contrato: contrato ? {
+            id: contrato.id,
+            numero: `CONT-2025-${String(contrato.id).padStart(6, '0')}`,
+            estadoFirma: contrato.estadoFirma,
+            fechaCreacion: contrato.fechaCreacion,
+            fechaFirma: contrato.fechaFirma
+          } : null
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: solicitudesConDocumentos,
+      pagination: {
+        total,
+        pagina: parseInt(pagina),
+        limite: parseInt(limite),
+        totalPaginas: Math.ceil(total / parseInt(limite))
+      }
+    });
+
+  } catch (error) {
+    console.error('[EVALUADOR] Error obteniendo solicitudes aprobadas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener solicitudes aprobadas',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * GET /api/evaluador/solicitudes/:id/documentacion
+ * Obtiene todos los documentos relacionados con una solicitud
+ */
+router.get('/solicitudes/:id/documentacion', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('[EVALUADOR] Obteniendo documentación de solicitud:', id);
+
+    const solicitud = await prisma.solicitudPrestamo.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        usuario: {
+          select: {
+            id: true,
+            nombre: true,
+            apellido: true,
+            cedula: true
+          }
+        }
+      }
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({
+        success: false,
+        message: 'Solicitud no encontrada'
+      });
+    }
+
+    // Obtener TODOS los documentos relacionados
+    const [documentosIdentificacion, documentosSolicitud] = await Promise.all([
+      // Documentos DPI del usuario
+      prisma.documento.findMany({
+        where: {
+          tipoDocumento: 'Identificacion',
+          idRelacionado: solicitud.usuarioId,
+          tipoRelacion: 'Usuario'
+        },
+        orderBy: { fechaSubida: 'desc' }
+      }),
+      // Documentos de la solicitud (fotos y especificaciones)
+      prisma.documento.findMany({
+        where: {
+          idRelacionado: solicitud.id,
+          tipoRelacion: 'Solicitud'
+        },
+        orderBy: { fechaSubida: 'asc' }
+      })
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        solicitudId: solicitud.id,
+        usuario: {
+          id: solicitud.usuario.id,
+          nombre: `${solicitud.usuario.nombre} ${solicitud.usuario.apellido}`,
+          cedula: solicitud.usuario.cedula
+        },
+        documentacion: {
+          identificacion: documentosIdentificacion.map(doc => ({
+            id: doc.id,
+            nombreArchivo: doc.nombreArchivo,
+            rutaArchivo: doc.rutaArchivo,
+            fechaSubida: doc.fechaSubida,
+            tamanoArchivo: doc.tamanoArchivo ? Number(doc.tamanoArchivo) : 0,
+            tipoMime: doc.tipoMime
+          })),
+          solicitud: documentosSolicitud.map(doc => ({
+            id: doc.id,
+            tipo: doc.tipoDocumento,
+            nombreArchivo: doc.nombreArchivo,
+            rutaArchivo: doc.rutaArchivo,
+            fechaSubida: doc.fechaSubida,
+            tamanoArchivo: doc.tamanoArchivo ? Number(doc.tamanoArchivo) : 0,
+            tipoMime: doc.tipoMime
+          }))
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('[EVALUADOR] Error obteniendo documentación:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener documentación',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 // Middleware de manejo de errores específico para el evaluador
 router.use((error, req, res, next) => {
   console.error('❌ Error en rutas de evaluador:', error);

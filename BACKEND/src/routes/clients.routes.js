@@ -2,19 +2,23 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
+import { uploadMiddleware, validateFileTypes } from '../middleware/upload.js';
+import { UploadService } from '../services/upload.service.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const uploadService = new UploadService();
 
 router.use((req, res, next) => {
   console.log(`👤 Clients API: ${req.method} ${req.path}`);
   next();
 });
 
-router.use(authenticateToken);
-router.use(requireAdmin);
+// ===============================================
+// RUTAS DE ADMINISTRACIÓN (REQUIEREN ADMIN)
+// ===============================================
 
-router.get('/stats', async (req, res) => {
+router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const [
       totalClients,
@@ -109,7 +113,7 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { 
       estado, 
@@ -200,7 +204,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -369,7 +373,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const {
       nombre,
@@ -460,7 +464,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -553,7 +557,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id/toggle-status', async (req, res) => {
+router.put('/:id/toggle-status', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -606,6 +610,299 @@ router.put('/:id/toggle-status', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error cambiando estado del cliente'
+    });
+  }
+});
+
+// ===============================================
+// RUTAS DE DOCUMENTOS DPI (USUARIO O EVALUADOR/ADMIN)
+// ===============================================
+
+/**
+ * POST /api/clients/:id/documentos-identificacion
+ * Subir documentos DPI del usuario
+ */
+router.post('/:id/documentos-identificacion',
+  authenticateToken,
+  uploadMiddleware,
+  validateFileTypes,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = parseInt(id);
+
+      console.log('[CLIENTS] Subiendo documentos DPI para usuario:', userId);
+
+      // Verificar permisos: el usuario solo puede subir sus propios documentos
+      // O un evaluador/admin puede subir documentos de cualquier usuario
+      const esPropio = req.user.id === userId;
+      const esEvaluadorOAdmin = ['Evaluador', 'Administrador'].includes(req.user.tipoUsuario);
+
+      if (!esPropio && !esEvaluadorOAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permiso para subir documentos de este usuario'
+        });
+      }
+
+      // Validar que se enviaron archivos
+      if (!req.files || (!req.files.dpiFrontal && !req.files.dpiTrasero)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Debes enviar al menos una foto del DPI (frontal o trasero)'
+        });
+      }
+
+      // Verificar que el usuario existe
+      const usuario = await prisma.usuario.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          cedula: true
+        }
+      });
+
+      if (!usuario) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuario no encontrado'
+        });
+      }
+
+      const documentosGuardados = [];
+
+      // Usar transacción para garantizar consistencia
+      await prisma.$transaction(async (tx) => {
+        // Guardar DPI Frontal
+        if (req.files.dpiFrontal) {
+          const dpiFrontal = req.files.dpiFrontal;
+          
+          // Validar tamaño
+          if (dpiFrontal.size > 10 * 1024 * 1024) {
+            throw new Error('La imagen del DPI frontal no puede exceder 10MB');
+          }
+
+          // Guardar archivo físico
+          const rutaFrontal = await uploadService.guardarFoto(
+            dpiFrontal, 
+            `usuarios/${userId}`
+          );
+
+          // Crear registro en BD
+          const docFrontal = await tx.documento.create({
+            data: {
+              tipoDocumento: 'Identificacion',
+              nombreArchivo: `DPI_Frontal_${usuario.cedula || userId}_${Date.now()}.${dpiFrontal.name.split('.').pop()}`,
+              rutaArchivo: rutaFrontal,
+              idRelacionado: userId,
+              tipoRelacion: 'Usuario',
+              tamanoArchivo: BigInt(dpiFrontal.size),
+              tipoMime: dpiFrontal.mimetype
+            }
+          });
+
+          documentosGuardados.push({
+            tipo: 'frontal',
+            id: docFrontal.id,
+            nombreArchivo: docFrontal.nombreArchivo,
+            rutaArchivo: docFrontal.rutaArchivo
+          });
+
+          console.log('✅ DPI Frontal guardado:', docFrontal.id);
+        }
+
+        // Guardar DPI Trasero
+        if (req.files.dpiTrasero) {
+          const dpiTrasero = req.files.dpiTrasero;
+          
+          // Validar tamaño
+          if (dpiTrasero.size > 10 * 1024 * 1024) {
+            throw new Error('La imagen del DPI trasero no puede exceder 10MB');
+          }
+
+          // Guardar archivo físico
+          const rutaTrasero = await uploadService.guardarFoto(
+            dpiTrasero,
+            `usuarios/${userId}`
+          );
+
+          // Crear registro en BD
+          const docTrasero = await tx.documento.create({
+            data: {
+              tipoDocumento: 'Identificacion',
+              nombreArchivo: `DPI_Trasero_${usuario.cedula || userId}_${Date.now()}.${dpiTrasero.name.split('.').pop()}`,
+              rutaArchivo: rutaTrasero,
+              idRelacionado: userId,
+              tipoRelacion: 'Usuario',
+              tamanoArchivo: BigInt(dpiTrasero.size),
+              tipoMime: dpiTrasero.mimetype
+            }
+          });
+
+          documentosGuardados.push({
+            tipo: 'trasero',
+            id: docTrasero.id,
+            nombreArchivo: docTrasero.nombreArchivo,
+            rutaArchivo: docTrasero.rutaArchivo
+          });
+
+          console.log('✅ DPI Trasero guardado:', docTrasero.id);
+        }
+      });
+
+      console.log(`🎉 Documentos DPI guardados exitosamente para usuario ${userId}`);
+
+      res.status(201).json({
+        success: true,
+        message: 'Documentos de identificación subidos exitosamente',
+        data: {
+          usuarioId: userId,
+          documentos: documentosGuardados,
+          totalDocumentos: documentosGuardados.length
+        }
+      });
+
+    } catch (error) {
+      console.error('[CLIENTS] Error subiendo documentos DPI:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al subir documentos de identificación',
+        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/clients/:id/documentos-identificacion
+ * Obtener documentos DPI del usuario
+ */
+router.get('/:id/documentos-identificacion', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id);
+
+    console.log('[CLIENTS] Obteniendo documentos DPI de usuario:', userId);
+
+    // Verificar permisos
+    const esPropio = req.user.id === userId;
+    const esEvaluadorOAdmin = ['Evaluador', 'Administrador'].includes(req.user.tipoUsuario);
+
+    if (!esPropio && !esEvaluadorOAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para ver estos documentos'
+      });
+    }
+
+    // Obtener documentos DPI
+    const documentosDPI = await prisma.documento.findMany({
+      where: {
+        tipoDocumento: 'Identificacion',
+        idRelacionado: userId,
+        tipoRelacion: 'Usuario'
+      },
+      orderBy: { fechaSubida: 'desc' },
+      select: {
+        id: true,
+        nombreArchivo: true,
+        rutaArchivo: true,
+        fechaSubida: true,
+        tamanoArchivo: true,
+        tipoMime: true
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        usuarioId: userId,
+        documentos: documentosDPI.map(doc => ({
+          id: doc.id,
+          nombreArchivo: doc.nombreArchivo,
+          rutaArchivo: doc.rutaArchivo,
+          fechaSubida: doc.fechaSubida,
+          tamanoArchivo: doc.tamanoArchivo ? Number(doc.tamanoArchivo) : 0,
+          tipoMime: doc.tipoMime
+        })),
+        totalDocumentos: documentosDPI.length,
+        tieneDocumentos: documentosDPI.length > 0
+      }
+    });
+
+  } catch (error) {
+    console.error('[CLIENTS] Error obteniendo documentos DPI:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener documentos de identificación',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+/**
+ * DELETE /api/clients/:id/documentos-identificacion/:docId
+ * Eliminar un documento DPI específico
+ */
+router.delete('/:id/documentos-identificacion/:docId', authenticateToken, async (req, res) => {
+  try {
+    const { id, docId } = req.params;
+    const userId = parseInt(id);
+    const documentoId = parseInt(docId);
+
+    console.log('[CLIENTS] Eliminando documento DPI:', documentoId, 'del usuario:', userId);
+
+    // Verificar permisos
+    const esPropio = req.user.id === userId;
+    const esEvaluadorOAdmin = ['Evaluador', 'Administrador'].includes(req.user.tipoUsuario);
+
+    if (!esPropio && !esEvaluadorOAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para eliminar este documento'
+      });
+    }
+
+    // Verificar que el documento existe y pertenece al usuario
+    const documento = await prisma.documento.findFirst({
+      where: {
+        id: documentoId,
+        tipoDocumento: 'Identificacion',
+        idRelacionado: userId,
+        tipoRelacion: 'Usuario'
+      }
+    });
+
+    if (!documento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Eliminar archivo físico
+    await uploadService.eliminarArchivo(documento.rutaArchivo);
+
+    // Eliminar registro de BD
+    await prisma.documento.delete({
+      where: { id: documentoId }
+    });
+
+    console.log('✅ Documento DPI eliminado exitosamente');
+
+    res.status(200).json({
+      success: true,
+      message: 'Documento eliminado exitosamente'
+    });
+
+  } catch (error) {
+    console.error('[CLIENTS] Error eliminando documento DPI:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar documento',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

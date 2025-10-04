@@ -55,6 +55,7 @@
       </div>
 
       <div class="content-card">
+        <!-- PASO 1: RESUMEN -->
         <div v-if="pasoActual === 1" class="paso-container">
           <h2>Resumen del Préstamo</h2>
           <p class="paso-descripcion">Revisa los detalles de tu préstamo aprobado</p>
@@ -136,6 +137,7 @@
           </div>
         </div>
 
+        <!-- PASO 2: DATOS PERSONALES -->
         <div v-if="pasoActual === 2" class="paso-container">
           <h2>Validación de Datos Personales</h2>
           <p class="paso-descripcion">Confirma que tu información sea correcta</p>
@@ -236,11 +238,13 @@
           </form>
         </div>
 
+        <!-- PASO 3: DOCUMENTACIÓN DPI -->
         <div v-if="pasoActual === 3" class="paso-container">
           <h2>Documentación de Identidad</h2>
           <p class="paso-descripcion">Sube fotos claras de ambos lados de tu DPI</p>
 
           <div class="upload-grid">
+            <!-- DPI FRONTAL -->
             <div class="upload-card">
               <div class="upload-header">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -250,7 +254,7 @@
                 <h3>DPI Frontal</h3>
               </div>
               
-              <div class="upload-area" :class="{ 'has-file': fotoDpiFrontal }">
+              <div class="upload-area" :class="{ 'has-file': previsualizacionFrontal }">
                 <input 
                   type="file" 
                   ref="dpiFrontalInput"
@@ -259,7 +263,7 @@
                   hidden
                 >
                 
-                <div v-if="!fotoDpiFrontal" class="upload-placeholder" @click="$refs.dpiFrontalInput.click()">
+                <div v-if="!previsualizacionFrontal" class="upload-placeholder" @click="$refs.dpiFrontalInput.click()">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
                     <path d="M21 15V19C21 20.1 20.1 21 19 21H5C3.9 21 3 20.1 3 19V15" stroke="currentColor" stroke-width="2"/>
                     <polyline points="17,8 12,3 7,8" stroke="currentColor" stroke-width="2"/>
@@ -269,37 +273,41 @@
                   <span>Parte frontal del DPI</span>
                 </div>
 
-                <div v-else class="upload-preview">
-                  <img :src="previewDpiFrontal" alt="DPI Frontal">
-                  <button type="button" @click="eliminarFotoDpiFrontal" class="btn-remove">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
-                      <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+                <div v-else class="preview-container">
+                  <img :src="previsualizacionFrontal" alt="DPI Frontal" class="preview-image">
+                  <button type="button" @click="eliminarDpiFrontal" class="btn-remove-file">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2"/>
                     </svg>
                   </button>
+                  <div class="file-info">
+                    <p>{{ fotoDpiFrontal?.name }}</p>
+                    <span>{{ formatFileSize(fotoDpiFrontal?.size) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
+            <!-- DPI TRASERO -->
             <div class="upload-card">
               <div class="upload-header">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                   <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
                   <path d="M8 10L12 14L16 10" stroke="currentColor" stroke-width="2"/>
                 </svg>
-                <h3>DPI Reverso</h3>
+                <h3>DPI Trasero</h3>
               </div>
               
-              <div class="upload-area" :class="{ 'has-file': fotoDpiReverso }">
+              <div class="upload-area" :class="{ 'has-file': previsualizacionTrasero }">
                 <input 
                   type="file" 
-                  ref="dpiReversoInput"
-                  @change="handleDpiReverso" 
+                  ref="dpiTraseroInput"
+                  @change="handleDpiTrasero" 
                   accept="image/*"
                   hidden
                 >
                 
-                <div v-if="!fotoDpiReverso" class="upload-placeholder" @click="$refs.dpiReversoInput.click()">
+                <div v-if="!previsualizacionTrasero" class="upload-placeholder" @click="$refs.dpiTraseroInput.click()">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
                     <path d="M21 15V19C21 20.1 20.1 21 19 21H5C3.9 21 3 20.1 3 19V15" stroke="currentColor" stroke-width="2"/>
                     <polyline points="17,8 12,3 7,8" stroke="currentColor" stroke-width="2"/>
@@ -309,14 +317,17 @@
                   <span>Parte trasera del DPI</span>
                 </div>
 
-                <div v-else class="upload-preview">
-                  <img :src="previewDpiReverso" alt="DPI Reverso">
-                  <button type="button" @click="eliminarFotoDpiReverso" class="btn-remove">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/>
-                      <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/>
+                <div v-else class="preview-container">
+                  <img :src="previsualizacionTrasero" alt="DPI Trasero" class="preview-image">
+                  <button type="button" @click="eliminarDpiTrasero" class="btn-remove-file">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2"/>
                     </svg>
                   </button>
+                  <div class="file-info">
+                    <p>{{ fotoDpiTrasero?.name }}</p>
+                    <span>{{ formatFileSize(fotoDpiTrasero?.size) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -333,34 +344,39 @@
               <ul>
                 <li>Las fotos deben ser claras y legibles</li>
                 <li>Asegúrate de que toda la información sea visible</li>
-                <li>Formato aceptado: JPG, PNG (máx. 5MB)</li>
+                <li>Formato aceptado: JPG, PNG, WebP (máx. 10MB)</li>
+                <li>Se requieren ambas fotos para continuar</li>
               </ul>
             </div>
           </div>
 
           <div class="button-group">
-            <button type="button" @click="anteriorPaso" class="btn-secondary" :disabled="enviando">
+            <button type="button" @click="anteriorPaso" class="btn-secondary" :disabled="subiendoDPI">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2"/>
               </svg>
               Anterior
             </button>
             <button 
-              @click="enviarSolicitudPrestamo" 
+              @click="continuarConDPI" 
               class="btn-primary btn-large"
-              :disabled="!fotoDpiFrontal || !fotoDpiReverso || enviando"
+              :disabled="!fotoDpiFrontal || !fotoDpiTrasero || subiendoDPI"
             >
-              <svg v-if="enviando" width="20" height="20" viewBox="0 0 24 24" fill="none" class="spinning">
+              <svg v-if="subiendoDPI" width="20" height="20" viewBox="0 0 24 24" fill="none" class="spinning">
                 <path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" fill="none"/>
               </svg>
-              <span v-if="!enviando">Enviar Solicitud</span>
-              <span v-else>Enviando...</span>
+              <span v-if="!subiendoDPI">Enviar Documentos</span>
+              <span v-else>Subiendo...</span>
+              <svg v-if="!subiendoDPI" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2"/>
+              </svg>
             </button>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- NOTIFICACIÓN -->
     <div class="notification-container" v-if="notification.show">
       <div class="notification" :class="`notification-${notification.type}`">
         <div class="notification-content">
@@ -404,14 +420,16 @@ useHead({
   ]
 })
 
+// Estado
 const loading = ref(true)
 const error = ref(null)
 const solicitud = ref(null)
 const pasoActual = ref(1)
-const enviando = ref(false)
+const subiendoDPI = ref(false)
 
 const pasos = ['Resumen', 'Datos Personales', 'Documentación']
 
+// Datos del formulario
 const formDatos = ref({
   nombre: '',
   apellido: '',
@@ -421,13 +439,14 @@ const formDatos = ref({
   fechaNacimiento: ''
 })
 
+// DPI
 const fotoDpiFrontal = ref(null)
-const fotoDpiReverso = ref(null)
-const previewDpiFrontal = ref(null)
-const previewDpiReverso = ref(null)
+const fotoDpiTrasero = ref(null)
+const previsualizacionFrontal = ref(null)
+const previsualizacionTrasero = ref(null)
 
 const dpiFrontalInput = ref(null)
-const dpiReversoInput = ref(null)
+const dpiTraseroInput = ref(null)
 
 const notification = ref({
   show: false,
@@ -435,6 +454,7 @@ const notification = ref({
   message: ''
 })
 
+// Computed
 const solicitudId = computed(() => {
   const id = route.query.id || route.params.id
   const parsedId = parseInt(id)
@@ -453,14 +473,24 @@ const fechaMaxima = computed(() => {
   return hoy.toISOString().split('T')[0]
 })
 
+// Métodos de formato
 const formatCurrency = (amount) => {
-  if (!amount && amount !== 0) return 'Q0.00'
+  if (!amount && amount !== 0) return '0.00'
   return new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: 'GTQ'
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(amount)
 }
 
+const formatFileSize = (bytes) => {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+}
+
+// Cargar datos de la solicitud
 const cargarDatosSolicitud = async () => {
   try {
     if (!solicitudId.value) {
@@ -477,13 +507,19 @@ const cargarDatosSolicitud = async () => {
     if (response.success && response.data) {
       solicitud.value = response.data
       
+      // Pre-llenar datos del usuario
       if (user.value) {
         formDatos.value.nombre = user.value.nombre || ''
         formDatos.value.apellido = user.value.apellido || ''
         formDatos.value.telefono = user.value.telefono || ''
         formDatos.value.cedula = user.value.cedula || ''
         formDatos.value.direccion = user.value.direccion || ''
-        formDatos.value.fechaNacimiento = user.value.fechaNacimiento || ''
+        
+        // Formatear fecha de nacimiento
+        if (user.value.fechaNacimiento) {
+          const fecha = new Date(user.value.fechaNacimiento)
+          formDatos.value.fechaNacimiento = fecha.toISOString().split('T')[0]
+        }
       }
     } else {
       throw new Error(response.message || 'No se pudo cargar la solicitud')
@@ -496,46 +532,137 @@ const cargarDatosSolicitud = async () => {
   }
 }
 
+// Manejar selección de DPI Frontal
 const handleDpiFrontal = (event) => {
   const file = event.target.files[0]
-  if (file) {
-    fotoDpiFrontal.value = file
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      previewDpiFrontal.value = e.target.result
-    }
-    reader.readAsDataURL(file)
+  if (!file) return
+
+  // Validar tipo
+  const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  if (!tiposPermitidos.includes(file.type)) {
+    mostrarNotificacion('Por favor selecciona una imagen válida (JPG, PNG o WEBP)', 'error')
+    event.target.value = ''
+    return
   }
+
+  // Validar tamaño (10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    mostrarNotificacion('La imagen no puede exceder 10MB', 'error')
+    event.target.value = ''
+    return
+  }
+
+  fotoDpiFrontal.value = file
+
+  // Crear previsualización
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    previsualizacionFrontal.value = e.target.result
+  }
+  reader.readAsDataURL(file)
+
+  console.log('✅ DPI Frontal seleccionado:', file.name)
 }
 
-const handleDpiReverso = (event) => {
+// Manejar selección de DPI Trasero
+const handleDpiTrasero = (event) => {
   const file = event.target.files[0]
-  if (file) {
-    fotoDpiReverso.value = file
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      previewDpiReverso.value = e.target.result
-    }
-    reader.readAsDataURL(file)
+  if (!file) return
+
+  // Validar tipo
+  const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  if (!tiposPermitidos.includes(file.type)) {
+    mostrarNotificacion('Por favor selecciona una imagen válida (JPG, PNG o WEBP)', 'error')
+    event.target.value = ''
+    return
   }
+
+  // Validar tamaño (10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    mostrarNotificacion('La imagen no puede exceder 10MB', 'error')
+    event.target.value = ''
+    return
+  }
+
+  fotoDpiTrasero.value = file
+
+  // Crear previsualización
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    previsualizacionTrasero.value = e.target.result
+  }
+  reader.readAsDataURL(file)
+
+  console.log('✅ DPI Trasero seleccionado:', file.name)
 }
 
-const eliminarFotoDpiFrontal = () => {
+// Eliminar DPI Frontal
+const eliminarDpiFrontal = () => {
   fotoDpiFrontal.value = null
-  previewDpiFrontal.value = null
+  previsualizacionFrontal.value = null
   if (dpiFrontalInput.value) {
     dpiFrontalInput.value.value = ''
   }
 }
 
-const eliminarFotoDpiReverso = () => {
-  fotoDpiReverso.value = null
-  previewDpiReverso.value = null
-  if (dpiReversoInput.value) {
-    dpiReversoInput.value.value = ''
+// Eliminar DPI Trasero
+const eliminarDpiTrasero = () => {
+  fotoDpiTrasero.value = null
+  previsualizacionTrasero.value = null
+  if (dpiTraseroInput.value) {
+    dpiTraseroInput.value.value = ''
   }
 }
 
+// Subir documentos DPI
+const continuarConDPI = async () => {
+  try {
+    if (!fotoDpiFrontal.value || !fotoDpiTrasero.value) {
+      mostrarNotificacion('Por favor, sube ambas fotos del DPI', 'error')
+      return
+    }
+
+    subiendoDPI.value = true
+
+    // Crear FormData
+    const formData = new FormData()
+    formData.append('dpiFrontal', fotoDpiFrontal.value)
+    formData.append('dpiTrasero', fotoDpiTrasero.value)
+
+    console.log('📤 Enviando documentos DPI...')
+
+    // Enviar al servidor
+    const response = await api(`/clients/${user.value.id}/documentos-identificacion`, {
+      method: 'POST',
+      body: formData,
+      headers: {} // No incluir Content-Type, el browser lo manejará automáticamente
+    })
+
+    if (response.success) {
+      console.log('✅ Documentos DPI enviados exitosamente')
+      mostrarNotificacion('Documentos enviados exitosamente', 'success')
+      
+      // Redirigir después de 2 segundos
+      setTimeout(() => {
+        if (solicitudId.value) {
+          router.push(`/empeno/solicitudes/${solicitudId.value}`)
+        } else {
+          router.push('/empeno')
+        }
+      }, 2000)
+    } else {
+      throw new Error(response.message || 'Error al enviar documentos')
+    }
+
+  } catch (err) {
+    console.error('❌ Error enviando documentos DPI:', err)
+    mostrarNotificacion(err.message || 'Error al enviar los documentos', 'error')
+  } finally {
+    subiendoDPI.value = false
+  }
+}
+
+// Navegación de pasos
 const siguientePaso = () => {
   if (pasoActual.value < 3) {
     pasoActual.value++
@@ -556,6 +683,7 @@ const volverAtras = () => {
   }
 }
 
+// Mostrar notificación
 const mostrarNotificacion = (message, type = 'success') => {
   notification.value = {
     show: true,
@@ -568,63 +696,7 @@ const mostrarNotificacion = (message, type = 'success') => {
   }, 5000)
 }
 
-const enviarSolicitudPrestamo = async () => {
-  try {
-    if (!solicitudId.value) {
-      mostrarNotificacion('ID de solicitud inválido', 'error')
-      return
-    }
-    
-    if (!fotoDpiFrontal.value || !fotoDpiReverso.value) {
-      mostrarNotificacion('Por favor, sube ambas fotos del DPI', 'error')
-      return
-    }
-    
-    if (!formDatos.value.nombre || !formDatos.value.apellido || !formDatos.value.cedula) {
-      mostrarNotificacion('Por favor, completa todos los datos personales', 'error')
-      return
-    }
-    
-    enviando.value = true
-    
-    const formData = new FormData()
-    formData.append('solicitudId', solicitudId.value.toString())
-    formData.append('nombre', formDatos.value.nombre)
-    formData.append('apellido', formDatos.value.apellido)
-    formData.append('cedula', formDatos.value.cedula)
-    formData.append('telefono', formDatos.value.telefono)
-    formData.append('direccion', formDatos.value.direccion)
-    formData.append('fechaNacimiento', formDatos.value.fechaNacimiento)
-    formData.append('dpiFrontal', fotoDpiFrontal.value)
-    formData.append('dpiReverso', fotoDpiReverso.value)
-    
-    const response = await api('/prestamos/crear-desde-solicitud', {
-      method: 'POST',
-      body: formData,
-      headers: {}
-    })
-    
-    if (response.success) {
-      mostrarNotificacion('¡Préstamo solicitado exitosamente!', 'success')
-      
-      setTimeout(() => {
-        router.push('/empeno/prestamos')
-      }, 2000)
-    } else {
-      throw new Error(response.message || 'Error al procesar la solicitud')
-    }
-    
-  } catch (err) {
-    console.error('❌ Error enviando solicitud:', err)
-    mostrarNotificacion(
-      err.message || 'Error al procesar la solicitud',
-      'error'
-    )
-  } finally {
-    enviando.value = false
-  }
-}
-
+// Lifecycle
 onMounted(async () => {
   if (!solicitudId.value) {
     error.value = 'ID de solicitud inválido. Redirigiendo...'
@@ -639,6 +711,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* Variables CSS */
 :root {
   --color-negro-carbon: #1A1A1A;
   --color-blanco-perla: #F5F5F5;
@@ -660,6 +733,7 @@ onMounted(async () => {
   padding: 2rem 0;
 }
 
+/* Loading y Error */
 .loading-container,
 .error-container {
   display: flex;
@@ -697,12 +771,14 @@ onMounted(async () => {
   margin-bottom: 2rem;
 }
 
+/* Container */
 .container {
   max-width: 900px;
   margin: 0 auto;
   padding: 0 2rem;
 }
 
+/* Header */
 .header {
   text-align: center;
   margin-bottom: 2rem;
@@ -740,6 +816,7 @@ onMounted(async () => {
   font-size: 1.125rem;
 }
 
+/* Progress Bar */
 .progress-bar {
   display: flex;
   justify-content: space-between;
@@ -806,6 +883,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 
+/* Content Card */
 .content-card {
   background: var(--color-blanco-perla);
   border-radius: 20px;
@@ -825,6 +903,7 @@ onMounted(async () => {
   margin-bottom: 2rem;
 }
 
+/* Resumen Grid */
 .resumen-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -907,6 +986,7 @@ onMounted(async () => {
   font-size: 1.5rem;
 }
 
+/* Form */
 .form-datos {
   width: 100%;
 }
@@ -950,6 +1030,7 @@ onMounted(async () => {
   border-color: var(--color-dorado-vintage);
 }
 
+/* Upload Grid */
 .upload-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -991,11 +1072,19 @@ onMounted(async () => {
   justify-content: center;
   transition: var(--transition);
   background: white;
+  cursor: pointer;
+}
+
+.upload-area:hover {
+  border-color: var(--color-dorado-vintage);
+  background: #FFF9E6;
 }
 
 .upload-area.has-file {
   border-color: var(--color-verde-bosque);
   border-style: solid;
+  cursor: default;
+  padding: 1rem;
 }
 
 .upload-placeholder {
@@ -1004,13 +1093,8 @@ onMounted(async () => {
   align-items: center;
   gap: 1rem;
   padding: 2rem;
-  cursor: pointer;
   color: var(--color-gris-acero);
   text-align: center;
-}
-
-.upload-placeholder:hover {
-  color: var(--color-azul-marino);
 }
 
 .upload-placeholder svg {
@@ -1027,41 +1111,72 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
-.upload-preview {
+/* Preview Container */
+.preview-container {
   position: relative;
   width: 100%;
   height: 100%;
-  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
 }
 
-.upload-preview img {
+.preview-image {
   width: 100%;
-  height: 100%;
+  height: 280px;
   object-fit: cover;
   border-radius: 8px;
+  border: 2px solid var(--color-dorado-vintage);
 }
 
-.btn-remove {
+.btn-remove-file {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
   background: var(--color-rojo-granate);
-  color: white;
   border: none;
-  cursor: pointer;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: var(--transition);
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 10;
 }
 
-.btn-remove:hover {
+.btn-remove-file:hover {
+  background: #A00000;
   transform: scale(1.1);
 }
 
+.btn-remove-file svg {
+  color: white;
+}
+
+.file-info {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(212, 175, 55, 0.1);
+  border-radius: 6px;
+  border-left: 3px solid var(--color-dorado-vintage);
+}
+
+.file-info p {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-negro-carbon);
+  margin: 0 0 0.25rem 0;
+  word-break: break-word;
+}
+
+.file-info span {
+  font-size: 0.8rem;
+  color: var(--color-gris-acero);
+}
+
+/* Info Box */
 .info-box {
   display: flex;
   align-items: flex-start;
@@ -1105,6 +1220,7 @@ onMounted(async () => {
   margin-bottom: 0.25rem;
 }
 
+/* Buttons */
 .button-group {
   display: flex;
   gap: 1rem;
@@ -1155,6 +1271,7 @@ onMounted(async () => {
   transform: translateY(-1px);
 }
 
+/* Notification */
 .notification-container {
   position: fixed;
   top: 2rem;
@@ -1222,6 +1339,7 @@ onMounted(async () => {
   opacity: 1;
 }
 
+/* Animations */
 .spinning {
   animation: spin 1s linear infinite;
 }
@@ -1235,6 +1353,7 @@ onMounted(async () => {
   }
 }
 
+/* Responsive */
 @media (max-width: 768px) {
   .container {
     padding: 0 1rem;
@@ -1290,6 +1409,10 @@ onMounted(async () => {
 
   .notification {
     max-width: 100%;
+  }
+
+  .preview-image {
+    height: 220px;
   }
 }
 </style>

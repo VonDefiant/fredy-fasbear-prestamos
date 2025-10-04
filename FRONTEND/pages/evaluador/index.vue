@@ -127,6 +127,49 @@
           </div>
         </section>
 
+        <!-- NUEVO: Menú de acceso rápido -->
+        <section class="menu-rapido">
+          <div class="section-header">
+            <h3>Acceso Rápido</h3>
+          </div>
+
+          <div class="menu-grid">
+            <!-- Solicitudes Pendientes -->
+            <NuxtLink to="/evaluador/solicitudes" class="menu-item">
+              <div class="menu-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </div>
+              <h3>Solicitudes Pendientes</h3>
+              <p>Evaluar nuevas solicitudes de préstamo</p>
+              <div class="menu-arrow">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </div>
+            </NuxtLink>
+
+            <!-- NUEVO: Solicitudes Aprobadas -->
+            <NuxtLink to="/evaluador/solicitudes-aprobadas" class="menu-item">
+              <div class="menu-icon approved">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M8 6V4c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v2" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </div>
+              <h3>Solicitudes Aprobadas</h3>
+              <p>Revisar documentación de clientes</p>
+              <div class="menu-arrow">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2"/>
+                </svg>
+              </div>
+            </NuxtLink>
+          </div>
+        </section>
+
         <div class="dashboard-grid">
           <section class="solicitudes-pendientes">
             <div class="section-header">
@@ -162,53 +205,53 @@
               <p>Todas las solicitudes han sido evaluadas</p>
             </div>
             
-<div v-else class="solicitudes-list">
-  <div 
-    v-for="solicitud in solicitudesPendientes" 
-    :key="solicitud.id" 
-    class="solicitud-card"
-    @click="verDetalleSolicitud(solicitud.id)"
-  >
-    <div class="solicitud-header">
-      <div class="solicitud-info">
-        <h4>Solicitud #{{ solicitud.id }}</h4>
-        <p class="cliente-nombre">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2"/>
-            <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          {{ solicitud.usuario.nombre }} {{ solicitud.usuario.apellido }}
-        </p>
-      </div>
-      <span class="estado-badge pendiente">{{ solicitud.estado }}</span>
-    </div>
+            <div v-else class="solicitudes-list">
+              <div 
+                v-for="solicitud in solicitudesPendientes" 
+                :key="solicitud.id" 
+                class="solicitud-card"
+                @click="verDetalleSolicitud(solicitud.id)"
+              >
+                <div class="solicitud-header">
+                  <div class="solicitud-info">
+                    <h4>Solicitud #{{ solicitud.id }}</h4>
+                    <p class="cliente-nombre">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                      {{ solicitud.usuario.nombre }} {{ solicitud.usuario.apellido }}
+                    </p>
+                  </div>
+                  <span class="estado-badge pendiente">{{ solicitud.estado }}</span>
+                </div>
 
-    <div class="solicitud-details">
-      <div class="detail-item">
-        <span class="label">Artículo:</span>
-        <span class="value">{{ solicitud.articulos?.[0]?.tipoArticulo?.nombre || 'N/A' }}</span>
-      </div>
-      <div class="detail-item">
-        <span class="label">Valor estimado:</span>
-        <span class="value">Q{{ formatCurrency(solicitud.articulos?.[0]?.valorEstimadoCliente || 0) }}</span>
-      </div>
-      <div class="detail-item">
-        <span class="label">Fecha solicitud:</span>
-        <span class="value">{{ formatDate(solicitud.fechaSolicitud) }}</span>
-      </div>
-    </div>
+                <div class="solicitud-details">
+                  <div class="detail-item">
+                    <span class="label">Artículo:</span>
+                    <span class="value">{{ solicitud.articulos?.[0]?.tipoArticulo?.nombre || 'N/A' }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="label">Valor estimado:</span>
+                    <span class="value">Q{{ formatCurrency(solicitud.articulos?.[0]?.valorEstimadoCliente || 0) }}</span>
+                  </div>
+                  <div class="detail-item">
+                    <span class="label">Fecha solicitud:</span>
+                    <span class="value">{{ formatDate(solicitud.fechaSolicitud) }}</span>
+                  </div>
+                </div>
 
-    <div class="solicitud-actions">
-      <button class="btn-evaluar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" stroke-width="2"/>
-          <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
-        </svg>
-        Evaluar Solicitud
-      </button>
-    </div>
-  </div>
-</div>
+                <div class="solicitud-actions">
+                  <button class="btn-evaluar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15" stroke="currentColor" stroke-width="2"/>
+                      <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    Evaluar Solicitud
+                  </button>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section class="actividad-reciente">
@@ -769,6 +812,118 @@ onUnmounted(() => {
   color: var(--color-gris-acero);
 }
 
+/* MENU RAPIDO */
+.menu-rapido {
+  margin-bottom: 3rem;
+}
+
+.menu-rapido .section-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-negro-carbon);
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+}
+
+.menu-item {
+  position: relative;
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  overflow: hidden;
+}
+
+.menu-item:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  border-color: var(--color-dorado-vintage);
+}
+
+.menu-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-dorado-vintage), var(--color-dorado-claro));
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.menu-item:hover::before {
+  transform: scaleX(1);
+}
+
+.menu-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--color-azul-marino), var(--color-negro-carbon));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+/* NUEVO: Estilo especial para el icono de Solicitudes Aprobadas */
+.menu-icon.approved {
+  background: linear-gradient(135deg, #1B4332, #2D6A4F);
+}
+
+.menu-item:hover .menu-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.menu-item:hover .menu-icon.approved {
+  background: linear-gradient(135deg, #2D6A4F, #40916C);
+}
+
+.menu-item h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-negro-carbon);
+  margin-bottom: 0.5rem;
+}
+
+.menu-item p {
+  font-size: 0.95rem;
+  color: var(--color-gris-acero);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.menu-arrow {
+  position: absolute;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-blanco-perla);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-gris-acero);
+  transition: all 0.3s ease;
+}
+
+.menu-item:hover .menu-arrow {
+  background: var(--color-dorado-vintage);
+  color: white;
+  transform: translateX(4px);
+}
+
 /* DASHBOARD GRID */
 .dashboard-grid {
   display: grid;
@@ -1041,6 +1196,10 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+
   .solicitud-details {
     grid-template-columns: 1fr;
   }
@@ -1049,4 +1208,4 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 }
-</style>
+</style>  
