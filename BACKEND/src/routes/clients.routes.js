@@ -1,13 +1,12 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
+import path from 'path';
+import fs from 'fs/promises';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { uploadMiddleware, validateFileTypes } from '../middleware/upload.js';
-import { UploadService } from '../services/upload.service.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
-const uploadService = new UploadService();
 
 router.use((req, res, next) => {
   console.log(`👤 Clients API: ${req.method} ${req.path}`);
@@ -97,7 +96,7 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
       }
     };
 
-    console.log('📊 Estadísticas calculadas:', stats);
+    console.log('Estadísticas calculadas:', stats);
 
     res.status(200).json({
       success: true,
@@ -185,7 +184,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       pages: Math.ceil(total / parseInt(limit))
     };
 
-    console.log(`📋 Clientes obtenidos: ${clients.length} de ${total}`);
+    console.log(`Clientes obtenidos: ${clients.length} de ${total}`);
 
     res.status(200).json({
       success: true,
@@ -209,7 +208,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params;
     
     if (!id || isNaN(parseInt(id))) {
-      console.log(`❌ ID inválido proporcionado: ${id}`);
+      console.log(`ID inválido proporcionado: ${id}`);
       return res.status(400).json({
         success: false,
         message: 'ID de cliente inválido'
@@ -217,7 +216,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     const clienteId = parseInt(id);
-    console.log(`🔍 Buscando cliente con ID: ${clienteId}`);
+    console.log(`Buscando cliente con ID: ${clienteId}`);
 
     const clienteExiste = await prisma.usuario.findUnique({
       where: {
@@ -230,7 +229,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     });
 
     if (!clienteExiste) {
-      console.log(`❌ Cliente con ID ${clienteId} no encontrado`);
+      console.log(`Cliente con ID ${clienteId} no encontrado`);
       return res.status(404).json({
         success: false,
         message: 'Cliente no encontrado'
@@ -238,7 +237,7 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     if (clienteExiste.tipoUsuario !== 'Cliente') {
-      console.log(`❌ Usuario ${clienteId} no es un cliente (es: ${clienteExiste.tipoUsuario})`);
+      console.log(`Usuario ${clienteId} no es un cliente (es: ${clienteExiste.tipoUsuario})`);
       return res.status(404).json({
         success: false,
         message: 'Cliente no encontrado'
@@ -287,14 +286,14 @@ router.get('/:id', authenticateToken, requireAdmin, async (req, res) => {
     });
 
     if (!cliente) {
-      console.log(`❌ Error inesperado: Cliente ${clienteId} no encontrado en segunda consulta`);
+      console.log(`Error inesperado: Cliente ${clienteId} no encontrado en segunda consulta`);
       return res.status(404).json({
         success: false,
         message: 'Cliente no encontrado'
       });
     }
 
-    console.log(`✅ Cliente encontrado: ${cliente.nombre} ${cliente.apellido} (${cliente.solicitudes?.length || 0} solicitudes)`);
+    console.log(`Cliente encontrado: ${cliente.nombre} ${cliente.apellido} (${cliente.solicitudes?.length || 0} solicitudes)`);
 
     const solicitudesProcesadas = (cliente.solicitudes || []).map(solicitud => {
       const descripcionArticulos = solicitud.articulos.length > 0
@@ -448,7 +447,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
       }
     });
 
-    console.log(`✅ Cliente creado exitosamente: ${nuevoCliente.nombre} ${nuevoCliente.apellido}`);
+    console.log(`Cliente creado exitosamente: ${nuevoCliente.nombre} ${nuevoCliente.apellido}`);
 
     res.status(201).json({
       success: true,
@@ -541,7 +540,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
       }
     });
 
-    console.log(`✅ Cliente actualizado: ${clienteActualizado.nombre} ${clienteActualizado.apellido}`);
+    console.log(`Cliente actualizado: ${clienteActualizado.nombre} ${clienteActualizado.apellido}`);
 
     res.status(200).json({
       success: true,
@@ -597,7 +596,7 @@ router.put('/:id/toggle-status', authenticateToken, requireAdmin, async (req, re
       }
     });
 
-    console.log(`✅ Estado del cliente cambiado: ${clienteActualizado.nombre} ${clienteActualizado.apellido} -> ${nuevoEstado}`);
+    console.log(`Estado del cliente cambiado: ${clienteActualizado.nombre} ${clienteActualizado.apellido} -> ${nuevoEstado}`);
 
     res.status(200).json({
       success: true,
@@ -615,165 +614,256 @@ router.put('/:id/toggle-status', authenticateToken, requireAdmin, async (req, re
 });
 
 // ===============================================
-// RUTAS DE DOCUMENTOS DPI (USUARIO O EVALUADOR/ADMIN)
+// RUTAS DE DOCUMENTOS DPI
 // ===============================================
 
 /**
  * POST /api/clients/:id/documentos-identificacion
- * Subir documentos DPI del usuario
+ * Subir documentos DPI del cliente (dpiFrontal y dpiTrasero)
  */
-router.post('/:id/documentos-identificacion',
-  authenticateToken,
-  uploadMiddleware,
-  validateFileTypes,
-  async (req, res) => {
-    try {
-      const { id } = req.params;
-      const userId = parseInt(id);
+router.post('/:id/documentos-identificacion', authenticateToken, async (req, res) => {
+  let dpiFrontalPath, dpiTraseroPath;
+  
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id);
 
-      console.log('[CLIENTS] Subiendo documentos DPI para usuario:', userId);
+    console.log('[CLIENTS] Iniciando subida de documentos DPI');
+    console.log('[CLIENTS] Usuario ID:', userId);
+    console.log('[CLIENTS] Files recibidos:', req.files ? Object.keys(req.files) : 'ninguno');
+    console.log('[CLIENTS] Headers Content-Type:', req.headers['content-type']);
 
-      // Verificar permisos: el usuario solo puede subir sus propios documentos
-      // O un evaluador/admin puede subir documentos de cualquier usuario
-      const esPropio = req.user.id === userId;
-      const esEvaluadorOAdmin = ['Evaluador', 'Administrador'].includes(req.user.tipoUsuario);
+    // Verificar permisos
+    const esPropio = req.user.id === userId;
+    const esEvaluadorOAdmin = ['Evaluador', 'Administrador'].includes(req.user.tipoUsuario);
 
-      if (!esPropio && !esEvaluadorOAdmin) {
-        return res.status(403).json({
-          success: false,
-          message: 'No tienes permiso para subir documentos de este usuario'
-        });
-      }
-
-      // Validar que se enviaron archivos
-      if (!req.files || (!req.files.dpiFrontal && !req.files.dpiTrasero)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Debes enviar al menos una foto del DPI (frontal o trasero)'
-        });
-      }
-
-      // Verificar que el usuario existe
-      const usuario = await prisma.usuario.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          nombre: true,
-          apellido: true,
-          cedula: true
-        }
-      });
-
-      if (!usuario) {
-        return res.status(404).json({
-          success: false,
-          message: 'Usuario no encontrado'
-        });
-      }
-
-      const documentosGuardados = [];
-
-      // Usar transacción para garantizar consistencia
-      await prisma.$transaction(async (tx) => {
-        // Guardar DPI Frontal
-        if (req.files.dpiFrontal) {
-          const dpiFrontal = req.files.dpiFrontal;
-          
-          // Validar tamaño
-          if (dpiFrontal.size > 10 * 1024 * 1024) {
-            throw new Error('La imagen del DPI frontal no puede exceder 10MB');
-          }
-
-          // Guardar archivo físico
-          const rutaFrontal = await uploadService.guardarFoto(
-            dpiFrontal, 
-            `usuarios/${userId}`
-          );
-
-          // Crear registro en BD
-          const docFrontal = await tx.documento.create({
-            data: {
-              tipoDocumento: 'Identificacion',
-              nombreArchivo: `DPI_Frontal_${usuario.cedula || userId}_${Date.now()}.${dpiFrontal.name.split('.').pop()}`,
-              rutaArchivo: rutaFrontal,
-              idRelacionado: userId,
-              tipoRelacion: 'Usuario',
-              tamanoArchivo: BigInt(dpiFrontal.size),
-              tipoMime: dpiFrontal.mimetype
-            }
-          });
-
-          documentosGuardados.push({
-            tipo: 'frontal',
-            id: docFrontal.id,
-            nombreArchivo: docFrontal.nombreArchivo,
-            rutaArchivo: docFrontal.rutaArchivo
-          });
-
-          console.log('✅ DPI Frontal guardado:', docFrontal.id);
-        }
-
-        // Guardar DPI Trasero
-        if (req.files.dpiTrasero) {
-          const dpiTrasero = req.files.dpiTrasero;
-          
-          // Validar tamaño
-          if (dpiTrasero.size > 10 * 1024 * 1024) {
-            throw new Error('La imagen del DPI trasero no puede exceder 10MB');
-          }
-
-          // Guardar archivo físico
-          const rutaTrasero = await uploadService.guardarFoto(
-            dpiTrasero,
-            `usuarios/${userId}`
-          );
-
-          // Crear registro en BD
-          const docTrasero = await tx.documento.create({
-            data: {
-              tipoDocumento: 'Identificacion',
-              nombreArchivo: `DPI_Trasero_${usuario.cedula || userId}_${Date.now()}.${dpiTrasero.name.split('.').pop()}`,
-              rutaArchivo: rutaTrasero,
-              idRelacionado: userId,
-              tipoRelacion: 'Usuario',
-              tamanoArchivo: BigInt(dpiTrasero.size),
-              tipoMime: dpiTrasero.mimetype
-            }
-          });
-
-          documentosGuardados.push({
-            tipo: 'trasero',
-            id: docTrasero.id,
-            nombreArchivo: docTrasero.nombreArchivo,
-            rutaArchivo: docTrasero.rutaArchivo
-          });
-
-          console.log('✅ DPI Trasero guardado:', docTrasero.id);
-        }
-      });
-
-      console.log(`🎉 Documentos DPI guardados exitosamente para usuario ${userId}`);
-
-      res.status(201).json({
-        success: true,
-        message: 'Documentos de identificación subidos exitosamente',
-        data: {
-          usuarioId: userId,
-          documentos: documentosGuardados,
-          totalDocumentos: documentosGuardados.length
-        }
-      });
-
-    } catch (error) {
-      console.error('[CLIENTS] Error subiendo documentos DPI:', error);
-      res.status(500).json({
+    if (!esPropio && !esEvaluadorOAdmin) {
+      return res.status(403).json({
         success: false,
-        message: error.message || 'Error al subir documentos de identificación',
-        error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        message: 'No tienes permiso para subir documentos de este usuario'
       });
     }
+
+    // Validar que se enviaron archivos
+    if (!req.files) {
+      console.log('[CLIENTS] ERROR: No se recibieron archivos en req.files');
+      return res.status(400).json({
+        success: false,
+        message: 'No se recibieron archivos. Verifica que estés enviando el formulario correctamente.'
+      });
+    }
+
+    const { dpiFrontal, dpiTrasero } = req.files;
+
+    if (!dpiFrontal && !dpiTrasero) {
+      console.log('[CLIENTS] ERROR: Faltan archivos dpiFrontal y dpiTrasero');
+      return res.status(400).json({
+        success: false,
+        message: 'Debes enviar al menos una foto del DPI (dpiFrontal o dpiTrasero)'
+      });
+    }
+
+    // Verificar que el usuario existe
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        cedula: true
+      }
+    });
+
+    if (!usuario) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    console.log('[CLIENTS] Usuario encontrado:', usuario.nombre, usuario.apellido);
+
+    // Crear directorio si no existe
+    const uploadDir = path.join(process.cwd(), 'uploads', 'clientes', 'dpi');
+    await fs.mkdir(uploadDir, { recursive: true });
+    console.log('[CLIENTS] Directorio de upload verificado:', uploadDir);
+
+    const documentosGuardados = [];
+
+    // Procesar DPI Frontal
+    if (dpiFrontal) {
+      console.log('[CLIENTS] Procesando DPI Frontal:', dpiFrontal.name, '|', dpiFrontal.size, 'bytes');
+      
+      // Validar tipo MIME
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(dpiFrontal.mimetype)) {
+        return res.status(400).json({
+          success: false,
+          message: 'DPI Frontal: Solo se permiten imágenes JPG, PNG o WebP'
+        });
+      }
+
+      // Validar tamaño (10MB)
+      if (dpiFrontal.size > 10 * 1024 * 1024) {
+        return res.status(400).json({
+          success: false,
+          message: 'DPI Frontal: El archivo no debe exceder 10MB'
+        });
+      }
+
+      // Generar nombre único
+      const timestamp = Date.now();
+      const extension = path.extname(dpiFrontal.name);
+      const dpiFrontalName = `dpi-frontal-${userId}-${timestamp}${extension}`;
+      dpiFrontalPath = path.join(uploadDir, dpiFrontalName);
+
+      // Mover archivo usando express-fileupload
+      console.log('[CLIENTS] Guardando DPI Frontal en:', dpiFrontalPath);
+      await dpiFrontal.mv(dpiFrontalPath);
+      console.log('[CLIENTS] DPI Frontal guardado exitosamente');
+
+      // Guardar en base de datos
+      const docFrontal = await prisma.documento.create({
+        data: {
+          tipoDocumento: 'Identificacion',
+          nombreArchivo: dpiFrontalName,
+          rutaArchivo: `/uploads/clientes/dpi/${dpiFrontalName}`,
+          idRelacionado: userId,
+          tipoRelacion: 'Usuario',
+          tamanoArchivo: BigInt(dpiFrontal.size),
+          tipoMime: dpiFrontal.mimetype
+        }
+      });
+
+      documentosGuardados.push({
+        tipo: 'frontal',
+        id: docFrontal.id,
+        nombreArchivo: docFrontal.nombreArchivo,
+        rutaArchivo: docFrontal.rutaArchivo,
+        tamaño: dpiFrontal.size
+      });
+
+      console.log('[CLIENTS] Registro de DPI Frontal creado con ID:', docFrontal.id);
+    }
+
+    // Procesar DPI Trasero
+    if (dpiTrasero) {
+      console.log('[CLIENTS] Procesando DPI Trasero:', dpiTrasero.name, '|', dpiTrasero.size, 'bytes');
+      
+      // Validar tipo MIME
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(dpiTrasero.mimetype)) {
+        // Limpiar archivo frontal si ya se guardó
+        if (dpiFrontalPath) {
+          await fs.unlink(dpiFrontalPath).catch(() => {});
+        }
+        return res.status(400).json({
+          success: false,
+          message: 'DPI Trasero: Solo se permiten imágenes JPG, PNG o WebP'
+        });
+      }
+
+      // Validar tamaño (10MB)
+      if (dpiTrasero.size > 10 * 1024 * 1024) {
+        // Limpiar archivo frontal si ya se guardó
+        if (dpiFrontalPath) {
+          await fs.unlink(dpiFrontalPath).catch(() => {});
+        }
+        return res.status(400).json({
+          success: false,
+          message: 'DPI Trasero: El archivo no debe exceder 10MB'
+        });
+      }
+
+      // Generar nombre único
+      const timestamp = Date.now();
+      const extension = path.extname(dpiTrasero.name);
+      const dpiTraseroName = `dpi-trasero-${userId}-${timestamp}${extension}`;
+      dpiTraseroPath = path.join(uploadDir, dpiTraseroName);
+
+      // Mover archivo usando express-fileupload
+      console.log('[CLIENTS] Guardando DPI Trasero en:', dpiTraseroPath);
+      await dpiTrasero.mv(dpiTraseroPath);
+      console.log('[CLIENTS] DPI Trasero guardado exitosamente');
+
+      // Guardar en base de datos
+      const docTrasero = await prisma.documento.create({
+        data: {
+          tipoDocumento: 'Identificacion',
+          nombreArchivo: dpiTraseroName,
+          rutaArchivo: `/uploads/clientes/dpi/${dpiTraseroName}`,
+          idRelacionado: userId,
+          tipoRelacion: 'Usuario',
+          tamanoArchivo: BigInt(dpiTrasero.size),
+          tipoMime: dpiTrasero.mimetype
+        }
+      });
+
+      documentosGuardados.push({
+        tipo: 'trasero',
+        id: docTrasero.id,
+        nombreArchivo: docTrasero.nombreArchivo,
+        rutaArchivo: docTrasero.rutaArchivo,
+        tamaño: dpiTrasero.size
+      });
+
+      console.log('[CLIENTS] Registro de DPI Trasero creado con ID:', docTrasero.id);
+    }
+
+    // Crear log de auditoría
+    try {
+      await prisma.auditLog.create({
+        data: {
+          usuarioId: req.user.id,
+          accion: 'CREAR',
+          tabla: 'documento',
+          descripcion: `Documentos DPI subidos para cliente ${userId}`,
+          detalles: JSON.stringify({
+            clienteId: userId,
+            documentos: documentosGuardados.map(d => d.nombreArchivo)
+          })
+        }
+      });
+    } catch (auditError) {
+      console.error('[CLIENTS] Error creando audit log:', auditError);
+      // No fallar la operación si el audit log falla
+    }
+
+    console.log(`[CLIENTS] Proceso completado exitosamente. Total documentos: ${documentosGuardados.length}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Documentos de identificación subidos exitosamente',
+      data: {
+        usuarioId: userId,
+        documentos: documentosGuardados,
+        totalDocumentos: documentosGuardados.length
+      }
+    });
+
+  } catch (error) {
+    console.error('[CLIENTS] ERROR subiendo documentos DPI:', error);
+    console.error('[CLIENTS] Stack trace:', error.stack);
+
+    // Limpiar archivos en caso de error
+    if (dpiFrontalPath) {
+      await fs.unlink(dpiFrontalPath).catch(err => 
+        console.error('[CLIENTS] Error eliminando archivo frontal:', err)
+      );
+    }
+    if (dpiTraseroPath) {
+      await fs.unlink(dpiTraseroPath).catch(err => 
+        console.error('[CLIENTS] Error eliminando archivo trasero:', err)
+      );
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error al subir documentos de identificación',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
-);
+});
 
 /**
  * GET /api/clients/:id/documentos-identificacion
@@ -883,14 +973,17 @@ router.delete('/:id/documentos-identificacion/:docId', authenticateToken, async 
     }
 
     // Eliminar archivo físico
-    await uploadService.eliminarArchivo(documento.rutaArchivo);
+    const rutaCompleta = path.join(process.cwd(), documento.rutaArchivo);
+    await fs.unlink(rutaCompleta).catch(err => {
+      console.error('[CLIENTS] Error eliminando archivo físico:', err);
+    });
 
     // Eliminar registro de BD
     await prisma.documento.delete({
       where: { id: documentoId }
     });
 
-    console.log('✅ Documento DPI eliminado exitosamente');
+    console.log('[CLIENTS] Documento DPI eliminado exitosamente');
 
     res.status(200).json({
       success: true,

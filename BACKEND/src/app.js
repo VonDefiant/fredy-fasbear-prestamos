@@ -103,7 +103,7 @@ app.use(fileUpload({
   debug: process.env.NODE_ENV ,
   abortOnLimit: true,
   responseOnLimit: 'El archivo es muy grande. Máximo 10MB permitido.',
-  uploadTimeout: 60000, // 60 segundos timeout
+  uploadTimeout: 120000, // 120 segundos timeout
   safeFileNames: true,
   preserveExtension: true
 }));
