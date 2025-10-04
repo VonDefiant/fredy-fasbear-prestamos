@@ -14,7 +14,7 @@ import auditLogsRoutes from './audit-logs.routes.js';
 import backupsRoutes from './backups.routes.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import evaluadorRoutes from './evaluador.routes.js';
-
+import contratosRoutes from './contratos.routes.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -36,6 +36,7 @@ router.use('/system-reports', systemReportsRoutes);
 router.use('/audit-logs', auditLogsRoutes);
 router.use('/admin/backups', authenticateToken, requireAdmin, backupsRoutes);
 router.use('/evaluador', evaluadorRoutes);
+router.use('/contratos', contratosRoutes);
 
 router.get('/health', async (req, res) => {
   try {

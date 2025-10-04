@@ -178,4 +178,23 @@ export const requireStaff = (req, res, next) => {
   next();
 };
 
+export const requireRole = (rolesPermitidos) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'No autenticado'
+      });
+    }
+
+    if (!rolesPermitidos.includes(req.user.tipoUsuario)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para realizar esta acción'
+      });
+    }
+
+    next();
+  };
+};
 export default authenticateToken;

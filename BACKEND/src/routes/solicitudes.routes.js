@@ -197,9 +197,9 @@ router.post('/',
       marca,
       modelo,
       especificacionesTecnicas,
-      montoSolicitado,      // ✨ NUEVO
-      plazoMeses,           // ✨ NUEVO  
-      modalidadPago,        // ✨ NUEVO
+      montoSolicitado,    
+      plazoMeses,           
+      modalidadPago,        
       aceptaTerminos
     } = req.body;
 
@@ -208,9 +208,9 @@ router.post('/',
       tipoArticulo,
       descripcion: descripcion?.substring(0, 50) + '...',
       valorEstimado,
-      montoSolicitado,      // ✨ NUEVO
-      plazoMeses,           // ✨ NUEVO
-      modalidadPago         // ✨ NUEVO
+      montoSolicitado,     
+      plazoMeses,
+      modalidadPago 
     });
 
     try {
